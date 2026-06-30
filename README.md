@@ -30,7 +30,7 @@ The system supports inventory tracking across UIRI Nakawa and Namanve campuses, 
 ## Default Test Account
 
 Username: admin  
-Password: Admin@1234
+Password: xxxxxxx
 
 This account is for testing only and must be changed before any real deployment.
 
