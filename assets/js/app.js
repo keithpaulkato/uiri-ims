@@ -190,7 +190,66 @@ document.addEventListener('DOMContentLoaded', function () {
             offset: 120,
         });
     }
+
+    restoreSidebarWidth();
+    initializeSidebarResizer();
 });
+
+function applySidebarWidth(width) {
+    const mainWrapper = document.querySelector('.main-wrapper');
+    document.documentElement.style.setProperty('--sidebar-w', width);
+    if (mainWrapper) {
+        mainWrapper.style.marginLeft = width;
+    }
+}
+
+function persistSidebarWidth(width) {
+    localStorage.setItem('uiri-sidebar-width', width);
+}
+
+function restoreSidebarWidth() {
+    const stored = localStorage.getItem('uiri-sidebar-width');
+    if (stored) {
+        applySidebarWidth(stored);
+    }
+}
+
+function initializeSidebarResizer() {
+    const sidebar = document.getElementById('sidebar');
+    const resizer = document.getElementById('sidebarResizer');
+    if (!sidebar || !resizer) return;
+
+    let startX = 0;
+    let startWidth = 0;
+
+    const minWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-min-w'), 10);
+    const maxWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-max-w'), 10);
+
+    function onPointerMove(e) {
+        const delta = e.clientX - startX;
+        let newWidth = startWidth + delta;
+        newWidth = Math.min(Math.max(newWidth, minWidth), maxWidth);
+        applySidebarWidth(`${newWidth}px`);
+    }
+
+    function onPointerUp() {
+        document.body.style.cursor = '';
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        persistSidebarWidth(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim());
+    }
+
+    resizer.addEventListener('pointerdown', function (e) {
+        if (e.pointerType === 'mouse' || e.pointerType === 'touch' || e.pointerType === 'pen') {
+            e.preventDefault();
+            startX = e.clientX;
+            startWidth = parseInt(getComputedStyle(sidebar).width, 10);
+            document.body.style.cursor = 'ew-resize';
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+        }
+    });
+}
 
 function toggleSidebar(force) {
     const sidebar = document.getElementById('sidebar');
@@ -207,6 +266,12 @@ function toggleSidebar(force) {
 
     if (mainWrapper) {
         mainWrapper.classList.toggle('sidebar-collapsed', isDesktop && !shouldOpen);
+        if (shouldOpen) {
+            const width = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
+            mainWrapper.style.marginLeft = width;
+        } else {
+            mainWrapper.style.marginLeft = '0';
+        }
     }
 
     if (overlay) {
