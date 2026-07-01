@@ -26,7 +26,7 @@ return new class extends Migration
             $table->foreignId('section_id')->nullable();
             $table->foreignId('department_id')->nullable();
             $table->foreignId('role_id')->nullable();
-            $table->string('name');
+            $table->string('full_name', 150);
             $table->string('email')->unique();
             $table->string('username', 80)->unique();
             $table->timestamp('email_verified_at')->nullable();
@@ -40,7 +40,7 @@ return new class extends Migration
             $table->dateTime('last_login_attempt')->nullable();
             $table->string('password_reset_token')->nullable();
             $table->dateTime('token_expiry')->nullable();
-            $table->rememberToken();
+            $table->string('remember_token', 255)->nullable();
             $table->timestamps();
         });
 
