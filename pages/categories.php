@@ -2,44 +2,103 @@
 require_once __DIR__ . '/../includes/config.php';
 requireLogin();
 $pageTitle = 'Categories'; $activePage = 'categories';
-$canManage = hasRole('Administrator','Store Manager'); $pdo = db();
+$user = currentUser();
+$branchId = $user['branch_id'];
+$isAdmin = hasRole('Administrator');
+$canManage = hasRole('Administrator','Store Manager');
+$pdo = db();
+
+$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name")->fetchAll();
+$branchFilter = $isAdmin ? (int)($_GET['branch'] ?? $branchId) : $branchId;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $action = $_POST['action']??'';
     $id = (int)($_POST['cat_id']??0);
-    $name = trim($_POST['name']??''); $desc = trim($_POST['description']??'');
+    $name = trim($_POST['name']??'');
+    $desc = trim($_POST['description']??'');
+    $categoryBranch = $isAdmin ? (int)($_POST['branch_id'] ?? $branchFilter) : $branchId;
+    if (!$categoryBranch) {
+        $categoryBranch = $branchId;
+    }
+
     if ($action==='add'||$action==='edit') {
-        if (!$name) { setFlash('error','Category name is required.'); }
-        elseif ($action==='add') {
-            $pdo->prepare("INSERT INTO categories (name,description) VALUES (?,?)")->execute([$name,$desc]);
-            setFlash('success',"Category '$name' added.");
+        if (!$name) {
+            setFlash('error','Category name is required.');
         } else {
-            $pdo->prepare("UPDATE categories SET name=?,description=? WHERE id=?")->execute([$name,$desc,$id]);
-            setFlash('success',"Category '$name' updated.");
+            $duplicateCheck = $pdo->prepare("SELECT COUNT(*) FROM categories WHERE branch_id = ? AND name = ?" . ($action==='edit' ? " AND id <> ?" : ""));
+            $dupParams = [$categoryBranch, $name];
+            if ($action==='edit') { $dupParams[] = $id; }
+            $duplicateCheck->execute($dupParams);
+            if ($duplicateCheck->fetchColumn() > 0) {
+                setFlash('error', "Category '$name' already exists for the selected branch.");
+            } else {
+                if ($action==='add') {
+                    $stmt = $pdo->prepare("INSERT INTO categories (branch_id, name, description) VALUES (?,?,?)");
+                    $stmt->execute([$categoryBranch, $name, $desc]);
+                    setFlash('success',"Category '$name' added.");
+                } else {
+                    $stmt = $pdo->prepare("UPDATE categories SET branch_id=?, name=?, description=? WHERE id=?");
+                    $stmt->execute([$categoryBranch, $name, $desc, $id]);
+                    setFlash('success',"Category '$name' updated.");
+                }
+            }
         }
     }
     if ($action==='delete') {
         $used = $pdo->prepare("SELECT COUNT(*) FROM inventory_items WHERE category_id=? AND is_active=1");
         $used->execute([$id]);
-        if ($used->fetchColumn()>0) { setFlash('error','Cannot delete — category has active items.'); }
-        else { $pdo->prepare("DELETE FROM categories WHERE id=?")->execute([$id]); setFlash('success','Category deleted.'); }
+        if ($used->fetchColumn()>0) {
+            setFlash('error','Cannot delete — category has active items.');
+        } else {
+            $pdo->prepare("DELETE FROM categories WHERE id=?")->execute([$id]);
+            setFlash('success','Category deleted.');
+        }
     }
-    header('Location: categories.php'); exit;
+    header('Location: categories.php' . ($isAdmin ? '?branch=' . $branchFilter : ''));
+    exit;
 }
 
-$categories = $pdo->query("SELECT c.*,(SELECT COUNT(*) FROM inventory_items WHERE category_id=c.id AND is_active=1) AS item_count FROM categories c ORDER BY c.name")->fetchAll();
+$categoryWhere = "WHERE c.branch_id = ?";
+$categoriesStmt = $pdo->prepare("SELECT c.*,(SELECT COUNT(*) FROM inventory_items WHERE category_id=c.id AND is_active=1) AS item_count FROM categories c $categoryWhere ORDER BY c.name");
+$categoriesStmt->execute([$branchFilter]);
+$categories = $categoriesStmt->fetchAll();
 $editCat = null;
-if (isset($_GET['edit'])) { $es=$pdo->prepare("SELECT * FROM categories WHERE id=?"); $es->execute([(int)$_GET['edit']]); $editCat=$es->fetch(); }
+if (isset($_GET['edit'])) {
+    $es = $pdo->prepare("SELECT * FROM categories WHERE id=?");
+    $es->execute([(int)$_GET['edit']]);
+    $editCat = $es->fetch();
+}
 
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">Categories</h1><p class="page-sub"><?= count($categories) ?> categories</p></div>
+    <div>
+        <h1 class="page-title">Categories</h1>
+        <p class="page-sub"><?= count($categories) ?> categories for <?= clean($branches[array_search($branchFilter, array_column($branches,'id'))]['name'] ?? ($_SESSION['user']['branch_name'] ?? 'Current Branch')) ?></p>
+    </div>
     <?php if ($canManage): ?>
-    <div class="page-actions"><button class="btn btn-primary" onclick="openModal('catModal')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Category</button></div>
+    <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('catModal')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Category</button>
+    </div>
     <?php endif; ?>
 </div>
+<?php if ($isAdmin): ?>
+<div class="card filter-bar">
+    <form method="GET" class="filter-form">
+        <div class="filter-group">
+            <select name="branch" onchange="this.form.submit()">
+                <?php foreach ($branches as $b): ?>
+                <option value="<?= $b['id'] ?>" <?= $b['id']==$branchFilter ? 'selected' : '' ?>><?= clean($b['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <button type="submit" class="btn btn-secondary">View Branch Categories</button>
+        </div>
+    </form>
+</div>
+<?php endif; ?>
 <div class="card">
     <div class="card-body p0">
         <table class="data-table">
@@ -82,7 +141,22 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="action" value="<?= $editCat?'edit':'add' ?>">
             <?php if ($editCat): ?><input type="hidden" name="cat_id" value="<?= $editCat['id'] ?>"><?php endif; ?>
             <div class="modal-body">
-                <div class="form-group"><label>Category Name *</label><input type="text" name="name" required value="<?= clean($editCat['name']??'') ?>" placeholder="e.g. ICT Equipment"></div>
+                <div class="form-group">
+                    <label>Category Name *</label>
+                    <input type="text" name="name" required value="<?= clean($editCat['name']??'') ?>" placeholder="e.g. ICT Equipment">
+                </div>
+                <?php if ($isAdmin): ?>
+                <div class="form-group">
+                    <label>Branch *</label>
+                    <select name="branch_id" required>
+                        <?php foreach ($branches as $b): ?>
+                        <option value="<?= $b['id'] ?>" <?= ($editCat['branch_id']??$branchFilter)==$b['id'] ? 'selected' : '' ?>><?= clean($b['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php else: ?>
+                <input type="hidden" name="branch_id" value="<?= $branchId ?>">
+                <?php endif; ?>
                 <div class="form-group"><label>Description</label><textarea name="description" rows="3" placeholder="Brief description…"><?= clean($editCat['description']??'') ?></textarea></div>
             </div>
             <div class="modal-footer">

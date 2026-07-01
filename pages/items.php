@@ -73,6 +73,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sectionId = $depRow['section_id'];
                 }
             }
+
+            if ($categoryId) {
+                $pc = $pdo->prepare("SELECT branch_id FROM categories WHERE id=?");
+                $pc->execute([$categoryId]);
+                $catRow = $pc->fetch();
+                if (!$catRow) {
+                    setFlash('error', 'Invalid category selected.');
+                    header('Location: items.php'); exit;
+                }
+                if ($catRow['branch_id'] != $itemBranch) {
+                    setFlash('error', 'Selected category does not belong to the chosen campus.');
+                    header('Location: items.php'); exit;
+                }
+            }
         if ($action === 'add') {
                 $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,description,unit,unit_price,minimum_stock,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$description,$unit,$unitPrice,$minStock,$imageName,$user['id']]);
@@ -124,9 +138,22 @@ $stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS su
 $stmt->execute($params);
 $items = $stmt->fetchAll();
 
-$categories = $pdo->query("SELECT * FROM categories ORDER BY name")->fetchAll();
 $suppliers  = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $branches   = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
+$filterCategoriesStmt = $pdo->prepare("SELECT * FROM categories" . ($isAdmin && $branchFilter ? " WHERE branch_id = ?" : "") . " ORDER BY name");
+if ($isAdmin && $branchFilter) {
+    $filterCategoriesStmt->execute([$branchFilter]);
+} else {
+    $filterCategoriesStmt->execute();
+}
+$filterCategories = $filterCategoriesStmt->fetchAll();
+if ($isAdmin) {
+    $categories = $pdo->query("SELECT * FROM categories ORDER BY branch_id, name")->fetchAll();
+} else {
+    $categories = $pdo->prepare("SELECT * FROM categories WHERE branch_id = ? ORDER BY name");
+    $categories->execute([$branchId]);
+    $categories = $categories->fetchAll();
+}
 $sections = $pdo->prepare("SELECT s.id, s.name, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id=b.id WHERE s.is_active=1" . (!$isAdmin ? " AND s.branch_id = ?" : "") . " ORDER BY b.name, s.name");
 $sections->execute(!$isAdmin ? [$branchId] : []);
 $sections = $sections->fetchAll();
@@ -169,8 +196,8 @@ include __DIR__ . '/../includes/header.php';
         <div class="filter-group">
             <select name="category">
                 <option value="">All Categories</option>
-                <?php foreach ($categories as $c): ?>
-                <option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>><?= clean($c['name']) ?></option>
+                <?php foreach ($filterCategories as $c): ?>
+                <option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -342,7 +369,7 @@ include __DIR__ . '/../includes/header.php';
                                             <select name="category_id" id="previewCategoryInput" required>
                                                 <option value="">Select category</option>
                                                 <?php foreach ($categories as $c): ?>
-                                                <option value="<?= $c['id'] ?>" <?= ($editItem['category_id']??0)==$c['id']?'selected':'' ?>><?= clean($c['name']) ?></option>
+                                                <option value="<?= $c['id'] ?>" data-branch="<?= $c['branch_id'] ?>" <?= ($editItem['category_id']??0)==$c['id']?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
@@ -641,6 +668,20 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function filterCategoryOptions() {
+        const branchSelect = document.getElementById('previewBranchInput');
+        const categorySelect = document.getElementById('previewCategoryInput');
+        if (!categorySelect) return;
+        const branchId = branchSelect?.value || '';
+        Array.from(categorySelect.options).forEach(option => {
+            if (!option.value) { option.style.display = ''; return; }
+            option.style.display = !branchId || option.dataset.branch === branchId ? '' : 'none';
+        });
+        if (categorySelect.selectedOptions[0] && categorySelect.selectedOptions[0].style.display === 'none') {
+            categorySelect.value = '';
+        }
+    }
+
     ['input', 'change'].forEach(eventName => {
         document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewMinStockInput, #previewPriceInput, #previewAssetCodeInput, #previewQrCodeInput').forEach(el => {
             el.addEventListener(eventName, updatePreview);
@@ -649,6 +690,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('previewBranchInput')?.addEventListener('change', function () {
         filterSectionOptions();
+        filterCategoryOptions();
         filterDepartmentOptions();
         updatePreview();
     });
@@ -659,6 +701,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     filterSectionOptions();
+    filterCategoryOptions();
     filterDepartmentOptions();
     updatePreview();
 });

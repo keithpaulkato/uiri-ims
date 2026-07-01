@@ -43,7 +43,17 @@ if ($statusFilter === 'low_stock') {
 }
 
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
-$categories = $pdo->query("SELECT * FROM categories ORDER BY name")->fetchAll();
+if (!$isAdmin) {
+    $categories = $pdo->prepare("SELECT * FROM categories WHERE branch_id = ? ORDER BY name");
+    $categories->execute([$branchId]);
+    $categories = $categories->fetchAll();
+} elseif ($branchFilter) {
+    $categories = $pdo->prepare("SELECT * FROM categories WHERE branch_id = ? ORDER BY name");
+    $categories->execute([$branchFilter]);
+    $categories = $categories->fetchAll();
+} else {
+    $categories = $pdo->query("SELECT * FROM categories ORDER BY branch_id, name")->fetchAll();
+}
 $sections = $pdo->query("SELECT * FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
 $departments = $pdo->query("SELECT d.*, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
 $suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
@@ -224,7 +234,7 @@ include __DIR__ . '/../includes/header.php';
             <label for="categorySelect" class="form-label">Category</label>
             <select id="categorySelect" name="category" class="form-control">
                 <option value="">All Categories</option>
-                <?php foreach ($categories as $c): ?><option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>><?= clean($c['name']) ?></option><?php endforeach; ?>
+                <?php foreach ($categories as $c): ?><option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin && !$branchFilter ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option><?php endforeach; ?>
             </select>
         </div>
         <?php endif; ?>

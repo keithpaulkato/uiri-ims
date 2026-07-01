@@ -37,7 +37,7 @@ CREATE TABLE sections (
     description TEXT,
     is_active TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE 
 );
 
 INSERT INTO sections (branch_id, name, code, description) VALUES
@@ -124,9 +124,12 @@ CREATE TABLE departments (
 -- ------------------------------------------------------------
 CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    branch_id INT NOT NULL DEFAULT 1,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    UNIQUE KEY ux_categories_branch_name (branch_id, name)
 );
 
 -- ------------------------------------------------------------
