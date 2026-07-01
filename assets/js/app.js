@@ -181,6 +181,17 @@ document.addEventListener('DOMContentLoaded', function () {
             const isFs = !!document.fullscreenElement;
             document.body.classList.toggle('is-fullscreen', isFs);
             fullscreenBtn.textContent = isFs ? '⤫ Exit Full Screen' : '⤢ Full Screen';
+
+            // When exiting fullscreen, ensure the sidebar is visible again on desktop
+            if (!isFs) {
+                try {
+                    // Re-apply stored sidebar width and open it
+                    restoreSidebarWidth();
+                    toggleSidebar(true);
+                } catch (err) {
+                    // ignore if functions not available for some pages
+                }
+            }
         });
     }
 
