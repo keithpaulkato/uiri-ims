@@ -233,7 +233,7 @@ $flash = getFlash();
                     <label for="password">Password</label>
                     <div class="input-wrap">
                         <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                        <input type="password" id="password" name="password" placeholder="ICON | Enter your password" required autocomplete="current-password">
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
                         <button type="button" class="toggle-password" onclick="togglePwd(this)" aria-label="Show password">
                             <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
