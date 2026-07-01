@@ -13,10 +13,33 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            // branch_id/role_id are NOT NULL in database.sql, but branches/roles
+            // are seeded via application logic (not migrations) in this rebuild,
+            // so they are left nullable here to keep `migrate:fresh` runnable
+            // without seed data. This file keeps Laravel's fixed
+            // 0001_01_01_000000 timestamp (so it still runs first, alongside
+            // password_reset_tokens/sessions), which means it runs BEFORE the
+            // 2026_07_01_* branches/sections/departments/roles migrations.
+            // Left as plain nullable foreign id columns without ->constrained()
+            // to avoid migration ordering failures, per task instructions.
+            $table->foreignId('branch_id')->nullable();
+            $table->foreignId('section_id')->nullable();
+            $table->foreignId('department_id')->nullable();
+            $table->foreignId('role_id')->nullable();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('username', 80)->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->string('role')->default('Staff');
+            $table->string('phone', 20)->nullable();
+            $table->string('profile_photo')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->dateTime('last_login')->nullable();
+            $table->integer('failed_login_attempts')->default(0);
+            $table->dateTime('last_login_attempt')->nullable();
+            $table->string('password_reset_token')->nullable();
+            $table->dateTime('token_expiry')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
