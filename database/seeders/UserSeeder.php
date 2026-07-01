@@ -16,10 +16,11 @@ class UserSeeder extends Seeder
      * project spec instead lists both as Store Managers, so this seeder
      * follows the spec and assigns them the 'Store Manager' role/role_id.
      *
-     * Users do not get assignRole() called on them here — the User model
-     * does not yet use the Spatie HasRoles trait (that lands in Task 7).
-     * Instead we set the legacy `role` (string) and `role_id` columns
-     * directly, matching the pre-Spatie users table shape.
+     * Users also get syncRoles() called on them so the Spatie HasRoles
+     * trait (added to the User model in Task 7) recognizes their role,
+     * in addition to the legacy `role` (string) and `role_id` columns
+     * which are kept for backwards compatibility with the pre-Spatie
+     * users table shape.
      */
     public function run(): void
     {
@@ -53,7 +54,7 @@ class UserSeeder extends Seeder
         foreach ($users as $user) {
             $role = Role::where('name', $user['role'])->where('guard_name', 'web')->firstOrFail();
 
-            User::firstOrCreate(
+            $createdUser = User::firstOrCreate(
                 ['username' => $user['username']],
                 [
                     'full_name' => $user['full_name'],
@@ -69,6 +70,8 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
+
+            $createdUser->syncRoles([$user['role']]);
         }
     }
 }
