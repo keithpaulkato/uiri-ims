@@ -112,6 +112,15 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 @media (max-width: 768px) {
   .sidebar-resizer { display: none; }
 }
+
+/* Fullscreen mode adjustments: hide sidebar and expand main area */
+body.is-fullscreen .sidebar { display: none !important; }
+body.is-fullscreen .sidebar-overlay { display: none !important; }
+body.is-fullscreen .main-wrapper { margin-left: 0 !important; }
+body.is-fullscreen .topnav { position: fixed; left: 0; right: 0; z-index: 500; }
+body.is-fullscreen .fab { right: 28px; bottom: 28px; }
+body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
+
 .branch-switcher { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
 .branch-switcher label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--corp-blue); display: block; margin-bottom: 6px; }
 .branch-switcher select { width: 100%; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); color: var(--gold); padding: 7px 10px; border-radius: 6px; font-size: .82rem; cursor: pointer; }
@@ -119,10 +128,18 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .branch-switcher select:focus { color: var(--gold); }
 .branch-badge { padding: 10px 16px; font-size: .82rem; color: var(--corp-blue); display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
 .branch-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
-.branch-badge em { color: rgba(255,255,255,.35); font-style: normal; }
+.branch-badge em { color: rgba(14,122,176,.65); font-style: normal; }
 .sidebar-nav { flex: 1; padding: 8px 0; }
 .sidebar-nav ul { list-style: none; }
 .nav-section { padding: 14px 20px 4px; font-size: .65rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--corp-blue); font-weight: 600; }
+
+/* Ensure sidebar headings use corporate blue even if overridden elsewhere */
+.sidebar .nav-section,
+.sidebar .branch-switcher label,
+.sidebar .branch-badge,
+.sidebar .branch-badge em {
+  color: var(--corp-blue) !important;
+}
 .sidebar-nav li a { display: flex; align-items: center; gap: 11px; padding: 9px 14px; margin: 2px 12px; color: var(--gold); font-size: .875rem; font-weight: 500; transition: all .2s ease; border-left: 3px solid transparent; border-radius: 10px; }
 .sidebar-nav li a:hover { background: rgba(255,255,255,.08); color: var(--gold); border-left-color: rgba(201,162,39,.5); }
 .sidebar-nav li.active a { background: rgba(201,162,39,.12); color: var(--gold); border-left-color: var(--gold); font-weight: 600; }

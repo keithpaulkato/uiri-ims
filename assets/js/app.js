@@ -161,11 +161,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const fullscreenBtn = document.getElementById('fullscreenDashboard');
     if (fullscreenBtn) {
         fullscreenBtn.addEventListener('click', function () {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen?.();
-            } else {
-                document.exitFullscreen?.();
+            try {
+                if (!document.fullscreenElement) {
+                    // Request fullscreen on the documentElement (entire page)
+                    const req = document.documentElement.requestFullscreen?.();
+                    if (req && req.catch) req.catch(() => {});
+                } else {
+                    const exit = document.exitFullscreen?.();
+                    if (exit && exit.catch) exit.catch(() => {});
+                }
+            } catch (err) {
+                // Fallback: toggle a CSS-only fullscreen class
+                document.body.classList.toggle('is-fullscreen');
             }
+        });
+
+        // Reflect state changes from the browser's fullscreen API
+        document.addEventListener('fullscreenchange', function () {
+            const isFs = !!document.fullscreenElement;
+            document.body.classList.toggle('is-fullscreen', isFs);
+            fullscreenBtn.textContent = isFs ? '⤫ Exit Full Screen' : '⤢ Full Screen';
         });
     }
 
