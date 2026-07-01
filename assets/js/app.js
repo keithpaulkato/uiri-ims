@@ -292,7 +292,7 @@ document.addEventListener('click', function (e) {
     }
 });
 
-document.addEventListener('resize', function () {
+window.addEventListener('resize', function () {
     if (window.innerWidth > 768) {
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebarOverlay');

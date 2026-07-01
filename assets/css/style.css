@@ -104,9 +104,10 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .sidebar-close { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.28); border-radius: 10px; background: rgba(255,255,255,.22); color: rgba(15, 63, 101,.9); cursor: pointer; transition: all .2s ease; flex-shrink: 0; }
 .sidebar-close:hover { background: rgba(255,255,255,.36); color: #064b7c; border-color: rgba(255,255,255,.48); transform: rotate(90deg); }
 .sidebar-close svg { width: 16px; height: 16px; }
-.sidebar-resizer { position: absolute; top: 0; right: 0; bottom: 0; width: 18px; cursor: ew-resize; z-index: 210; touch-action: none; }
-.sidebar-resizer::before { content: ''; position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 2px; height: 120px; background: rgba(255,255,255,.35); border-radius: 999px; box-shadow: 0 0 0 4px rgba(255,255,255,.05); }
-.sidebar-resizer:hover::before { background: rgba(255,255,255,.75); }
+.sidebar-resizer { position: absolute; top: 0; right: -11px; bottom: 0; width: 22px; cursor: ew-resize; z-index: 210; touch-action: none; background: rgba(255,255,255,.08); border-left: 1px solid rgba(255,255,255,.18); user-select: none; }
+.sidebar-resizer::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 4px; height: 140px; background: rgba(255,255,255,.45); border-radius: 999px; box-shadow: 0 0 0 4px rgba(255,255,255,.05); }
+.sidebar-resizer:hover { background: rgba(255,255,255,.14); }
+.sidebar-resizer:hover::before { background: rgba(255,255,255,.95); }
 @media (max-width: 768px) {
   .sidebar-resizer { display: none; }
 }
