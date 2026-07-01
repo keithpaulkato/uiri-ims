@@ -7,9 +7,22 @@ use Illuminate\Database\Eloquent\Model;
 class Section extends Model
 {
     /**
-     * The attributes that aren't mass assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array<string>|bool
+     * @var array<int, string>
      */
-    protected $guarded = [];
+    protected $fillable = [
+        'branch_id',
+        'name',
+        'code',
+        'description',
+        'is_active',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
 }

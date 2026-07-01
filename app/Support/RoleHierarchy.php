@@ -7,17 +7,18 @@ class RoleHierarchy
     /**
      * Role name => hierarchy level. Higher number outranks lower.
      *
-     * "Department Head" is intentionally NOT listed here — it maps to
-     * level 0, matching the original app's config.php which defined
-     * only these 5 levels.
+     * "Department Head" oversees a department, which sits under a section in
+     * the org structure (departments.section_id), so it ranks above Staff and
+     * below Section Manager. Any role not listed maps to level 0 (deny).
      *
      * @var array<string, int>
      */
     public const LEVELS = [
-        'Administrator' => 5,
-        'Campus Manager' => 4,
-        'Store Manager' => 3,
-        'Section Manager' => 2,
+        'Administrator' => 6,
+        'Campus Manager' => 5,
+        'Store Manager' => 4,
+        'Section Manager' => 3,
+        'Department Head' => 2,
         'Staff' => 1,
     ];
 

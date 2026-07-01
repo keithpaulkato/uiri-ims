@@ -9,24 +9,11 @@ class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_registration_screen_can_be_rendered(): void
+    public function test_public_registration_is_disabled(): void
     {
-        $response = $this->get('/register');
-
-        $response->assertStatus(200);
-    }
-
-    public function test_new_users_can_register(): void
-    {
-        $response = $this->post('/register', [
-            'full_name' => 'Test User',
-            'username' => 'testuser',
-            'email' => 'test@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
-        ]);
-
-        $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        // Self-registration is disabled for this internal IMS; accounts are
+        // created by administrators. Both register routes must be absent.
+        $this->get('/register')->assertNotFound();
+        $this->post('/register', [])->assertNotFound();
     }
 }
