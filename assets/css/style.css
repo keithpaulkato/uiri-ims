@@ -358,10 +358,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .input-wrap input::placeholder { color: var(--sub); }
 .input-wrap input:focus { outline: none; }
 .input-wrap:focus-within { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(41,171,226,.14); }
-.input-wrap:focus-within .input-icon { opacity: 0; visibility: hidden; }
-.computed-field { background: #f8fafc; border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 12px; font-weight: 700; color: var(--navy); font-size: .95rem; }
-
-/* MODALS */
+    .input-wrap .input-icon { opacity: 1; visibility: visible; }
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); }
 .modal { background: var(--white); border-radius: 12px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2); animation: floatIn .2s ease; }
 .modal-lg { max-width: 1080px; }

@@ -16,7 +16,7 @@
         }
         .landing-card {
             width: 100%;
-            max-width: 980px;
+            max-width: 860px;
             background: #fff;
             border-radius: 18px;
             box-shadow: 0 24px 70px rgba(16, 24, 40, .08);
@@ -24,28 +24,39 @@
         }
         .landing-hero {
             display: flex;
-            flex-wrap: wrap;
-            gap: 30px;
+            flex-direction: column;
             align-items: center;
-            padding: 40px;
+            text-align: center;
+            gap: 18px;
+            padding: 48px 40px 32px;
+        }
+        .landing-copy {
+            max-width: 720px;
+        }
+        .landing-copy img {
+            width: 84px;
+            height: auto;
+            margin-bottom: 24px;
         }
         .landing-hero h1 {
-            margin: 0 0 18px;
-            font-size: 2.8rem;
+            margin: 0;
+            font-size: 3rem;
             line-height: 1.05;
             color: #0f172a;
         }
         .landing-hero p {
-            margin: 0 0 28px;
-            max-width: 600px;
+            margin: 0;
+            max-width: 620px;
             color: #475569;
             font-size: 1rem;
-            line-height: 1.7;
+            line-height: 1.75;
         }
         .landing-actions {
             display: flex;
+            justify-content: center;
             gap: 14px;
             flex-wrap: wrap;
+            margin-top: 16px;
         }
         .landing-actions a {
             display: inline-flex;
@@ -56,6 +67,7 @@
             border-radius: 10px;
             font-weight: 600;
             text-decoration: none;
+            min-width: 140px;
         }
         .btn-primary {
             background: #0f172a;
@@ -65,24 +77,40 @@
             background: #e2e8f0;
             color: #0f172a;
         }
-        .landing-image {
-            flex: 1 1 320px;
-            min-width: 280px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .landing-footer {
+            background: #0f172a;
+            color: #fff;
+            padding: 32px 40px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 24px;
+            align-items: start;
         }
-        .landing-image img {
-            width: 100%;
-            max-width: 420px;
-            display: block;
+        .landing-footer h4 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: #f8fafc;
         }
-        @media (max-width: 800px) {
+        .landing-footer p,
+        .landing-footer a,
+        .landing-footer li {
+            margin: 0;
+            color: rgba(255,255,255,.78);
+            font-size: .92rem;
+            line-height: 1.8;
+        }
+        .landing-footer a { color: rgba(255,255,255,.9); text-decoration: none; }
+        .landing-footer ul { list-style: none; padding: 0; margin: 0; }
+        .landing-footer li { margin-bottom: 10px; }
+        @media (max-width: 820px) {
             .landing-hero {
-                padding: 28px;
+                padding: 32px 28px 24px;
             }
-            .landing-hero h1 {
-                font-size: 2.2rem;
+            .landing-footer {
+                grid-template-columns: 1fr;
+                padding: 28px 28px 32px;
             }
         }
     </style>
@@ -92,7 +120,7 @@
         <div class="landing-card">
             <div class="landing-hero">
                 <div class="landing-copy">
-                    <img src="../assets/img/uiri-logo.webp" alt="UIRI Logo" style="width:84px;height:auto;margin-bottom:24px;">
+                    <img src="../assets/img/uiri-logo.webp" alt="UIRI Logo">
                     <h1>UIRI Inventory Management</h1>
                     <p>Welcome to the UIRI Inventory Management System. Track stock, manage suppliers, handle stock movements, and view reporting for Nakawa and Namanve branches.</p>
                     <div class="landing-actions">
@@ -100,8 +128,24 @@
                         <a class="btn-secondary" href="../index.php">Launch App</a>
                     </div>
                 </div>
-                <div class="landing-image">
-                    <img src="../assets/img/uiri-logo.webp" alt="UIRI Inventory System">
+            </div>
+            <div class="landing-footer">
+                <div>
+                    <h4>About UIRI</h4>
+                    <p>Uganda Industrial Research Institute (UIRI) delivers industrial research, product development, and SME support for the Nakawa and Namanve branches.</p>
+                </div>
+                <div>
+                    <h4>Quick links</h4>
+                    <ul>
+                        <li><a href="../login.php">Sign In</a></li>
+                        <li><a href="../index.php">Launch App</a></li>
+                        <li><a href="../pages/landing.html">Landing Page</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Contact</h4>
+                    <p>Plot 42A Mukabya Road, Nakawa<br>Kampala, Uganda</p>
+                    <p>info@uiri.go.ug</p>
                 </div>
             </div>
         </div>
