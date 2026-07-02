@@ -10,6 +10,7 @@ use App\Models\Supplier;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ItemController extends Controller
@@ -86,6 +87,7 @@ class ItemController extends Controller
     public function edit(InventoryItem $item): View
     {
         $this->authorize('manage_inventory', InventoryItem::class);
+        $this->ensureSameBranch($item);
 
         return view('items.edit', [
             'item' => $item,
@@ -100,9 +102,15 @@ class ItemController extends Controller
      */
     public function update(UpdateItemRequest $request, InventoryItem $item): RedirectResponse
     {
+        $this->ensureSameBranch($item);
+
         $data = $request->validated();
 
         if ($request->hasFile('image')) {
+            // Remove the previous image so orphaned files don't accumulate.
+            if ($item->image) {
+                Storage::disk('public')->delete($item->image);
+            }
             $data['image'] = $request->file('image')->store('items', 'public');
         }
 
@@ -118,9 +126,20 @@ class ItemController extends Controller
     public function destroy(InventoryItem $item): RedirectResponse
     {
         $this->authorize('manage_inventory', InventoryItem::class);
+        $this->ensureSameBranch($item);
 
         $item->update(['is_active' => false]);
 
         return redirect()->route('items.index')->with('success', 'Item deactivated.');
+    }
+
+    /**
+     * Guard against cross-branch access (IDOR): an item may only be edited,
+     * updated, or deactivated by a user currently acting in that item's
+     * branch. Administrators reach other branches by switching first.
+     */
+    private function ensureSameBranch(InventoryItem $item): void
+    {
+        abort_unless($item->branch_id === auth()->user()->activeBranchId(), 404);
     }
 }

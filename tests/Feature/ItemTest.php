@@ -235,4 +235,41 @@ class ItemTest extends TestCase
         $response->assertSee('Low Stock Item');
         $response->assertDontSee('Healthy Stock Item');
     }
+
+    public function test_manager_cannot_edit_update_or_destroy_an_item_from_another_branch(): void
+    {
+        $category = Category::firstOrFail();
+
+        $otherBranchItem = InventoryItem::create([
+            'branch_id' => $this->branch2Id,
+            'category_id' => $category->id,
+            'item_code' => 'X-BRANCH-001',
+            'name' => 'Other Branch Item',
+            'unit_price' => 1000,
+            'current_stock' => 10,
+            'minimum_stock' => 2,
+        ]);
+
+        // A Store Manager acting in branch 1 (has manage_inventory) must not
+        // reach a branch-2 item by guessing its id.
+        $manager = User::factory()->create(['role' => 'Store Manager', 'branch_id' => $this->branch1Id]);
+
+        $this->actingAs($manager)->get(route('items.edit', $otherBranchItem))->assertNotFound();
+        $this->actingAs($manager)->put(route('items.update', $otherBranchItem), [
+            'item_code' => 'X-BRANCH-001',
+            'name' => 'Hacked Name',
+            'category_id' => $category->id,
+            'unit_price' => 1000,
+            'current_stock' => 10,
+            'minimum_stock' => 2,
+        ])->assertNotFound();
+        $this->actingAs($manager)->delete(route('items.destroy', $otherBranchItem))->assertNotFound();
+
+        // Untouched.
+        $this->assertDatabaseHas('inventory_items', [
+            'item_code' => 'X-BRANCH-001',
+            'name' => 'Other Branch Item',
+            'is_active' => true,
+        ]);
+    }
 }
