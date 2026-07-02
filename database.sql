@@ -236,6 +236,7 @@ INSERT INTO users (branch_id, role_id, full_name, email, username, password, pho
 (1, 1, 'System Administrator', 'admin@uiri.go.ug', 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '+256 700 000001'),
 (1, 2, 'John Ssemanda', 'jssemanda@uiri.go.ug', 'jssemanda', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '+256 700 000002'),
 (2, 2, 'Grace Akello', 'gakello@uiri.go.ug', 'gakello', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '+256 700 000003');
+(1, 3, 'KAMATE DEO', 'kamate@uiri.go.ug', 'kamate', 'DEO@egan', '+256 700 000004');
 
 -- DEPARTMENTS FOR NAKAWA SECTIONS
 INSERT INTO departments (section_id, name, code, manager_name, contact_email) VALUES
