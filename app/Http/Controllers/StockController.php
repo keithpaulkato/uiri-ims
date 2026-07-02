@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class StockController extends Controller
@@ -93,28 +94,33 @@ class StockController extends Controller
 
         $item = $this->findActiveBranchItem($data['item_id']);
 
-        if ($data['quantity'] > $item->current_stock) {
-            return back()->withInput()->withErrors([
-                'quantity' => 'Quantity exceeds current stock ('.$item->current_stock.' available).',
-            ]);
-        }
-
         DB::transaction(function () use ($item, $data) {
-            $item->decrement('current_stock', $data['quantity']);
+            // Lock the row and re-check against fresh committed stock so two
+            // concurrent stock-outs can't both pass a stale check and drive
+            // current_stock negative (TOCTOU).
+            $locked = InventoryItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+
+            if ($data['quantity'] > $locked->current_stock) {
+                throw ValidationException::withMessages([
+                    'quantity' => 'Quantity exceeds current stock ('.$locked->current_stock.' available).',
+                ]);
+            }
+
+            $locked->decrement('current_stock', $data['quantity']);
 
             StockTransaction::create([
-                'item_id' => $item->id,
-                'branch_id' => $item->branch_id,
+                'item_id' => $locked->id,
+                'branch_id' => $locked->branch_id,
                 'user_id' => auth()->id(),
                 'transaction_type' => 'stock_out',
                 'quantity' => $data['quantity'],
-                'unit_price' => $data['unit_price'] ?? $item->unit_price,
+                'unit_price' => $data['unit_price'] ?? $locked->unit_price,
                 'reference_number' => $data['reference_number'] ?? null,
                 'remarks' => $data['remarks'] ?? null,
                 'transaction_date' => $data['transaction_date'] ?? now()->toDateString(),
             ]);
 
-            Notification::notifyLowStock($item->fresh());
+            Notification::notifyLowStock($locked->fresh());
         });
 
         return redirect()->route('stock.out')->with('success', 'Stock out recorded.');
@@ -150,36 +156,38 @@ class StockController extends Controller
         $item = $this->findActiveBranchItem($data['item_id']);
 
         DB::transaction(function () use ($item, $data) {
-            $previous = $item->current_stock;
+            // Lock the row so the read-then-set can't lose a concurrent update.
+            $locked = InventoryItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+
+            $previous = $locked->current_stock;
             $new = $data['current_stock'];
             $delta = $new - $previous;
             $direction = $delta >= 0 ? 'increase' : 'decrease';
 
-            $item->update(['current_stock' => $new]);
+            $locked->update(['current_stock' => $new]);
 
             $remarks = trim(sprintf(
-                'Adjustment %s from %d to %d (%s).%s',
+                'Adjustment %s from %d to %d.%s',
                 $direction,
                 $previous,
                 $new,
-                $direction,
                 $data['remarks'] ? ' '.$data['remarks'] : ''
             ));
 
             StockTransaction::create([
-                'item_id' => $item->id,
-                'branch_id' => $item->branch_id,
+                'item_id' => $locked->id,
+                'branch_id' => $locked->branch_id,
                 'user_id' => auth()->id(),
                 'transaction_type' => 'adjustment',
                 'quantity' => abs($delta),
-                'unit_price' => $item->unit_price,
+                'unit_price' => $locked->unit_price,
                 'reference_number' => null,
                 'remarks' => $remarks,
                 'transaction_date' => $data['transaction_date'] ?? now()->toDateString(),
             ]);
 
             if ($delta < 0) {
-                Notification::notifyLowStock($item->fresh());
+                Notification::notifyLowStock($locked->fresh());
             }
         });
 
