@@ -75,8 +75,8 @@
                             Inventory Items
                         </a>
                     </li>
-                    <li>
-                        <a href="#">
+                    <li class="{{ request()->routeIs('categories.*') ? 'active' : '' }}">
+                        <a href="{{ route('categories.index') }}">
                             <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
                             Categories
                         </a>
@@ -109,8 +109,8 @@
                     </li>
 
                     <li class="nav-section">Management</li>
-                    <li>
-                        <a href="#">
+                    <li class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">
+                        <a href="{{ route('suppliers.index') }}">
                             <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></span>
                             Suppliers
                         </a>
