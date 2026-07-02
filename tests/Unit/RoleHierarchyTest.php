@@ -24,6 +24,12 @@ class RoleHierarchyTest extends TestCase
 
     public function test_unknown_role_is_level_zero(): void
     {
-        $this->assertSame(0, RoleHierarchy::level('Department Head'));
+        $this->assertSame(0, RoleHierarchy::level('Nonexistent Role'));
+    }
+
+    public function test_department_head_outranks_staff_but_not_section_manager(): void
+    {
+        $this->assertTrue(RoleHierarchy::isAtOrAbove('Department Head', 'Staff'));
+        $this->assertFalse(RoleHierarchy::isAtOrAbove('Department Head', 'Section Manager'));
     }
 }

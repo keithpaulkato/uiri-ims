@@ -7,9 +7,23 @@ use Illuminate\Database\Eloquent\Model;
 class Branch extends Model
 {
     /**
-     * The attributes that aren't mass assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array<string>|bool
+     * @var array<int, string>
      */
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'location',
+        'address',
+        'phone',
+        'email',
+        'is_headquarters',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_headquarters' => 'boolean',
+        ];
+    }
 }
