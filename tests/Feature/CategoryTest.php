@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Branch;
 use App\Models\Category;
+use App\Models\InventoryItem;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -82,6 +84,36 @@ class CategoryTest extends TestCase
 
         $response->assertRedirect(route('categories.index'));
         $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+    }
+
+    public function test_deleting_a_category_with_items_is_blocked(): void
+    {
+        $admin = User::factory()->create(['role' => 'Administrator']);
+        $branch = Branch::create([
+            'name' => 'Test Branch',
+            'location' => 'Test Location',
+            'address' => 'Test Address',
+            'phone' => '+256 700 000000',
+            'email' => 'test@example.com',
+            'is_headquarters' => false,
+        ]);
+        $category = Category::create(['name' => 'Machinery In Use', 'description' => 'Has items']);
+
+        InventoryItem::create([
+            'branch_id' => $branch->id,
+            'category_id' => $category->id,
+            'item_code' => 'GRD-001',
+            'name' => 'Guarded Item',
+            'unit_price' => 1000,
+            'current_stock' => 5,
+            'minimum_stock' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->delete(route('categories.destroy', $category));
+
+        $response->assertRedirect(route('categories.index'));
+        $response->assertSessionHas('error');
+        $this->assertDatabaseHas('categories', ['id' => $category->id]);
     }
 
     public function test_index_supports_search_filter_on_name(): void

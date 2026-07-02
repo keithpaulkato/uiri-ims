@@ -20,6 +20,10 @@
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
+    @if (session('error'))
+        <div class="alert alert-error">{{ session('error') }}</div>
+    @endif
+
     <div class="card">
         <div class="card-body p0">
             <form method="GET" action="{{ route('categories.index') }}" class="filter-group" style="padding: 16px 20px;">

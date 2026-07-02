@@ -78,10 +78,16 @@ class CategoryController extends Controller
     /**
      * Delete a category. Categories have no is_active column (unlike
      * suppliers) so this is a hard delete. Requires manage_inventory.
+     * Blocked if the category still has inventory items assigned to it.
      */
     public function destroy(Category $category): RedirectResponse
     {
         $this->authorize('manage_inventory', Category::class);
+
+        if ($category->items()->exists()) {
+            return redirect()->route('categories.index')
+                ->with('error', 'Cannot delete a category that has inventory items assigned to it.');
+        }
 
         $category->delete();
 
