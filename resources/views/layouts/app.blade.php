@@ -83,26 +83,26 @@
                     </li>
 
                     <li class="nav-section">Stock</li>
-                    <li>
-                        <a href="#">
+                    <li class="{{ request()->routeIs('stock.in') ? 'active' : '' }}">
+                        <a href="{{ route('stock.in') }}">
                             <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
                             Stock In
                         </a>
                     </li>
-                    <li>
-                        <a href="#">
+                    <li class="{{ request()->routeIs('stock.out') ? 'active' : '' }}">
+                        <a href="{{ route('stock.out') }}">
                             <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></span>
                             Stock Out
                         </a>
                     </li>
-                    <li>
-                        <a href="#">
+                    <li class="{{ request()->routeIs('stock.adjust') ? 'active' : '' }}">
+                        <a href="{{ route('stock.adjust') }}">
                             <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 6v12m-6-6h12"/></svg></span>
                             Stock Adjustment
                         </a>
                     </li>
-                    <li>
-                        <a href="#">
+                    <li class="{{ request()->routeIs('transactions.index') ? 'active' : '' }}">
+                        <a href="{{ route('transactions.index') }}">
                             <span class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></span>
                             Transactions
                         </a>
