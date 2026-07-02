@@ -82,4 +82,31 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Department::class);
     }
+
+    /**
+     * The id of the branch the user is currently acting within.
+     *
+     * This is the single canonical "active branch" accessor. Administrators
+     * may switch branches (stored in the session by BranchSwitchController);
+     * everyone else is fixed to their assigned branch. All branch-scoped
+     * queries and UI should read this rather than branch_id directly.
+     */
+    public function activeBranchId(): ?int
+    {
+        if ($this->hasRole('Administrator')) {
+            return session('active_branch_id', $this->branch_id);
+        }
+
+        return $this->branch_id;
+    }
+
+    /**
+     * The Branch model the user is currently acting within.
+     */
+    public function activeBranch(): ?Branch
+    {
+        $id = $this->activeBranchId();
+
+        return $id ? Branch::find($id) : null;
+    }
 }

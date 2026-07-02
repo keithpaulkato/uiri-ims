@@ -193,7 +193,7 @@
                 </button>
 
                 <div class="topnav-branch">
-                    @php($currentBranch = auth()->user()->branch)
+                    @php($currentBranch = auth()->user()->activeBranch())
                     <span class="branch-indicator {{ $currentBranch?->is_headquarters ? 'hq' : 'branch' }}">
                         {{ $currentBranch?->name }}
                     </span>
