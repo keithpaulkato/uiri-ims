@@ -93,17 +93,17 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 /* SIDEBAR */
 .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(2, 6, 23, .45); z-index: 150; backdrop-filter: blur(2px); }
 .sidebar-overlay.show { display: block; }
-.sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w); background: linear-gradient(180deg, #d0efff 0%, #6db9ec 100%); display: flex; flex-direction: column; overflow-y: auto; z-index: 200; transition: transform .3s ease, box-shadow .3s ease, width .2s ease; box-shadow: 20px 0 45px rgba(13,67,115,.18); border-right: 1px solid rgba(255,255,255,.18); }
+.sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w); background: linear-gradient(135deg, #0f2b4b 0%, #0a1628 55%, #0d2741 100%); color: #f8fbff; display: flex; flex-direction: column; overflow-y: auto; z-index: 200; transition: transform .3s ease, box-shadow .3s ease, width .2s ease; box-shadow: 20px 0 45px rgba(2, 8, 23, .28); border-right: 1px solid rgba(255,255,255,.12); }
 .sidebar.open { transform: translateX(0); }
 .sidebar.closed { transform: translateX(-100%); }
-.sidebar-brand { display: flex; align-items: center; gap: 12px; padding: 18px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.18); }
-.brand-logo { background: #fff; border-radius: 12px; padding: 5px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sidebar-brand { display: flex; align-items: center; gap: 12px; padding: 18px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.brand-logo { background: rgba(255,255,255,.95); border-radius: 12px; padding: 5px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 18px rgba(0,0,0,.18); }
 .brand-logo img { width: 100%; height: 100%; object-fit: contain; }
 .brand-text { flex: 1; min-width: 0; }
-.brand-name { display: block; font-size: 1rem; font-weight: 800; color: #0f3f65; letter-spacing: .5px; }
-.brand-sub { display: block; font-size: .75rem; color: rgba(15, 63, 101,.75); text-transform: uppercase; letter-spacing: .8px; }
-.sidebar-close { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.28); border-radius: 10px; background: rgba(255,255,255,.22); color: rgba(15, 63, 101,.9); cursor: pointer; transition: all .2s ease; flex-shrink: 0; }
-.sidebar-close:hover { background: rgba(255,255,255,.36); color: #064b7c; border-color: rgba(255,255,255,.48); transform: rotate(90deg); }
+.brand-name { display: block; font-size: 1rem; font-weight: 800; color: #f8fbff; letter-spacing: .5px; }
+.brand-sub { display: block; font-size: .75rem; color: rgba(226,232,240,.72); text-transform: uppercase; letter-spacing: .8px; }
+.sidebar-close { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; background: rgba(255,255,255,.1); color: #f8fbff; cursor: pointer; transition: all .2s ease; flex-shrink: 0; }
+.sidebar-close:hover { background: rgba(255,255,255,.16); color: #ffffff; border-color: rgba(255,255,255,.24); transform: rotate(90deg); }
 .sidebar-close svg { width: 16px; height: 16px; }
 .sidebar-resizer { position: absolute; top: 0; right: -11px; bottom: 0; width: 22px; cursor: ew-resize; z-index: 210; touch-action: none; background: rgba(255,255,255,.08); border-left: 1px solid rgba(255,255,255,.18); user-select: none; }
 .sidebar-resizer::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 4px; height: 140px; background: rgba(255,255,255,.45); border-radius: 999px; box-shadow: 0 0 0 4px rgba(255,255,255,.05); }
@@ -122,30 +122,23 @@ body.is-fullscreen .fab { right: 28px; bottom: 28px; }
 body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 
 .branch-switcher { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
-.branch-switcher label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--corp-blue); display: block; margin-bottom: 6px; }
-.branch-switcher select { width: 100%; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); color: var(--gold); padding: 7px 10px; border-radius: 6px; font-size: .82rem; cursor: pointer; }
-.branch-switcher select option { background: var(--navy-2); color: var(--gold); }
-.branch-switcher select:focus { color: var(--gold); }
-.branch-badge { padding: 10px 16px; font-size: .82rem; color: var(--corp-blue); display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.branch-switcher label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: #cfe8ff !important; display: block; margin-bottom: 6px; }
+.branch-switcher select { width: 100%; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); color: #f8fbff; padding: 7px 10px; border-radius: 6px; font-size: .82rem; cursor: pointer; }
+.branch-switcher select option { background: #102033; color: #f8fbff; }
+.branch-switcher select:focus { color: #f8fbff; }
+.branch-badge { padding: 10px 16px; font-size: .82rem; color: #dff2ff !important; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
 .branch-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
-.branch-badge em { color: rgba(14,122,176,.65); font-style: normal; }
+.branch-badge em { color: rgba(207,232,255,.72); font-style: normal; }
 .sidebar-nav { flex: 1; padding: 8px 0; }
 .sidebar-nav ul { list-style: none; }
-.nav-section { padding: 14px 20px 4px; font-size: .65rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--corp-blue); font-weight: 600; }
+.nav-section { padding: 14px 20px 4px; font-size: .65rem; text-transform: uppercase; letter-spacing: 1.2px; color: #a7d7ff !important; font-weight: 600; }
 
-/* Ensure sidebar headings use corporate blue even if overridden elsewhere */
-.sidebar .nav-section,
-.sidebar .branch-switcher label,
-.sidebar .branch-badge,
-.sidebar .branch-badge em {
-  color: var(--corp-blue) !important;
-}
-.sidebar-nav li a { display: flex; align-items: center; gap: 11px; padding: 9px 14px; margin: 2px 12px; color: var(--gold); font-size: .875rem; font-weight: 500; transition: all .2s ease; border-left: 3px solid transparent; border-radius: 10px; }
-.sidebar-nav li a:hover { background: rgba(255,255,255,.08); color: var(--gold); border-left-color: rgba(201,162,39,.5); }
-.sidebar-nav li.active a { background: rgba(201,162,39,.12); color: var(--gold); border-left-color: var(--gold); font-weight: 600; }
-.sidebar-nav li a .nav-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,.08); color: var(--gold); transition: all .2s ease; flex-shrink: 0; }
+.sidebar-nav li a { display: flex; align-items: center; gap: 11px; padding: 9px 14px; margin: 2px 12px; color: #f8fbff; font-size: .875rem; font-weight: 500; transition: all .2s ease; border-left: 3px solid transparent; border-radius: 10px; }
+.sidebar-nav li a:hover { background: rgba(255,255,255,.12); color: #ffffff; border-left-color: rgba(201,162,39,.5); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.sidebar-nav li.active a { background: linear-gradient(90deg, rgba(201,162,39,.22) 0%, rgba(255,255,255,.1) 100%); color: #ffffff; border-left-color: var(--gold); font-weight: 600; }
+.sidebar-nav li a .nav-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,.12); color: #ffd36a; transition: all .2s ease; flex-shrink: 0; }
 .sidebar-nav li a .nav-icon svg { width: 17px; height: 17px; opacity: .9; }
-.sidebar-nav li a:hover .nav-icon, .sidebar-nav li.active a .nav-icon { background: rgba(201,162,39,.16); color: var(--gold); transform: translateY(-1px); }
+.sidebar-nav li a:hover .nav-icon, .sidebar-nav li.active a .nav-icon { background: rgba(255,255,255,.16); color: #ffd36a; transform: translateY(-1px); }
 .sidebar-nav li.active a .nav-icon svg { opacity: 1; }
 
 /* MAIN */
