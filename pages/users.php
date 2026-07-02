@@ -12,6 +12,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fullName = trim($_POST['full_name']??''); $emailInput = trim($_POST['email']??'');
         $email = $emailInput !== '' ? $emailInput : null;
         $username = trim($_POST['username']??''); $phone = trim($_POST['phone']??'');
+        $profilePhoto = null;
+        $existingPhoto = null;
+        if ($action === 'edit' && $id) {
+            $existingUserStmt = $pdo->prepare("SELECT profile_photo FROM users WHERE id = ?");
+            $existingUserStmt->execute([$id]);
+            $existingPhoto = $existingUserStmt->fetchColumn();
+        }
+        if (!empty($_FILES['profile_photo']['name'])) {
+            $profilePhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $id ?: 0);
+            if (!$profilePhoto) {
+                setFlash('error','Please upload a valid image file (jpg, png, webp, gif) under 2MB.');
+                header('Location: users.php'); exit;
+            }
+        } elseif ($action==='edit') {
+            $profilePhoto = $existingPhoto;
+        }
         $roleId = (int)($_POST['role_id']??0); $branchId = (int)($_POST['branch_id']??0);
         $departmentId = (int)($_POST['department_id']??0); $sectionId = (int)($_POST['section_id']??0);
         $status = (int)($_POST['is_active']??1);
@@ -30,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (strlen($pass) < 8) { setFlash('error','Password must be at least 8 characters.'); }
                 else {
                     $hash = password_hash($pass, PASSWORD_BCRYPT);
-                    $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active) VALUES (?,?,?,?,?,?,?,?,?,?)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status]);
+                    $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active,profile_photo) VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status,$profilePhoto]);
                     $newId = $pdo->lastInsertId();
                     auditLog('ADD_USER','users',$newId,"Added user: $username");
 
@@ -54,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
             } else {
-                $pdo->prepare("UPDATE users SET branch_id=?,section_id=?,department_id=?,role_id=?,full_name=?,email=?,username=?,phone=?,is_active=? WHERE id=?")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$phone,$status,$id]);
+                $pdo->prepare("UPDATE users SET branch_id=?,section_id=?,department_id=?,role_id=?,full_name=?,email=?,username=?,phone=?,is_active=?,profile_photo=? WHERE id=?")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$phone,$status,$profilePhoto,$id]);
                 if ($pass && strlen($pass)>=8) {
                     $hash=password_hash($pass,PASSWORD_BCRYPT);
                     $pdo->prepare("UPDATE users SET password=? WHERE id=?")->execute([$hash,$id]);
@@ -107,7 +123,9 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($users as $i=>$u): ?>
             <tr>
                 <td><?= $i+1 ?></td>
-                <td><div class="item-cell"><div class="user-avatar-sm"><?= strtoupper(substr($u['full_name'],0,1)) ?></div><div><span class="item-name"><?= clean($u['full_name']) ?></span><span class="item-code"><?= clean($u['email']) ?></span></div></div></td>
+                <td><div class="item-cell"><div class="user-avatar-sm">
+                    <img src="<?= clean(profilePhotoUrl($u)) ?>" alt="<?= clean($u['full_name']) ?> avatar">
+                </div><div><span class="item-name"><?= clean($u['full_name']) ?></span><span class="item-code"><?= clean($u['email']) ?></span></div></div></td>
                 <td><code><?= clean($u['username']) ?></code></td>
                 <td><span class="badge badge-purple"><?= clean($u['role_name']) ?></span></td>
                 <td><?= clean($u['branch_name']) ?></td>
@@ -145,7 +163,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="modal-overlay" id="userModal" <?= $editUser?'style="display:flex"':'' ?>>
     <div class="modal modal-lg">
         <div class="modal-header"><h3><?= $editUser?'Edit User':'Add User' ?></h3><button class="modal-close" onclick="closeModal('userModal')">×</button></div>
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="<?= $editUser?'edit':'add' ?>">
             <?php if ($editUser): ?><input type="hidden" name="user_id" value="<?= $editUser['id'] ?>"><?php endif; ?>
@@ -190,6 +208,11 @@ include __DIR__ . '/../includes/header.php';
                             <option value="1" <?= (($editUser['is_active']??1)==1?'selected':'') ?>>Active</option>
                             <option value="0" <?= (($editUser['is_active']??1)==0?'selected':'') ?>>Inactive</option>
                         </select>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label>Profile Photo</label>
+                        <input type="file" name="profile_photo" accept="image/*">
+                        <small class="form-note">Leave blank to keep the current photo or use the default avatar.</small>
                     </div>
                     <div class="form-group" style="grid-column:1/-1">
                         <label>Password <?= $editUser?'(leave blank to keep current)':'(leave blank to auto-generate)' ?></label>

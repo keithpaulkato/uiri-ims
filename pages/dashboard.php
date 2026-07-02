@@ -179,8 +179,15 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="dashboard-hero card">
     <div class="dashboard-hero-main">
-        <div class="hero-badge">Live operations</div>
-        <h2><?= date('H') < 12 ? 'Good morning' : (date('H') < 18 ? 'Good afternoon' : 'Good evening') ?>, <?= clean($user['full_name']) ?> 👋</h2>
+        <div class="dashboard-user-summary">
+            <div class="dashboard-avatar-large">
+                <img src="<?= clean(profilePhotoUrl($user)) ?>" alt="<?= clean($user['full_name']) ?> avatar">
+            </div>
+            <div>
+                <div class="hero-badge">Live operations</div>
+                <h2><?= date('H') < 12 ? 'Good morning' : (date('H') < 18 ? 'Good afternoon' : 'Good evening') ?>, <?= clean($user['full_name']) ?> 👋</h2>
+            </div>
+        </div>
         <p>Welcome back. You have <?= number_format($pendingRequests) ?> active alerts, <?= number_format($lowStock) ?> low stock items, and <?= number_format($pendingApprovals) ?> approvals to review.</p>
         <div class="hero-highlights">
             <div class="hero-highlight"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M3 12h18"/></svg> Stock overview</div>

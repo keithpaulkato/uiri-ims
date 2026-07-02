@@ -8,10 +8,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $fullName = trim($_POST['full_name']??''); $phone = trim($_POST['phone']??'');
     $oldPass = $_POST['old_password']??''; $newPass = $_POST['new_password']??''; $confirmPass = $_POST['confirm_password']??'';
+    $profilePhoto = $profile['profile_photo'] ?? null;
+    if (!empty($_FILES['profile_photo']['name'])) {
+        $uploadedPhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $user['id']);
+        if ($uploadedPhoto) {
+            $profilePhoto = $uploadedPhoto;
+        } else {
+            setFlash('error','Please upload a valid image file (jpg, png, webp, gif) under 2MB.');
+            header('Location: profile.php'); exit;
+        }
+    }
     if (!$fullName) { setFlash('error','Full name is required.'); }
     else {
-        $pdo->prepare("UPDATE users SET full_name=?,phone=? WHERE id=?")->execute([$fullName,$phone,$user['id']]);
+        $pdo->prepare("UPDATE users SET full_name=?,phone=?,profile_photo=? WHERE id=?")->execute([$fullName,$phone,$profilePhoto,$user['id']]);
         $_SESSION['user']['full_name'] = $fullName;
+        $_SESSION['user']['profile_photo'] = $profilePhoto;
         if ($newPass) {
             if ($newPass !== $confirmPass) { setFlash('error','New passwords do not match.'); }
             elseif (!validatePassword($newPass, $passError)) { setFlash('error',$passError); }
@@ -39,7 +50,13 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-header"><h3>Account Information</h3></div>
     <div class="card-body">
         <div style="text-align:center;padding:20px 0">
-            <div style="width:80px;height:80px;border-radius:50%;background:#0A1628;color:#C9A227;font-size:2rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><?= strtoupper(substr($profile['full_name'],0,1)) ?></div>
+            <div style="width:80px;height:80px;border-radius:50%;background:#0A1628;color:#C9A227;font-size:2rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;overflow:hidden">
+                <?php if (profilePhotoUrl($profile)): ?>
+                    <img src="<?= clean(profilePhotoUrl($profile)) ?>" alt="<?= clean($profile['full_name']) ?> avatar" style="width:100%;height:100%;object-fit:cover;display:block">
+                <?php else: ?>
+                    <?= strtoupper(substr($profile['full_name'],0,1)) ?>
+                <?php endif; ?>
+            </div>
             <h3><?= clean($profile['full_name']) ?></h3>
             <span class="badge badge-purple"><?= clean($profile['role_name']) ?></span>
         </div>
@@ -55,8 +72,9 @@ include __DIR__ . '/../includes/header.php';
 <div class="card">
     <div class="card-header"><h3>Edit Profile</h3></div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <div class="form-group"><label>Profile Photo</label><input type="file" name="profile_photo" accept="image/*"></div>
             <div class="form-group"><label>Full Name *</label><input type="text" name="full_name" required value="<?= clean($profile['full_name']) ?>"></div>
             <div class="form-group"><label>Phone</label><input type="text" name="phone" value="<?= clean($profile['phone']??'') ?>"></div>
             <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">

@@ -35,6 +35,7 @@ if (!isLoggedIn() && isset($_COOKIE['remember_token'])) {
             'branch_name'   => $user['branch_name'],
             'section_id'    => $user['section_id'],
             'department_id' => $user['department_id'],
+            'profile_photo' => $user['profile_photo'] ?? null,
         ];
         db()->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")->execute([$user['id']]);
         auditLog('LOGIN', 'users', $user['id'], 'Auto-login via remember token');
@@ -105,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'branch_name'   => $user['branch_name'],
                         'section_id'    => $user['section_id'],
                         'department_id' => $user['department_id'],
+                        'profile_photo' => $user['profile_photo'] ?? null,
                     ];
 
                     // Reset failed attempts and update last login

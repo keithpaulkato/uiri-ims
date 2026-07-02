@@ -13,6 +13,8 @@ define('SITE_SHORT', 'UIRI IMS');
 define('BASE_URL', 'http://localhost/uiri-ims/');
 define('UPLOAD_DIR', __DIR__ . '/../uploads/items/');
 define('UPLOAD_URL', BASE_URL . 'uploads/items/');
+define('PROFILE_UPLOAD_DIR', __DIR__ . '/../uploads/profiles/');
+define('PROFILE_UPLOAD_URL', BASE_URL . 'uploads/profiles/');
 
 // SMTP settings — configure these for real email delivery
 define('SMTP_HOST', ''); // e.g. smtp.mailtrap.io or smtp.yourdomain.com
@@ -240,8 +242,48 @@ function ugx(float $amount): string {
     return 'UGX ' . number_format($amount, 0);
 }
 
+function ensureUsersProfilePhotoColumn(): void {
+    $pdo = db();
+    $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'profile_photo'");
+    if ($check->fetch()) return;
+    $pdo->exec("ALTER TABLE users ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL");
+}
+
+function profilePhotoUrl(?array $user = null): string {
+    $user = $user ?? currentUser();
+    $photo = $user['profile_photo'] ?? '';
+    if ($photo === '') return BASE_URL . 'assets/img/default-avatar.svg';
+    if (preg_match('/^https?:\/\//', $photo)) return $photo;
+    return strpos($photo, 'uploads/') === 0 ? BASE_URL . $photo : BASE_URL . ltrim($photo, '/');
+}
+
+function saveProfilePhotoUpload(array $file, int $userId): ?string {
+    if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+        return null;
+    }
+
+    if (!is_dir(PROFILE_UPLOAD_DIR)) {
+        mkdir(PROFILE_UPLOAD_DIR, 0755, true);
+    }
+
+    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowed, true) || (int)$file['size'] > 2 * 1024 * 1024) {
+        return null;
+    }
+
+    $filename = 'user_' . $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    $target = PROFILE_UPLOAD_DIR . $filename;
+    if (!move_uploaded_file($file['tmp_name'], $target)) {
+        return null;
+    }
+
+    return 'uploads/profiles/' . $filename;
+}
+
 // Include helper functions
 require_once __DIR__ . '/functions.php';
+ensureUsersProfilePhotoColumn();
 
 // Validate password strength
 function validatePassword(string $password, string &$error = ''): bool {
