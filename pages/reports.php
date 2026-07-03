@@ -5,7 +5,7 @@ $pageTitle = 'Reports';
 $activePage = 'reports';
 $user = currentUser();
 $branchId = $user['branch_id'];
-$isAdmin = hasRole('Administrator');
+$isAdmin = hasRole('Administrator', 'Executive');
 $pdo = db();
 
 $reportType       = $_GET['report'] ?? 'summary';
@@ -70,19 +70,6 @@ $reportTabs = [
     'movement'  => 'Stock Movement',
     'valuation' => 'Inventory Valuation',
     'low_stock' => 'Low Stock',
-];
-
-$reportCategories = [
-    ['icon' => '📦', 'label' => 'Inventory Reports', 'key' => 'summary'],
-    ['icon' => '📈', 'label' => 'Stock Reports', 'key' => 'movement'],
-    ['icon' => '🏷', 'label' => 'Asset Reports', 'key' => 'valuation'],
-    ['icon' => '🔄', 'label' => 'Transfer Reports', 'key' => 'movement'],
-    ['icon' => '🏢', 'label' => 'Campus Reports', 'key' => 'summary'],
-    ['icon' => '🏭', 'label' => 'Department Reports', 'key' => 'summary'],
-    ['icon' => '🚚', 'label' => 'Supplier Reports', 'key' => 'summary'],
-    ['icon' => '📋', 'label' => 'Request Reports', 'key' => 'summary'],
-    ['icon' => '🛠', 'label' => 'Maintenance Reports', 'key' => 'summary'],
-    ['icon' => '📝', 'label' => 'Audit Reports', 'key' => 'summary'],
 ];
 
 $data = [];
@@ -230,14 +217,58 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <?php endif; ?>
         <?php if (in_array($reportType,['summary','low_stock'])): ?>
-        <div class="filter-group">
-            <label for="categorySelect" class="form-label">Category</label>
-            <select id="categorySelect" name="category" class="form-control">
-                <option value="">All Categories</option>
-                <?php foreach ($categories as $c): ?><option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin && !$branchFilter ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option><?php endforeach; ?>
-            </select>
-        </div>
-        <?php endif; ?>
+    <div class="filter-group">
+        <label for="categorySelect" class="form-label">Category</label>
+        <select id="categorySelect" name="category" class="form-control">
+            <option value="">All Categories</option>
+            <?php foreach ($categories as $c): ?>
+                <option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>>
+                    <?= clean($c['name']) ?><?= $isAdmin && !$branchFilter ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="sectionSelect" class="form-label">Section</label>
+        <select id="sectionSelect" name="section" class="form-control">
+            <option value="">All Sections</option>
+            <?php foreach ($sections as $s): ?>
+                <option value="<?= $s['id'] ?>" <?= $s['id']==$sectionFilter?'selected':'' ?>><?= clean($s['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="departmentSelect" class="form-label">Department</label>
+        <select id="departmentSelect" name="department" class="form-control">
+            <option value="">All Departments</option>
+            <?php foreach ($departments as $d): ?>
+                <option value="<?= $d['id'] ?>" <?= $d['id']==$departmentFilter?'selected':'' ?>><?= clean($d['name']) ?><?= isset($d['section_name']) ? ' — '.clean($d['section_name']) : '' ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="supplierSelect" class="form-label">Supplier</label>
+        <select id="supplierSelect" name="supplier" class="form-control">
+            <option value="">All Suppliers</option>
+            <?php foreach ($suppliers as $s): ?>
+                <option value="<?= $s['id'] ?>" <?= $s['id']==$supplierFilter?'selected':'' ?>><?= clean($s['company_name'] ?? $s['name'] ?? '') ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="statusSelect" class="form-label">Status</label>
+        <select id="statusSelect" name="status" class="form-control">
+            <option value="">All Statuses</option>
+            <option value="low_stock" <?= $statusFilter==='low_stock'?'selected':'' ?>>Low Stock</option>
+            <option value="out_of_stock" <?= $statusFilter==='out_of_stock'?'selected':'' ?>>Out of Stock</option>
+            <option value="available" <?= $statusFilter==='available'?'selected':'' ?>>Available</option>
+        </select>
+    </div>
+<?php endif; ?>
         <div class="filter-group flex-fill">
             <label for="searchInput" class="form-label">Search</label>
             <div class="input-group">
@@ -346,7 +377,7 @@ function exportCurrentReport() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'uiri-report.csv';
+    link.download = 'uiri-report-' + encodeURIComponent('<?= clean($reportType) ?>') + '.csv';
     link.click();
     Swal.fire({
         icon: 'success',

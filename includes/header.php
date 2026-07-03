@@ -66,7 +66,7 @@ $notifications = $notifStmt->fetchAll();
     <div class="sidebar-resizer" id="sidebarResizer" aria-hidden="true" title="Drag to resize sidebar"></div>
 
     <!-- Branch Switcher -->
-    <?php if (hasRole('Administrator')): ?>
+    <?php if (hasRole('Administrator', 'Executive')): ?>
     <div class="branch-switcher">
         <label>Active Branch</label>
         <form method="POST" action="<?= BASE_URL ?>includes/switch_branch.php">
