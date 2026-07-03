@@ -268,8 +268,12 @@ $notifications = $notifStmt->fetchAll();
         </button>
         <div class="user-menu" id="userMenu">
             <button class="user-btn" onclick="document.getElementById('userDropdown').classList.toggle('show')">
-                <div class="user-avatar">
-                    <img src="<?= clean(profilePhotoUrl($user)) ?>" alt="<?= clean($user['full_name']) ?> avatar">
+                <div class="user-avatar<?= profilePhotoUrl($user) ? ' has-photo' : '' ?>">
+                    <?php if (profilePhotoUrl($user)): ?>
+                        <img src="<?= clean(profilePhotoUrl($user)) ?>" alt="<?= clean($user['full_name']) ?> avatar">
+                    <?php else: ?>
+                        <?= strtoupper(substr($user['full_name'], 0, 1)) ?>
+                    <?php endif; ?>
                 </div>
                 <div class="user-info">
                     <span class="user-name"><?= clean(explode(' ', $user['full_name'])[0]) ?></span>
