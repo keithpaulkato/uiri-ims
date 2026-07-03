@@ -186,12 +186,16 @@ $notifications = $notifStmt->fetchAll();
                     Users
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (hasRole('Administrator', 'Campus Manager', 'Store Manager', 'Section Manager')): ?>
             <li class="<?= ($activePage ?? '') === 'sections' ? 'active' : '' ?>">
                 <a href="<?= BASE_URL ?>pages/sections.php">
                     <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg></span>
                     Sections
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (hasRole('Administrator')): ?>
             <li class="<?= ($activePage ?? '') === 'departments' ? 'active' : '' ?>">
                 <a href="<?= BASE_URL ?>pages/departments.php">
                     <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/></svg></span>
@@ -268,8 +272,12 @@ $notifications = $notifStmt->fetchAll();
         </button>
         <div class="user-menu" id="userMenu">
             <button class="user-btn" onclick="document.getElementById('userDropdown').classList.toggle('show')">
-                <div class="user-avatar">
-                    <img src="<?= clean(profilePhotoUrl($user)) ?>" alt="<?= clean($user['full_name']) ?> avatar">
+                <div class="user-avatar<?= profilePhotoUrl($user) ? ' has-photo' : '' ?>">
+                    <?php if (profilePhotoUrl($user)): ?>
+                        <img src="<?= clean(profilePhotoUrl($user)) ?>" alt="<?= clean($user['full_name']) ?> avatar">
+                    <?php else: ?>
+                        <?= strtoupper(substr($user['full_name'], 0, 1)) ?>
+                    <?php endif; ?>
                 </div>
                 <div class="user-info">
                     <span class="user-name"><?= clean(explode(' ', $user['full_name'])[0]) ?></span>

@@ -32,6 +32,44 @@
   --shadow-lg: 0 24px 56px rgba(15, 23, 42, .10);
 }
 
+/* Default (corporate) theme explicit styling for dashboard elements */
+body[data-dashboard-theme="corporate"] .dashboard-hero,
+body[data-dashboard-theme="corporate"] .dashboard-widget,
+body[data-dashboard-theme="corporate"] .card,
+body[data-dashboard-theme="corporate"] .stat-card,
+body[data-dashboard-theme="corporate"] .branch-overview-card,
+body[data-dashboard-theme="corporate"] .form-section-card,
+body[data-dashboard-theme="corporate"] .chart-card,
+body[data-dashboard-theme="corporate"] .preview-card,
+body[data-dashboard-theme="corporate"] .notification-summary-card {
+  background: linear-gradient(145deg, var(--white) 0%, var(--surface) 100%) !important;
+  border-color: var(--border) !important;
+}
+
+body[data-dashboard-theme="corporate"] .dashboard-hero h2,
+body[data-dashboard-theme="corporate"] .dashboard-widget h4,
+body[data-dashboard-theme="corporate"] .dashboard-widget p,
+body[data-dashboard-theme="corporate"] .card-header h3,
+body[data-dashboard-theme="corporate"] .stat-label,
+body[data-dashboard-theme="corporate"] .stat-value,
+body[data-dashboard-theme="corporate"] .stat-sub,
+body[data-dashboard-theme="corporate"] .feed-copy,
+body[data-dashboard-theme="corporate"] .notice-item,
+body[data-dashboard-theme="corporate"] .quick-link-list a,
+body[data-dashboard-theme="corporate"] .dashboard-pill,
+body[data-dashboard-theme="corporate"] .dashboard-search input,
+body[data-dashboard-theme="corporate"] .branch-overview-stats span,
+body[data-dashboard-theme="corporate"] .branch-overview-stats label,
+body[data-dashboard-theme="corporate"] .data-table th,
+body[data-dashboard-theme="corporate"] .data-table td,
+body[data-dashboard-theme="corporate"] .page-title,
+body[data-dashboard-theme="corporate"] .page-sub,
+body[data-dashboard-theme="corporate"] .card-link,
+body[data-dashboard-theme="corporate"] .notification-summary-card strong,
+body[data-dashboard-theme="corporate"] .notification-summary-card span {
+  color: var(--navy) !important;
+}
+
 body[data-theme="dark"] {
   --navy: #0f172a;
   --navy-2: #111827;
@@ -50,15 +88,92 @@ body[data-theme="dark"] {
   --shadow-md: 0 8px 18px rgba(0,0,0,.45), 0 4px 8px rgba(0,0,0,.35);
 }
 
+body[data-theme="dark"] .dashboard-hero,
+body[data-theme="dark"] .dashboard-widget,
+body[data-theme="dark"] .card,
+body[data-theme="dark"] .stat-card,
+body[data-theme="dark"] .branch-overview-card,
+body[data-theme="dark"] .form-section-card,
+body[data-theme="dark"] .chart-card,
+body[data-theme="dark"] .preview-card,
+body[data-theme="dark"] .notification-summary-card {
+  background: #0b1220 !important;
+  border-color: #1e293b !important;
+}
+
+body[data-theme="dark"] .dashboard-hero h2,
+body[data-theme="dark"] .dashboard-widget h4,
+body[data-theme="dark"] .dashboard-widget p,
+body[data-theme="dark"] .card-header h3,
+body[data-theme="dark"] .stat-label,
+body[data-theme="dark"] .stat-value,
+body[data-theme="dark"] .stat-sub,
+body[data-theme="dark"] .feed-copy,
+body[data-theme="dark"] .notice-item,
+body[data-theme="dark"] .quick-link-list a,
+body[data-theme="dark"] .dashboard-pill,
+body[data-theme="dark"] .dashboard-search input,
+body[data-theme="dark"] .branch-overview-stats span,
+body[data-theme="dark"] .branch-overview-stats label,
+body[data-theme="dark"] .data-table th,
+body[data-theme="dark"] .data-table td,
+body[data-theme="dark"] .page-title,
+body[data-theme="dark"] .page-sub,
+body[data-theme="dark"] .card-link,
+body[data-theme="dark"] .notification-summary-card strong,
+body[data-theme="dark"] .notification-summary-card span {
+  color: #e5eefc !important;
+}
+
 body[data-dashboard-theme="contrast"] {
   --navy:#050816;
   --gold:#ffd84d;
   --sky:#5ee7ff;
+  --white:#ffffff;
   --bg:#f7f7f7;
+  --card:#ffffff;
   --surface:#ffffff;
   --surface-2:#f0f4ff;
+  --border:#cbd5e1;
   --text:#050816;
   --sub:#3c4b61;
+  --shadow: 0 10px 24px rgba(2, 6, 23, .12);
+  --shadow-md: 0 16px 36px rgba(2, 6, 23, .16);
+}
+
+body[data-dashboard-theme="contrast"] .dashboard-hero,
+body[data-dashboard-theme="contrast"] .dashboard-widget,
+body[data-dashboard-theme="contrast"] .card,
+body[data-dashboard-theme="contrast"] .stat-card,
+body[data-dashboard-theme="contrast"] .branch-overview-card,
+body[data-dashboard-theme="contrast"] .form-section-card,
+body[data-dashboard-theme="contrast"] .chart-card,
+body[data-dashboard-theme="contrast"] .preview-card {
+  color: #050816;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
+  border-color: #94a3b8;
+  box-shadow: 0 10px 24px rgba(2, 6, 23, .14);
+}
+
+body[data-dashboard-theme="contrast"] .dashboard-hero h2,
+body[data-dashboard-theme="contrast"] .dashboard-widget h4,
+body[data-dashboard-theme="contrast"] .dashboard-widget p,
+body[data-dashboard-theme="contrast"] .card-header h3,
+body[data-dashboard-theme="contrast"] .stat-label,
+body[data-dashboard-theme="contrast"] .stat-value,
+body[data-dashboard-theme="contrast"] .stat-sub,
+body[data-dashboard-theme="contrast"] .feed-copy,
+body[data-dashboard-theme="contrast"] .notice-item,
+body[data-dashboard-theme="contrast"] .quick-link-list a,
+body[data-dashboard-theme="contrast"] .dashboard-pill,
+body[data-dashboard-theme="contrast"] .dashboard-search input,
+body[data-dashboard-theme="contrast"] .branch-overview-stats span,
+body[data-dashboard-theme="contrast"] .branch-overview-stats label,
+body[data-dashboard-theme="contrast"] .data-table th,
+body[data-dashboard-theme="contrast"] .data-table td,
+body[data-dashboard-theme="contrast"] .page-title,
+body[data-dashboard-theme="contrast"] .page-sub {
+  color: #050816 !important;
 }
 
 body[data-dashboard-theme="blue"] {
@@ -68,8 +183,44 @@ body[data-dashboard-theme="blue"] {
   --bg:#f2f8ff;
   --surface:#f8fbff;
   --surface-2:#e7f2ff;
-  --text:#102033;
-  --sub:#5b7188;
+  --white:#ffffff;
+  --card:#ffffff;
+  --border:#d1d5e0;
+  --text:#0a1a2f;
+  --sub:#3b5068;
+}
+
+body[data-dashboard-theme="blue"] .dashboard-hero,
+body[data-dashboard-theme="blue"] .dashboard-widget,
+body[data-dashboard-theme="blue"] .card,
+body[data-dashboard-theme="blue"] .stat-card,
+body[data-dashboard-theme="blue"] .branch-overview-card,
+body[data-dashboard-theme="blue"] .form-section-card,
+body[data-dashboard-theme="blue"] .chart-card,
+body[data-dashboard-theme="blue"] .preview-card {
+  background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
+  border-color: var(--border);
+}
+
+body[data-dashboard-theme="blue"] .dashboard-hero h2,
+body[data-dashboard-theme="blue"] .dashboard-widget h4,
+body[data-dashboard-theme="blue"] .dashboard-widget p,
+body[data-dashboard-theme="blue"] .card-header h3,
+body[data-dashboard-theme="blue"] .stat-label,
+body[data-dashboard-theme="blue"] .stat-value,
+body[data-dashboard-theme="blue"] .stat-sub,
+body[data-dashboard-theme="blue"] .feed-copy,
+body[data-dashboard-theme="blue"] .notice-item,
+body[data-dashboard-theme="blue"] .quick-link-list a,
+body[data-dashboard-theme="blue"] .dashboard-pill,
+body[data-dashboard-theme="blue"] .dashboard-search input,
+body[data-dashboard-theme="blue"] .branch-overview-stats span,
+body[data-dashboard-theme="blue"] .branch-overview-stats label,
+body[data-dashboard-theme="blue"] .data-table th,
+body[data-dashboard-theme="blue"] .data-table td,
+body[data-dashboard-theme="blue"] .page-title,
+body[data-dashboard-theme="blue"] .page-sub {
+  color: #0a1a2f !important;
 }
 
 html { font-size: 15px; scroll-behavior: smooth; }
@@ -316,14 +467,14 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 
 /* TABLES */
 .data-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-.data-table th { padding: 11px 14px; text-align: left; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--sub); background: linear-gradient(90deg, #f8fbff 0%, #f3f7fb 100%); border-bottom: 1px solid var(--border); white-space: nowrap; }
-.data-table td { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.data-table th { padding: 11px 14px; text-align: left; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--sub); background: var(--surface); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.data-table td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); }
 .data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr:hover td { background: #f5f9ff; transition: background .2s ease; }
-.data-table tbody tr:focus-within td, .data-table tbody tr.selected td { background: #eef6ff; border-left: 2px solid var(--sky); }
-.data-table tfoot td { padding: 12px 14px; background: #f8fafc; border-top: 2px solid var(--border); font-weight: 700; }
+.data-table tbody tr:hover td { background: var(--surface); transition: background .2s ease; }
+.data-table tbody tr:focus-within td, .data-table tbody tr.selected td { background: var(--surface-2); border-left: 2px solid var(--sky); }
+.data-table tfoot td { padding: 12px 14px; background: var(--surface); border-top: 2px solid var(--border); font-weight: 700; color: var(--text); }
 .item-cell { display: flex; align-items: center; gap: 10px; }
-.item-thumb-placeholder { width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; flex-shrink: 0; }
+.item-thumb-placeholder { width: 36px; height: 36px; border-radius: 6px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--sub); flex-shrink: 0; }
 .item-thumb-placeholder svg { width: 18px; height: 18px; }
 .item-name { display: block; font-weight: 600; color: var(--navy); }
 .item-code { display: block; font-size: .75rem; color: var(--sub); font-family: monospace; }
@@ -678,3 +829,38 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
   .hero-stats { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } .page-content { padding: 16px; } }
+
+/* Theme transition support - smooth color transitions when switching themes */
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+.dashboard-hero,
+.dashboard-widget,
+.card,
+.stat-card,
+.branch-overview-card,
+.form-section-card,
+.chart-card,
+.preview-card,
+.notification-summary-card {
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+.dashboard-hero h2,
+.dashboard-widget h4,
+.dashboard-widget p,
+.card-header h3,
+.stat-label,
+.stat-value,
+.stat-sub,
+.feed-copy,
+.notice-item,
+.quick-link-list a,
+.dashboard-pill,
+.dashboard-search input,
+.branch-overview-stats span,
+.branch-overview-stats label,
+.page-title,
+.page-sub,
+.card-link {
+  transition: color 0.3s ease;
+}

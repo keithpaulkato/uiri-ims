@@ -173,6 +173,12 @@ include __DIR__ . '/../includes/header.php';
             <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
             Stock Out
         </a>
+        <?php if ($isAdmin): ?>
+        <a href="<?= BASE_URL ?>pages/users.php" class="btn btn-outline">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>
+            Manage Users
+        </a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

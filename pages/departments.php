@@ -11,23 +11,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if ($action === 'add' || $action === 'edit') {
         $id = (int)($_POST['department_id'] ?? 0);
-        $branchId = (int)($_POST['branch_id'] ?? 0);
+        $sectionId = (int)($_POST['section_id'] ?? 0);
         $name = trim($_POST['name'] ?? '');
         $code = trim($_POST['code'] ?? '');
         $managerName = trim($_POST['manager_name'] ?? '');
         $contactEmail = trim($_POST['contact_email'] ?? '');
         $description = trim($_POST['description'] ?? '');
-        if (!$branchId || !$name) {
-            setFlash('error', 'Campus and department name are required.');
+        if (!$sectionId || !$name) {
+            setFlash('error', 'Section and department name are required.');
         } else {
             if ($action === 'add') {
-                $pdo->prepare("INSERT INTO departments (branch_id, name, code, manager_name, contact_email, description) VALUES (?, ?, ?, ?, ?, ?)")
-                    ->execute([$branchId, $name, $code, $managerName, $contactEmail, $description]);
+                $pdo->prepare("INSERT INTO departments (section_id, name, code, manager_name, contact_email, description) VALUES (?, ?, ?, ?, ?, ?)")
+                    ->execute([$sectionId, $name, $code, $managerName, $contactEmail, $description]);
                 auditLog('ADD_DEPARTMENT', 'departments', $pdo->lastInsertId(), "Added department: $name");
                 setFlash('success', 'Department added successfully.');
             } else {
-                $pdo->prepare("UPDATE departments SET branch_id = ?, name = ?, code = ?, manager_name = ?, contact_email = ?, description = ? WHERE id = ?")
-                    ->execute([$branchId, $name, $code, $managerName, $contactEmail, $description, $id]);
+                $pdo->prepare("UPDATE departments SET section_id = ?, name = ?, code = ?, manager_name = ?, contact_email = ?, description = ? WHERE id = ?")
+                    ->execute([$sectionId, $name, $code, $managerName, $contactEmail, $description, $id]);
                 auditLog('EDIT_DEPARTMENT', 'departments', $id, "Updated department: $name");
                 setFlash('success', 'Department updated successfully.');
             }
@@ -43,9 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $departments = $pdo->query(
-    "SELECT d.*, b.name AS branch_name FROM departments d JOIN branches b ON d.branch_id = b.id WHERE d.is_active = 1 ORDER BY b.name, d.name"
+    "SELECT d.*, s.name AS section_name, b.name AS branch_name FROM departments d JOIN sections s ON d.section_id = s.id JOIN branches b ON s.branch_id = b.id WHERE d.is_active = 1 ORDER BY b.name, s.name, d.name"
 )->fetchAll();
-$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
+$sections = $pdo->query("SELECT s.id, s.name, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name")->fetchAll();
 $editDepartment = null;
 if (isset($_GET['edit'])) {
     $stmt = $pdo->prepare("SELECT * FROM departments WHERE id = ?");
@@ -110,10 +110,10 @@ include __DIR__ . '/../includes/header.php';
             <div class="modal-body">
                 <div class="form-grid-2">
                     <div class="form-group">
-                        <label>Campus *</label>
-                        <select name="branch_id" required>
-                            <?php foreach ($branches as $b): ?>
-                            <option value="<?= $b['id'] ?>" <?= ($editDepartment['branch_id'] ?? 0) == $b['id'] ? 'selected' : '' ?>><?= clean($b['name']) ?></option>
+                        <label>Section *</label>
+                        <select name="section_id" required>
+                            <?php foreach ($sections as $section): ?>
+                            <option value="<?= $section['id'] ?>" <?= ($editDepartment['section_id'] ?? 0) == $section['id'] ? 'selected' : '' ?>><?= clean($section['branch_name'] . ' / ' . $section['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
