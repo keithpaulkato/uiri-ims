@@ -186,12 +186,16 @@ $notifications = $notifStmt->fetchAll();
                     Users
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (hasRole('Administrator', 'Campus Manager', 'Store Manager', 'Section Manager')): ?>
             <li class="<?= ($activePage ?? '') === 'sections' ? 'active' : '' ?>">
                 <a href="<?= BASE_URL ?>pages/sections.php">
                     <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg></span>
                     Sections
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (hasRole('Administrator')): ?>
             <li class="<?= ($activePage ?? '') === 'departments' ? 'active' : '' ?>">
                 <a href="<?= BASE_URL ?>pages/departments.php">
                     <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/></svg></span>
