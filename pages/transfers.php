@@ -144,14 +144,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $branchFilter = $isAdmin ? (int)($_GET['branch'] ?? 0) : $branchId;
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name")->fetchAll();
 $branchMap = array_column($branches, 'name', 'id');
-$statusDescriptions = [
-    'Requested' => 'Awaiting source campus approval.',
-    'Approved' => 'Awaiting destination campus confirmation.',
-    'Dispatched' => 'Awaiting destination store receipt.',
-    'Received' => 'Transfer completed successfully.',
-    'Rejected' => 'Transfer was rejected by source campus.',
-    'Cancelled' => 'Transfer was cancelled.',
-];
+function getTransferStatusDescription(string $status, string $fromBranch, string $toBranch): string {
+    switch ($status) {
+        case 'Requested':
+            return 'Waiting for approval from ' . clean($fromBranch) . ' campus manager.';
+        case 'Approved':
+            return 'Waiting for confirmation from ' . clean($toBranch) . ' campus manager.';
+        case 'Dispatched':
+            return 'Waiting for receipt confirmation from ' . clean($toBranch) . ' store manager.';
+        case 'Received':
+            return 'Transfer completed successfully.';
+        case 'Rejected':
+            return 'Transfer was rejected by ' . clean($fromBranch) . ' campus manager.';
+        case 'Cancelled':
+            return 'Transfer has been cancelled.';
+        default:
+            return 'Status: ' . clean($status);
+    }
+}
 
 $transfersQuery = "SELECT t.*, f.name AS from_branch, tb.name AS to_branch, u.full_name AS requested_by_name, a.full_name AS approved_by_name
                   FROM transfers t
@@ -228,9 +238,7 @@ include __DIR__ . '/../includes/header.php';
                     <span class="badge <?= $row['status'] === 'Received' ? 'badge-success' : ($row['status'] === 'Approved' || $row['status'] === 'Dispatched' ? 'badge-blue' : ($row['status'] === 'Rejected' ? 'badge-danger' : 'badge-warn')) ?>">
                         <?= clean($row['status']) ?>
                     </span>
-                    <?php if (!empty($statusDescriptions[$row['status']])): ?>
-                    <div class="status-note"><small><?= clean($statusDescriptions[$row['status']]) ?></small></div>
-                    <?php endif; ?>
+                    <div class="status-note"><small><?= getTransferStatusDescription($row['status'], $row['from_branch'], $row['to_branch']) ?></small></div>
                 </td>
                 <td>
                     <div class="action-btns">
