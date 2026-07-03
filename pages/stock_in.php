@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 requireLogin();
-requireRole('Administrator', 'Store Manager');
+requireRole('Administrator', 'Store Manager', 'Staff');
 $pageTitle = 'Stock In'; $activePage = 'stock_in';
 $user = currentUser(); $branchId = $user['branch_id'];
 $isAdmin = hasRole('Administrator'); $pdo = db();
