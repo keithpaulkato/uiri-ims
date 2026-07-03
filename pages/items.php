@@ -7,7 +7,7 @@ $activePage = 'items';
 $user       = currentUser();
 $branchId   = $user['branch_id'];
 $isAdmin    = hasRole('Administrator');
-$canManage  = hasRole('Administrator', 'Store Manager');
+$canManage  = hasRole('Administrator', 'Store Manager', 'Staff');
 $pdo        = db();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
