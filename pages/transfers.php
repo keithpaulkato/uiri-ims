@@ -113,10 +113,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $branchFilter = $isAdmin ? (int)($_GET['branch'] ?? 0) : $branchId;
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 
-$transfersQuery = "SELECT t.*, f.name AS from_branch, to.name AS to_branch, u.full_name AS requested_by_name, a.full_name AS approved_by_name
+$transfersQuery = "SELECT t.*, f.name AS from_branch, tb.name AS to_branch, u.full_name AS requested_by_name, a.full_name AS approved_by_name
                   FROM transfers t
                   JOIN branches f ON t.from_branch_id = f.id
-                  JOIN branches to ON t.to_branch_id = to.id
+                  JOIN branches tb ON t.to_branch_id = tb.id
                   JOIN users u ON t.requested_by = u.id
                   LEFT JOIN users a ON t.approved_by = a.id";
 if (!$isAdmin && $canManage) {
