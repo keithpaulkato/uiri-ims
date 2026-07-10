@@ -327,11 +327,8 @@ include __DIR__ . '/../includes/header.php';
         </table>
         <?php if ($totalPages > 1): ?>
         <div class="pagination-bar">
-            <div class="pagination-summary">
-                Page <?= number_format($page) ?> of <?= number_format($totalPages) ?>
-            </div>
-            <nav class="pagination-nav" aria-label="Inventory item pages">
-                <a class="pagination-link <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $page > 1 ? clean($pageUrl($page - 1)) : '#' ?>" aria-disabled="<?= $page <= 1 ? 'true' : 'false' ?>">Previous</a>
+            <nav class="pagination-nav pagination-nav-left" aria-label="Previous inventory item pages">
+                <a class="pagination-link pagination-direction <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $page > 1 ? clean($pageUrl($page - 1)) : '#' ?>" aria-disabled="<?= $page <= 1 ? 'true' : 'false' ?>">&lt;&lt;Previous</a>
                 <?php
                     $windowStart = max(1, $page - 2);
                     $windowEnd = min($totalPages, $page + 2);
@@ -351,7 +348,12 @@ include __DIR__ . '/../includes/header.php';
                     <?php if ($windowEnd < $totalPages - 1): ?><span class="pagination-ellipsis">...</span><?php endif; ?>
                     <a class="pagination-link" href="<?= clean($pageUrl($totalPages)) ?>"><?= number_format($totalPages) ?></a>
                 <?php endif; ?>
-                <a class="pagination-link <?= $page >= $totalPages ? 'disabled' : '' ?>" href="<?= $page < $totalPages ? clean($pageUrl($page + 1)) : '#' ?>" aria-disabled="<?= $page >= $totalPages ? 'true' : 'false' ?>">Next</a>
+            </nav>
+            <div class="pagination-summary">
+                Page <?= number_format($page) ?> of <?= number_format($totalPages) ?>
+            </div>
+            <nav class="pagination-nav pagination-nav-right" aria-label="Next inventory item page">
+                <a class="pagination-link pagination-direction <?= $page >= $totalPages ? 'disabled' : '' ?>" href="<?= $page < $totalPages ? clean($pageUrl($page + 1)) : '#' ?>" aria-disabled="<?= $page >= $totalPages ? 'true' : 'false' ?>">Next&gt;&gt;</a>
             </nav>
         </div>
         <?php endif; ?>
