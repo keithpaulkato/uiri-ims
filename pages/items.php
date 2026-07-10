@@ -113,7 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $search         = trim($_GET['search'] ?? '');
 $catFilter      = (int)($_GET['category'] ?? 0);
 $supplierFilter = (int)($_GET['supplier'] ?? 0);
-$branchFilter   = $isAdmin ? (int)($_GET['branch'] ?? 0) : $branchId;
+$branchParam    = $_GET['branch'] ?? '';
+$showAllBranches = $isAdmin && $branchParam === 'all';
+$branchFilter   = $isAdmin ? ($showAllBranches ? 0 : ($branchParam !== '' ? (int)$branchParam : (int)$branchId)) : (int)$branchId;
 $deptFilter     = (int)($_GET['department'] ?? 0);
 $sectionFilter  = (int)($_GET['section'] ?? 0);
 $stockFilter    = $_GET['filter'] ?? '';
@@ -173,11 +175,11 @@ if ($isAdmin) {
     $categories->execute([$branchId]);
     $categories = $categories->fetchAll();
 }
-$sections = $pdo->prepare("SELECT s.id, s.name, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id=b.id WHERE s.is_active=1" . (!$isAdmin ? " AND s.branch_id = ?" : "") . " ORDER BY b.name, s.name");
-$sections->execute(!$isAdmin ? [$branchId] : []);
+$sections = $pdo->prepare("SELECT s.id, s.name, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id=b.id WHERE s.is_active=1" . ($branchFilter ? " AND s.branch_id = ?" : "") . " ORDER BY b.name, s.name");
+$sections->execute($branchFilter ? [$branchFilter] : []);
 $sections = $sections->fetchAll();
-$departments = $pdo->prepare("SELECT d.id, d.name, d.section_id, s.branch_id, b.name AS branch_name, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id JOIN branches b ON s.branch_id=b.id WHERE d.is_active=1" . (!$isAdmin ? " AND b.id = ?" : "") . " ORDER BY b.name, s.name, d.name");
-$departments->execute(!$isAdmin ? [$branchId] : []);
+$departments = $pdo->prepare("SELECT d.id, d.name, d.section_id, s.branch_id, b.name AS branch_name, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id JOIN branches b ON s.branch_id=b.id WHERE d.is_active=1" . ($branchFilter ? " AND b.id = ?" : "") . " ORDER BY b.name, s.name, d.name");
+$departments->execute($branchFilter ? [$branchFilter] : []);
 $departments = $departments->fetchAll();
 
 $editItem = null;
@@ -237,7 +239,7 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($isAdmin): ?>
         <div class="filter-group">
             <select name="branch">
-                <option value="">All Campuses</option>
+                <option value="all" <?= $showAllBranches ? 'selected' : '' ?>>All Campuses</option>
                 <?php foreach ($branches as $b): ?>
                 <option value="<?= $b['id'] ?>" <?= $b['id']==$branchFilter?'selected':'' ?>><?= clean($b['name']) ?></option>
                 <?php endforeach; ?>
