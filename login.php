@@ -56,7 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Rate limiting check
     $clientIp = getUserIpAddress();
-    if (isRateLimited($clientIp . ':login', 10, 900)) {
+    $loginAttemptLimit = 4;
+    $loginWindowSeconds = 900;
+    $loginIdentifier = $clientIp . ':login';
+    if (isRateLimited($loginIdentifier, $loginAttemptLimit, $loginWindowSeconds)) {
         $error = 'Too many failed login attempts from your IP. Please try again after 15 minutes.';
     } else {
         $username = trim($_POST['username'] ?? '');
@@ -75,11 +78,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = $stmt->fetch();
 
             if (!$user) {
-                $error = 'Invalid username or password.';
-                recordRateLimitAttempt($clientIp . ':login', 'login');
+                recordRateLimitAttempt($loginIdentifier, 'login');
+                $attempts = getRateLimitAttemptCount($loginIdentifier, $loginWindowSeconds);
+                if ($attempts >= $loginAttemptLimit) {
+                    $error = 'Too many failed login attempts. Please try again after 15 minutes.';
+                } else {
+                    $remaining = $loginAttemptLimit - $attempts;
+                    $error = "Invalid username or password. ($remaining attempt" . ($remaining === 1 ? '' : 's') . " remaining)";
+                }
             } elseif (($user['email_verified'] ?? 1) == 0 && ($user['username'] ?? '') !== 'admin') {
                 $error = 'Your email address has not been verified yet. Please check your email for the verification link.';
-            } elseif (isAccountLocked($user['id'])) {
+            } elseif (isAccountLocked($user['id'], $loginAttemptLimit)) {
                 $error = 'Account locked due to too many failed login attempts. Please try again in 30 minutes or contact your administrator.';
             } else {
                 $passwordValid = password_verify($password, $user['password']);
@@ -111,6 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Reset failed attempts and update last login
                     db()->prepare("UPDATE users SET last_login = NOW(), failed_login_attempts = 0, last_login_attempt = NULL WHERE id = ?")->execute([$user['id']]);
+                    db()->prepare("DELETE FROM rate_limits WHERE identifier = ?")->execute([$loginIdentifier]);
 
                     // Handle remember me
                     if ($remember) {
@@ -127,16 +137,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Failed login attempt
                     $attempts = $user['failed_login_attempts'] + 1;
 
-                    if ($attempts >= 5) {
+                    if ($attempts >= $loginAttemptLimit) {
                         $error = 'Too many failed attempts. Account will be locked for 30 minutes.';
                     } else {
-                        $remaining = 5 - $attempts;
-                        $error = "Invalid username or password. ($remaining attempts remaining)";
+                        $remaining = $loginAttemptLimit - $attempts;
+                        $error = "Invalid username or password. ($remaining attempt" . ($remaining === 1 ? '' : 's') . " remaining)";
                     }
 
                     db()->prepare("UPDATE users SET failed_login_attempts = ?, last_login_attempt = NOW() WHERE id = ?")->execute([$attempts, $user['id']]);
                     recordLoginAttempt($user['id'], false, 'Failed password attempt');
-                    recordRateLimitAttempt($clientIp . ':login', 'login');
+                    recordRateLimitAttempt($loginIdentifier, 'login');
                 }
             }
         } else {

@@ -553,6 +553,29 @@ function isRateLimited(string $identifier, int $maxAttempts = 5, int $windowSeco
 }
 
 /**
+ * Count recent rate limit attempts for an identifier.
+ */
+function getRateLimitAttemptCount(string $identifier, int $windowSeconds = 300): int {
+    $pdo = db();
+
+    try {
+        $pdo->query("DELETE FROM rate_limits WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM rate_limits
+            WHERE identifier = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+        ");
+        $stmt->execute([$identifier, $windowSeconds]);
+        return (int)$stmt->fetchColumn();
+    } catch (PDOException $e) {
+        if (str_contains($e->getMessage(), '42S02') || str_contains($e->getMessage(), 'doesn\'t exist')) {
+            return 0;
+        }
+        throw $e;
+    }
+}
+
+/**
  * Record a rate limit attempt for tracking.
  */
 function recordRateLimitAttempt(string $identifier, string $action = 'login'): void {
@@ -580,7 +603,7 @@ function generateEmailVerificationToken(): string {
  * Check if account is locked due to too many failed attempts.
  * Returns true if locked, false otherwise.
  */
-function isAccountLocked(int $userId): bool {
+function isAccountLocked(int $userId, int $maxAttempts = 4): bool {
     $pdo = db();
     $stmt = $pdo->prepare("
         SELECT failed_login_attempts, last_login_attempt FROM users WHERE id = ?
@@ -590,7 +613,7 @@ function isAccountLocked(int $userId): bool {
     
     if (!$user) return false;
     
-    if ($user['failed_login_attempts'] < 5) return false;
+    if ($user['failed_login_attempts'] < $maxAttempts) return false;
     
     $lockoutTime = strtotime('-30 minutes');
     $lastAttemptTime = strtotime($user['last_login_attempt']);
