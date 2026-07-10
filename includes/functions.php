@@ -593,6 +593,23 @@ function recordRateLimitAttempt(string $identifier, string $action = 'login'): v
 }
 
 /**
+ * Clear rate limit attempts for an identifier.
+ */
+function clearRateLimitAttempts(string $identifier): void {
+    $pdo = db();
+
+    try {
+        $stmt = $pdo->prepare("DELETE FROM rate_limits WHERE identifier = ?");
+        $stmt->execute([$identifier]);
+    } catch (PDOException $e) {
+        if (str_contains($e->getMessage(), '42S02') || str_contains($e->getMessage(), 'doesn\'t exist')) {
+            return;
+        }
+        throw $e;
+    }
+}
+
+/**
  * Generate email verification token.
  */
 function generateEmailVerificationToken(): string {

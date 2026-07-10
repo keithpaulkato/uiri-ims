@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Reset failed attempts and update last login
                     db()->prepare("UPDATE users SET last_login = NOW(), failed_login_attempts = 0, last_login_attempt = NULL WHERE id = ?")->execute([$user['id']]);
-                    db()->prepare("DELETE FROM rate_limits WHERE identifier = ?")->execute([$loginIdentifier]);
+                    clearRateLimitAttempts($loginIdentifier);
 
                     // Handle remember me
                     if ($remember) {
