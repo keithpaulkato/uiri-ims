@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../includes/config.php';
 requireLogin();
 requireRole('Administrator');
-$pageTitle = 'Departments';
+$pageTitle = 'Sections / Units';
 $activePage = 'departments';
 $pdo = db();
 
@@ -18,25 +18,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $contactEmail = trim($_POST['contact_email'] ?? '');
         $description = trim($_POST['description'] ?? '');
         if (!$sectionId || !$name) {
-            setFlash('error', 'Section and department name are required.');
+            setFlash('error', 'Parent department and section/unit name are required.');
         } else {
             if ($action === 'add') {
                 $pdo->prepare("INSERT INTO departments (section_id, name, code, manager_name, contact_email, description) VALUES (?, ?, ?, ?, ?, ?)")
                     ->execute([$sectionId, $name, $code, $managerName, $contactEmail, $description]);
-                auditLog('ADD_DEPARTMENT', 'departments', $pdo->lastInsertId(), "Added department: $name");
-                setFlash('success', 'Department added successfully.');
+                auditLog('ADD_DEPARTMENT', 'departments', $pdo->lastInsertId(), "Added section/unit: $name");
+                setFlash('success', 'Section/unit added successfully.');
             } else {
                 $pdo->prepare("UPDATE departments SET section_id = ?, name = ?, code = ?, manager_name = ?, contact_email = ?, description = ? WHERE id = ?")
                     ->execute([$sectionId, $name, $code, $managerName, $contactEmail, $description, $id]);
-                auditLog('EDIT_DEPARTMENT', 'departments', $id, "Updated department: $name");
-                setFlash('success', 'Department updated successfully.');
+                auditLog('EDIT_DEPARTMENT', 'departments', $id, "Updated section/unit: $name");
+                setFlash('success', 'Section/unit updated successfully.');
             }
         }
     } elseif ($action === 'delete') {
         $id = (int)($_POST['department_id'] ?? 0);
         $pdo->prepare("DELETE FROM departments WHERE id = ?")->execute([$id]);
-        auditLog('DELETE_DEPARTMENT', 'departments', $id, 'Deleted department');
-        setFlash('success', 'Department deleted.');
+        auditLog('DELETE_DEPARTMENT', 'departments', $id, 'Deleted section/unit');
+        setFlash('success', 'Section/unit deleted.');
     }
     header('Location: departments.php');
     exit;
@@ -57,11 +57,11 @@ include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <div>
-        <h1 class="page-title">Department Management</h1>
-        <p class="page-sub">Manage departments under each campus</p>
+        <h1 class="page-title">Section / Unit Management</h1>
+        <p class="page-sub">Manage sections and units under their parent departments/directorates.</p>
     </div>
     <div class="page-actions">
-        <button class="btn btn-primary" onclick="openModal('departmentModal')">Add Department</button>
+        <button class="btn btn-primary" onclick="openModal('departmentModal')">Add Section / Unit</button>
     </div>
 </div>
 
@@ -69,7 +69,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body p0">
         <table class="data-table">
             <thead>
-                <tr><th>#</th><th>Department</th><th>Code</th><th>Campus</th><th>Manager</th><th>Actions</th></tr>
+                <tr><th>#</th><th>Section / Unit</th><th>Code</th><th>Parent Department</th><th>Campus</th><th>Manager</th><th>Actions</th></tr>
             </thead>
             <tbody>
             <?php foreach ($departments as $i => $dept): ?>
@@ -77,12 +77,13 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= $i + 1 ?></td>
                 <td><strong><?= clean($dept['name']) ?></strong></td>
                 <td><?= clean($dept['code'] ?: '—') ?></td>
+                <td><?= clean($dept['section_name']) ?></td>
                 <td><?= clean($dept['branch_name']) ?></td>
                 <td><?= clean($dept['manager_name'] ?: '—') ?></td>
                 <td>
                     <div class="action-btns">
                         <a href="departments.php?edit=<?= $dept['id'] ?>" class="btn-icon" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
-                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this department?')">
+                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this section/unit?')">
                             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="department_id" value="<?= $dept['id'] ?>">
@@ -100,7 +101,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="modal-overlay" id="departmentModal" <?= $editDepartment ? 'style="display:flex"' : '' ?>>
     <div class="modal">
         <div class="modal-header">
-            <h3><?= $editDepartment ? 'Edit Department' : 'Add Department' ?></h3>
+            <h3><?= $editDepartment ? 'Edit Section / Unit' : 'Add Section / Unit' ?></h3>
             <button class="modal-close" onclick="closeModal('departmentModal')">×</button>
         </div>
         <form method="POST">
@@ -110,7 +111,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="modal-body">
                 <div class="form-grid-2">
                     <div class="form-group">
-                        <label>Section *</label>
+                        <label>Parent Department *</label>
                         <select name="section_id" required>
                             <?php foreach ($sections as $section): ?>
                             <option value="<?= $section['id'] ?>" <?= ($editDepartment['section_id'] ?? 0) == $section['id'] ? 'selected' : '' ?>><?= clean($section['branch_name'] . ' / ' . $section['name']) ?></option>
@@ -118,11 +119,11 @@ include __DIR__ . '/../includes/header.php';
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Department Code</label>
+                        <label>Section / Unit Code</label>
                         <input type="text" name="code" value="<?= clean($editDepartment['code'] ?? '') ?>">
                     </div>
                     <div class="form-group" style="grid-column:1/-1">
-                        <label>Department Name *</label>
+                        <label>Section / Unit Name *</label>
                         <input type="text" name="name" required value="<?= clean($editDepartment['name'] ?? '') ?>">
                     </div>
                     <div class="form-group">
@@ -141,7 +142,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('departmentModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary"><?= $editDepartment ? 'Update Department' : 'Add Department' ?></button>
+                <button type="submit" class="btn btn-primary"><?= $editDepartment ? 'Update Section / Unit' : 'Add Section / Unit' ?></button>
             </div>
         </form>
     </div>

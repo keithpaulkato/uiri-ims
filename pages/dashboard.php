@@ -294,7 +294,7 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="dashboard-widget-grid">
     <div class="dashboard-widget">
-        <h4>Department Performance</h4>
+        <h4>Section / Unit Performance</h4>
         <div class="activity-feed">
             <?php foreach ($departmentPerformance as $index => $dept): ?>
             <div class="feed-item">

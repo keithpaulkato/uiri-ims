@@ -248,7 +248,7 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
         <div class="filter-group">
             <select name="section">
-                <option value="">All Sections</option>
+                <option value="">All Departments</option>
                 <?php foreach ($sections as $s): ?>
                 <option value="<?= $s['id'] ?>" <?= $s['id']==$sectionFilter?'selected':'' ?>><?= clean($s['branch_name']) ?> — <?= clean($s['name']) ?></option>
                 <?php endforeach; ?>
@@ -256,7 +256,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="filter-group">
             <select name="department">
-                <option value="">All Departments</option>
+                <option value="">All Sections / Units</option>
                 <?php foreach ($departments as $d): ?>
                 <option value="<?= $d['id'] ?>" <?= $d['id']==$deptFilter?'selected':'' ?>><?= clean($d['branch_name']) ?> — <?= clean($d['section_name']) ?> — <?= clean($d['name']) ?></option>
                 <?php endforeach; ?>
@@ -280,7 +280,7 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($items): ?>
         <table class="data-table">
             <thead><tr>
-                <th>#</th><th>Item</th><th>Category</th><th>Section</th><th>Department</th>
+                <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
                 <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
                 <th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
                 <?php if ($canManage): ?><th>Actions</th><?php endif; ?>
@@ -488,7 +488,7 @@ include __DIR__ . '/../includes/header.php';
                             <div class="wizard-step-panel" data-step-panel="location">
                                 <div class="form-section-card">
                                     <h4>Organizational Assignment</h4>
-                                    <p>Assign the item to the right campus, section, and department.</p>
+                                    <p>Assign the item to the right campus, department, and section/unit.</p>
                                     <div class="form-grid-2">
                                                 <?php if ($isAdmin): ?>
                                         <div class="form-group">
@@ -501,18 +501,18 @@ include __DIR__ . '/../includes/header.php';
                                         </div>
                                         <?php endif; ?>
                                         <div class="form-group">
-                                            <label>Section</label>
+                                            <label>Department</label>
                                             <select name="section_id" id="previewSectionInput" <?= $isAdmin ? '' : 'required' ?>>
-                                                <option value="">Select section</option>
+                                                <option value="">Select department</option>
                                                 <?php foreach ($sections as $s): ?>
                                                 <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?>" <?= ($editItem['section_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['branch_name']) ?> — <?= clean($s['name']) ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Department</label>
+                                            <label>Section / Unit</label>
                                             <select name="department_id" id="previewDeptInput">
-                                                <option value="">Select department</option>
+                                                <option value="">Select section/unit</option>
                                                 <?php foreach ($departments as $d): ?>
                                                 <option value="<?= $d['id'] ?>" data-section="<?= $d['section_id'] ?>" <?= ($editItem['department_id']??0)==$d['id']?'selected':'' ?>><?= clean($d['branch_name']) ?> — <?= clean($d['section_name']) ?> — <?= clean($d['name']) ?></option>
                                                 <?php endforeach; ?>
@@ -606,7 +606,7 @@ include __DIR__ . '/../includes/header.php';
                                     <p>Confirm the inventory details before saving.</p>
                                     <div class="review-checklist">
                                         <div class="review-item"><strong>Core details</strong><span>Item name, category, and description will be saved.</span></div>
-                                        <div class="review-item"><strong>Location</strong><span>Campus and department assignments are included in the record.</span></div>
+                                        <div class="review-item"><strong>Location</strong><span>Campus, department, and section/unit assignments are included in the record.</span></div>
                                         <div class="review-item"><strong>Stock & financials</strong><span>Minimum stock and price thresholds are tracked.</span></div>
                                         <div class="review-item"><strong>Tracking</strong><span>Asset and QR references are generated for easy identification.</span></div>
                                     </div>
@@ -624,8 +624,8 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                                 <dl class="preview-list">
                                     <div><dt>Supplier</dt><dd id="previewSupplier">Not assigned</dd></div>
-                                    <div><dt>Section</dt><dd id="previewSection">Unassigned section</dd></div>
-                                    <div><dt>Department</dt><dd id="previewDepartment">Unassigned department</dd></div>
+                                    <div><dt>Department</dt><dd id="previewSection">Unassigned department</dd></div>
+                                    <div><dt>Section / Unit</dt><dd id="previewDepartment">Unassigned section/unit</dd></div>
                                     <div><dt>Current Stock</dt><dd id="previewStock">0 units</dd></div>
                                     <div><dt>Estimated Value</dt><dd id="previewValue">UGX 0</dd></div>
                                     <div><dt>Asset Code</dt><dd id="previewAssetCode">—</dd></div>
@@ -679,8 +679,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function updatePreview() {
         const name = document.getElementById('previewNameInput')?.value?.trim() || 'Untitled Item';
         const category = document.getElementById('previewCategoryInput')?.selectedOptions[0]?.text || 'Unassigned Category';
-        const section = document.getElementById('previewSectionInput')?.selectedOptions[0]?.text || 'Unassigned section';
-        const department = document.getElementById('previewDeptInput')?.selectedOptions[0]?.text || 'Unassigned department';
+        const section = document.getElementById('previewSectionInput')?.selectedOptions[0]?.text || 'Unassigned department';
+        const department = document.getElementById('previewDeptInput')?.selectedOptions[0]?.text || 'Unassigned section/unit';
         const branch = document.getElementById('previewBranchInput')?.selectedOptions[0]?.text || 'Campus Not Set';
         const supplier = document.getElementById('previewSupplierInput')?.selectedOptions[0]?.text || 'Not assigned';
         const unit = document.getElementById('previewUnitInput')?.value || 'unit';

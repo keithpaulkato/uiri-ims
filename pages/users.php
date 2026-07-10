@@ -119,7 +119,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body p0">
         <div class="table-responsive users-table-wrap">
         <table class="data-table users-table">
-            <thead><tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Section</th><th>Department</th><th>Phone</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Department</th><th>Section / Unit</th><th>Phone</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($users as $i=>$u): ?>
             <tr>
@@ -189,7 +189,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group"><label>Section</label>
+                    <div class="form-group"><label>Department</label>
                         <select name="section_id">
                             <option value="0">-- None --</option>
                             <?php foreach ($sections as $s): ?>
@@ -197,7 +197,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group"><label>Department</label>
+                    <div class="form-group"><label>Section / Unit</label>
                         <select name="department_id">
                             <option value="0">-- None --</option>
                             <?php foreach ($departments as $d): ?>

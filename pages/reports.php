@@ -230,9 +230,9 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="filter-group">
-        <label for="sectionSelect" class="form-label">Section</label>
+        <label for="sectionSelect" class="form-label">Department</label>
         <select id="sectionSelect" name="section" class="form-control">
-            <option value="">All Sections</option>
+            <option value="">All Departments</option>
             <?php foreach ($sections as $s): ?>
                 <option value="<?= $s['id'] ?>" <?= $s['id']==$sectionFilter?'selected':'' ?>><?= clean($s['name']) ?></option>
             <?php endforeach; ?>
@@ -240,11 +240,11 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="filter-group">
-        <label for="departmentSelect" class="form-label">Department</label>
+        <label for="departmentSelect" class="form-label">Section / Unit</label>
         <select id="departmentSelect" name="department" class="form-control">
-            <option value="">All Departments</option>
+            <option value="">All Sections / Units</option>
             <?php foreach ($departments as $d): ?>
-                <option value="<?= $d['id'] ?>" <?= $d['id']==$departmentFilter?'selected':'' ?>><?= clean($d['name']) ?><?= isset($d['section_name']) ? ' — '.clean($d['section_name']) : '' ?></option>
+                <option value="<?= $d['id'] ?>" <?= $d['id']==$departmentFilter?'selected':'' ?>><?= isset($d['section_name']) ? clean($d['section_name']).' — ' : '' ?><?= clean($d['name']) ?></option>
             <?php endforeach; ?>
         </select>
     </div>

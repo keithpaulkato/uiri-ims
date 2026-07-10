@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../includes/config.php';
 requireLogin();
 requireRole('Administrator', 'Campus Manager', 'Store Manager', 'Section Manager');
-$pageTitle = 'Sections';
+$pageTitle = 'Departments';
 $activePage = 'sections';
 $pdo = db();
 
@@ -16,25 +16,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $code = trim($_POST['code'] ?? '');
         $description = trim($_POST['description'] ?? '');
         if (!$branchId || !$name) {
-            setFlash('error', 'Campus and section name are required.');
+            setFlash('error', 'Campus and department name are required.');
         } else {
             if ($action === 'add') {
                 $pdo->prepare("INSERT INTO sections (branch_id, name, code, description) VALUES (?, ?, ?, ?)")
                     ->execute([$branchId, $name, $code, $description]);
-                auditLog('ADD_SECTION', 'sections', $pdo->lastInsertId(), "Added section: $name");
-                setFlash('success', 'Section added successfully.');
+                auditLog('ADD_SECTION', 'sections', $pdo->lastInsertId(), "Added department: $name");
+                setFlash('success', 'Department added successfully.');
             } else {
                 $pdo->prepare("UPDATE sections SET branch_id = ?, name = ?, code = ?, description = ? WHERE id = ?")
                     ->execute([$branchId, $name, $code, $description, $id]);
-                auditLog('EDIT_SECTION', 'sections', $id, "Updated section: $name");
-                setFlash('success', 'Section updated successfully.');
+                auditLog('EDIT_SECTION', 'sections', $id, "Updated department: $name");
+                setFlash('success', 'Department updated successfully.');
             }
         }
     } elseif ($action === 'delete') {
         $id = (int)($_POST['section_id'] ?? 0);
         $pdo->prepare("DELETE FROM sections WHERE id = ?")->execute([$id]);
-        auditLog('DELETE_SECTION', 'sections', $id, 'Deleted section');
-        setFlash('success', 'Section deleted.');
+        auditLog('DELETE_SECTION', 'sections', $id, 'Deleted department');
+        setFlash('success', 'Department deleted.');
     }
     header('Location: sections.php');
     exit;
@@ -54,11 +54,11 @@ include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <div>
-        <h1 class="page-title">Section Management</h1>
-        <p class="page-sub">Manage sections under each department</p>
+        <h1 class="page-title">Department Management</h1>
+        <p class="page-sub">Manage UIRI departments/directorates under each campus.</p>
     </div>
     <div class="page-actions">
-        <button class="btn btn-primary" onclick="openModal('sectionModal')">Add Section</button>
+        <button class="btn btn-primary" onclick="openModal('sectionModal')">Add Department</button>
     </div>
 </div>
 
@@ -66,7 +66,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body p0">
         <table class="data-table">
             <thead>
-                <tr><th>#</th><th>Section</th><th>Code</th><th>Campus</th><th>Description</th><th>Actions</th></tr>
+                <tr><th>#</th><th>Department</th><th>Code</th><th>Campus</th><th>Description</th><th>Actions</th></tr>
             </thead>
             <tbody>
             <?php foreach ($sections as $i => $sec): ?>
@@ -79,7 +79,7 @@ include __DIR__ . '/../includes/header.php';
                 <td>
                     <div class="action-btns">
                         <a href="sections.php?edit=<?= $sec['id'] ?>" class="btn-icon" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
-                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this section?')">
+                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this department?')">
                             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="section_id" value="<?= $sec['id'] ?>">
@@ -97,7 +97,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="modal-overlay" id="sectionModal" <?= $editSection ? 'style="display:flex"' : '' ?>>
     <div class="modal">
         <div class="modal-header">
-            <h3><?= $editSection ? 'Edit Section' : 'Add Section' ?></h3>
+            <h3><?= $editSection ? 'Edit Department' : 'Add Department' ?></h3>
             <button class="modal-close" onclick="closeModal('sectionModal')">×</button>
         </div>
         <form method="POST">
@@ -115,11 +115,11 @@ include __DIR__ . '/../includes/header.php';
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Section Code</label>
+                        <label>Department Code</label>
                         <input type="text" name="code" value="<?= clean($editSection['code'] ?? '') ?>">
                     </div>
                     <div class="form-group" style="grid-column:1/-1">
-                        <label>Section Name *</label>
+                        <label>Department Name *</label>
                         <input type="text" name="name" required value="<?= clean($editSection['name'] ?? '') ?>">
                     </div>
                     <div class="form-group" style="grid-column:1/-1">
@@ -130,7 +130,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('sectionModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary"><?= $editSection ? 'Update Section' : 'Add Section' ?></button>
+                <button type="submit" class="btn btn-primary"><?= $editSection ? 'Update Department' : 'Add Department' ?></button>
             </div>
         </form>
     </div>
