@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $departmentId = (int)($_POST['department_id'] ?? 0) ?: null;
         $unit         = trim($_POST['unit'] ?? 'piece');
         $unitPrice    = (float)($_POST['unit_price'] ?? 0);
+        $currentStock = max(0, (int)($_POST['current_stock'] ?? 0));
         $minStock     = (int)($_POST['minimum_stock'] ?? 5);
         $description  = trim($_POST['description'] ?? '');
         $itemBranch   = $isAdmin ? (int)($_POST['branch_id'] ?? $branchId) : $branchId;
@@ -88,13 +89,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         if ($action === 'add') {
-                $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,description,unit,unit_price,minimum_stock,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-                $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$description,$unit,$unitPrice,$minStock,$imageName,$user['id']]);
+                $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,description,unit,unit_price,current_stock,minimum_stock,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$description,$unit,$unitPrice,$currentStock,$minStock,$imageName,$user['id']]);
                 auditLog('ADD_ITEM','inventory_items',$pdo->lastInsertId(),"Added: $name");
                 setFlash('success',"Item '$name' added successfully.");
             } else {
-                $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,description=?,unit=?,unit_price=?,minimum_stock=?,image=?,branch_id=? WHERE id=?");
-                $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$description,$unit,$unitPrice,$minStock,$imageName,$itemBranch,$itemId]);
+                $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,image=?,branch_id=? WHERE id=?");
+                $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$description,$unit,$unitPrice,$currentStock,$minStock,$imageName,$itemBranch,$itemId]);
                 auditLog('EDIT_ITEM','inventory_items',$itemId,"Updated: $name");
                 setFlash('success',"Item '$name' updated successfully.");
             }
@@ -167,6 +168,7 @@ if (isset($_GET['edit'])) {
     $es->execute([(int)$_GET['edit']]);
     $editItem = $es->fetch();
 }
+$showAddModal = $canManage && (($_GET['action'] ?? '') === 'add' || $editItem);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -311,7 +313,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <?php if ($canManage): ?>
-<div class="modal-overlay" id="addItemModal" <?= $editItem?'style="display:flex"':'' ?>>
+<div class="modal-overlay" id="addItemModal" <?= $showAddModal?'style="display:flex"':'' ?>>
     <div class="modal modal-lg">
         <div class="modal-header">
             <h3><?= $editItem?'Edit Item':'Add New Item' ?></h3>
@@ -485,6 +487,10 @@ include __DIR__ . '/../includes/header.php';
                                             <input type="number" name="unit_price" id="previewPriceInput" min="0" step="100" value="<?= $editItem['unit_price']??0 ?>">
                                         </div>
                                         <div class="form-group">
+                                            <label>Current Stock</label>
+                                            <input type="number" name="current_stock" id="previewCurrentStockInput" min="0" value="<?= $editItem['current_stock']??0 ?>">
+                                        </div>
+                                        <div class="form-group">
                                             <label>Minimum Stock Level</label>
                                             <input type="number" name="minimum_stock" id="previewMinStockInput" min="0" value="<?= $editItem['minimum_stock']??5 ?>">
                                         </div>
@@ -621,7 +627,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const branch = document.getElementById('previewBranchInput')?.selectedOptions[0]?.text || 'Campus Not Set';
         const supplier = document.getElementById('previewSupplierInput')?.selectedOptions[0]?.text || 'Not assigned';
         const unit = document.getElementById('previewUnitInput')?.value || 'unit';
-        const stock = parseInt(document.getElementById('previewMinStockInput')?.value || '0', 10);
+        const stock = parseInt(document.getElementById('previewCurrentStockInput')?.value || '0', 10);
         const price = parseFloat(document.getElementById('previewPriceInput')?.value || '0');
         const assetCode = document.getElementById('previewAssetCodeInput')?.value?.trim() || '—';
         const qrCode = document.getElementById('previewQrCodeInput')?.value?.trim() || '—';
@@ -683,7 +689,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     ['input', 'change'].forEach(eventName => {
-        document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewMinStockInput, #previewPriceInput, #previewAssetCodeInput, #previewQrCodeInput').forEach(el => {
+        document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewAssetCodeInput, #previewQrCodeInput').forEach(el => {
             el.addEventListener(eventName, updatePreview);
         });
     });
