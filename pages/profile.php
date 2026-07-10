@@ -3,16 +3,27 @@ require_once __DIR__ . '/../includes/config.php';
 requireLogin();
 $pageTitle = 'My Profile'; $activePage = '';
 $user = currentUser(); $pdo = db();
+$userId = (int)($_SESSION['user_id'] ?? ($user['id'] ?? 0));
+
+$profileStmt = $pdo->prepare("SELECT u.*,r.name AS role_name,b.name AS branch_name FROM users u JOIN roles r ON u.role_id=r.id JOIN branches b ON u.branch_id=b.id WHERE u.id=?");
+$profileStmt->execute([$userId]);
+$profile = $profileStmt->fetch();
+if (!$profile) {
+    setFlash('error', 'Profile could not be found. Please sign in again.');
+    header('Location: ' . BASE_URL . 'includes/logout.php'); exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $fullName = trim($_POST['full_name']??''); $phone = trim($_POST['phone']??'');
     $oldPass = $_POST['old_password']??''; $newPass = $_POST['new_password']??''; $confirmPass = $_POST['confirm_password']??'';
     $profilePhoto = $profile['profile_photo'] ?? null;
+    $photoChanged = false;
     if (!empty($_FILES['profile_photo']['name'])) {
-        $uploadedPhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $user['id']);
+        $uploadedPhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $userId);
         if ($uploadedPhoto) {
             $profilePhoto = $uploadedPhoto;
+            $photoChanged = true;
         } else {
             setFlash('error','Please upload a valid image file (jpg, png, webp, gif) under 2MB.');
             header('Location: profile.php'); exit;
@@ -20,27 +31,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!$fullName) { setFlash('error','Full name is required.'); }
     else {
-        $pdo->prepare("UPDATE users SET full_name=?,phone=?,profile_photo=? WHERE id=?")->execute([$fullName,$phone,$profilePhoto,$user['id']]);
-        $_SESSION['user']['full_name'] = $fullName;
-        $_SESSION['user']['profile_photo'] = $profilePhoto;
-        if ($newPass) {
-            if ($newPass !== $confirmPass) { setFlash('error','New passwords do not match.'); }
-            elseif (!validatePassword($newPass, $passError)) { setFlash('error',$passError); }
-            else {
-                $row = $pdo->prepare("SELECT password FROM users WHERE id=?"); $row->execute([$user['id']]); $row=$row->fetch();
-                if (!password_verify($oldPass,$row['password'])) { setFlash('error','Current password is incorrect.'); }
-                else { 
-                    $pdo->prepare("UPDATE users SET password=?, failed_login_attempts=0 WHERE id=?")->execute([password_hash($newPass,PASSWORD_BCRYPT),$user['id']]); 
-                    setFlash('success','Password changed successfully.'); 
+        $passwordRequested = $oldPass !== '' || $newPass !== '' || $confirmPass !== '';
+        $passwordOk = true;
+        $passwordHash = null;
+
+        if ($passwordRequested) {
+            $passError = '';
+            if ($oldPass === '' || $newPass === '' || $confirmPass === '') {
+                setFlash('error', 'To change your password, please fill in current password, new password, and confirmation.');
+                $passwordOk = false;
+            } elseif ($newPass !== $confirmPass) {
+                setFlash('error','New passwords do not match.');
+                $passwordOk = false;
+            } elseif (!validatePassword($newPass, $passError)) {
+                setFlash('error',$passError);
+                $passwordOk = false;
+            } else {
+                $row = $pdo->prepare("SELECT password FROM users WHERE id=?"); $row->execute([$userId]); $row=$row->fetch();
+                if (!$row || !password_verify($oldPass,$row['password'])) {
+                    setFlash('error','Current password is incorrect.');
+                    $passwordOk = false;
+                } else {
+                    $passwordHash = password_hash($newPass,PASSWORD_BCRYPT);
                 }
             }
-        } else { setFlash('success','Profile updated successfully.'); }
+        }
+
+        if ($passwordOk) {
+            $pdo->prepare("UPDATE users SET full_name=?,phone=?,profile_photo=? WHERE id=?")->execute([$fullName,$phone,$profilePhoto,$userId]);
+            $_SESSION['user']['full_name'] = $fullName;
+            $_SESSION['user']['profile_photo'] = $profilePhoto;
+
+            if ($passwordHash) {
+                $pdo->prepare("UPDATE users SET password=?, failed_login_attempts=0 WHERE id=?")->execute([$passwordHash,$userId]);
+                setFlash('success','Profile and password updated successfully.');
+            } elseif ($photoChanged) {
+                setFlash('success','Profile photo updated successfully.');
+            } else {
+                setFlash('success','Profile updated successfully.');
+            }
+        }
     }
     header('Location: profile.php'); exit;
 }
-
-$profile = $pdo->prepare("SELECT u.*,r.name AS role_name,b.name AS branch_name FROM users u JOIN roles r ON u.role_id=r.id JOIN branches b ON u.branch_id=b.id WHERE u.id=?");
-$profile->execute([$user['id']]); $profile=$profile->fetch();
 
 include __DIR__ . '/../includes/header.php';
 ?>
