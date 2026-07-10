@@ -224,6 +224,11 @@ document.addEventListener('DOMContentLoaded', function () {
 function applySidebarWidth(width) {
     const mainWrapper = document.querySelector('.main-wrapper');
     document.documentElement.style.setProperty('--sidebar-w', width);
+    const numericWidth = parseInt(width, 10) || 250;
+    const maxWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-max-w'), 10) || 360;
+    const minWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-min-w'), 10) || 220;
+    const progress = Math.min(1, Math.max(0, (numericWidth - minWidth) / Math.max(1, maxWidth - minWidth)));
+    document.documentElement.style.setProperty('--sidebar-scale', (1 - (progress * 0.12)).toFixed(3));
     if (mainWrapper) {
         mainWrapper.style.marginLeft = width;
     }

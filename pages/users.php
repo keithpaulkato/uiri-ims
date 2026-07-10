@@ -115,9 +115,10 @@ include __DIR__ . '/../includes/header.php';
     <div><h1 class="page-title">User Management</h1><p class="page-sub"><?= count($users) ?> users registered</p></div>
     <div class="page-actions"><button class="btn btn-primary" onclick="openModal('userModal')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add User</button></div>
 </div>
-<div class="card">
+<div class="card users-table-card">
     <div class="card-body p0">
-        <table class="data-table">
+        <div class="table-responsive users-table-wrap">
+        <table class="data-table users-table">
             <thead><tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Section</th><th>Department</th><th>Phone</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($users as $i=>$u): ?>
@@ -157,6 +158,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 
