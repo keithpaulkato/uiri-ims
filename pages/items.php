@@ -135,9 +135,27 @@ if ($stockFilter === 'out') $where[] = "i.current_stock = 0";
 if ($stockFilter === 'good') $where[] = "i.current_stock > i.minimum_stock";
 $whereSQL = implode(' AND ', $where);
 
-$stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL ORDER BY i.created_at DESC");
+$itemsPerPage = 10;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL");
+$countStmt->execute($params);
+$totalItems = (int)$countStmt->fetchColumn();
+$totalPages = max(1, (int)ceil($totalItems / $itemsPerPage));
+$page = min($page, $totalPages);
+$offset = ($page - 1) * $itemsPerPage;
+$pageStart = $totalItems ? $offset + 1 : 0;
+$pageEnd = min($offset + $itemsPerPage, $totalItems);
+
+$stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL ORDER BY i.created_at DESC LIMIT $itemsPerPage OFFSET $offset");
 $stmt->execute($params);
 $items = $stmt->fetchAll();
+
+$paginationParams = $_GET;
+unset($paginationParams['page'], $paginationParams['edit'], $paginationParams['action']);
+$pageUrl = function (int $targetPage) use ($paginationParams): string {
+    $query = http_build_query(array_merge($paginationParams, ['page' => $targetPage]));
+    return 'items.php' . ($query ? '?' . $query : '');
+};
 
 $suppliers  = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $branches   = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
@@ -175,7 +193,12 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <div>
         <h1 class="page-title">Inventory Items</h1>
-        <p class="page-sub"><?= count($items) ?> item(s) found</p>
+        <p class="page-sub">
+            <?= number_format($totalItems) ?> item(s) found
+            <?php if ($totalItems): ?>
+                · Showing <?= number_format($pageStart) ?>-<?= number_format($pageEnd) ?>
+            <?php endif; ?>
+        </p>
     </div>
     <?php if ($canManage): ?>
     <div class="page-actions">
@@ -266,7 +289,7 @@ include __DIR__ . '/../includes/header.php';
                 $sl = $ss==='out' ? 'Out of Stock' : ($ss==='low' ? 'Low Stock' : 'In Stock');
             ?>
             <tr>
-                <td><?= $i+1 ?></td>
+                <td><?= $offset + $i + 1 ?></td>
                 <td>
                     <div class="item-cell">
                         <div class="item-thumb-placeholder"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div>
@@ -302,6 +325,36 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?php if ($totalPages > 1): ?>
+        <div class="pagination-bar">
+            <div class="pagination-summary">
+                Page <?= number_format($page) ?> of <?= number_format($totalPages) ?>
+            </div>
+            <nav class="pagination-nav" aria-label="Inventory item pages">
+                <a class="pagination-link <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $page > 1 ? clean($pageUrl($page - 1)) : '#' ?>" aria-disabled="<?= $page <= 1 ? 'true' : 'false' ?>">Previous</a>
+                <?php
+                    $windowStart = max(1, $page - 2);
+                    $windowEnd = min($totalPages, $page + 2);
+                    if ($windowEnd - $windowStart < 4) {
+                        $windowStart = max(1, min($windowStart, $windowEnd - 4));
+                        $windowEnd = min($totalPages, max($windowEnd, $windowStart + 4));
+                    }
+                ?>
+                <?php if ($windowStart > 1): ?>
+                    <a class="pagination-link" href="<?= clean($pageUrl(1)) ?>">1</a>
+                    <?php if ($windowStart > 2): ?><span class="pagination-ellipsis">...</span><?php endif; ?>
+                <?php endif; ?>
+                <?php for ($p = $windowStart; $p <= $windowEnd; $p++): ?>
+                    <a class="pagination-link <?= $p === $page ? 'active' : '' ?>" href="<?= clean($pageUrl($p)) ?>" aria-current="<?= $p === $page ? 'page' : 'false' ?>"><?= $p ?></a>
+                <?php endfor; ?>
+                <?php if ($windowEnd < $totalPages): ?>
+                    <?php if ($windowEnd < $totalPages - 1): ?><span class="pagination-ellipsis">...</span><?php endif; ?>
+                    <a class="pagination-link" href="<?= clean($pageUrl($totalPages)) ?>"><?= number_format($totalPages) ?></a>
+                <?php endif; ?>
+                <a class="pagination-link <?= $page >= $totalPages ? 'disabled' : '' ?>" href="<?= $page < $totalPages ? clean($pageUrl($page + 1)) : '#' ?>" aria-disabled="<?= $page >= $totalPages ? 'true' : 'false' ?>">Next</a>
+            </nav>
+        </div>
+        <?php endif; ?>
         <?php else: ?>
         <div class="empty-state">
             <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
