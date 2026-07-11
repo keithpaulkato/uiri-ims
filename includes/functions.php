@@ -684,3 +684,30 @@ function validateEmailStrength(string $email): bool {
     return true;
 }
 
+/**
+ * Ensure decision/reporting fields exist on inventory items.
+ */
+function ensureInventoryDecisionColumns(): void {
+    $pdo = db();
+    $columns = [
+        'brand_model' => "ALTER TABLE inventory_items ADD COLUMN brand_model VARCHAR(150) DEFAULT NULL AFTER name",
+        'asset_status' => "ALTER TABLE inventory_items ADD COLUMN asset_status VARCHAR(30) DEFAULT 'Available' AFTER warranty_date",
+        'asset_condition' => "ALTER TABLE inventory_items ADD COLUMN asset_condition VARCHAR(30) DEFAULT 'New' AFTER asset_status",
+        'funding_source' => "ALTER TABLE inventory_items ADD COLUMN funding_source VARCHAR(120) DEFAULT NULL AFTER asset_condition",
+        'storage_location' => "ALTER TABLE inventory_items ADD COLUMN storage_location VARCHAR(120) DEFAULT NULL AFTER funding_source"
+    ];
+
+    foreach ($columns as $column => $sql) {
+        try {
+            $check = $pdo->query("SHOW COLUMNS FROM inventory_items LIKE " . $pdo->quote($column));
+            if (!$check->fetch()) {
+                $pdo->exec($sql);
+            }
+        } catch (PDOException $e) {
+            if (!str_contains($e->getMessage(), '42S02') && !str_contains($e->getMessage(), "doesn't exist")) {
+                throw $e;
+            }
+        }
+    }
+}
+

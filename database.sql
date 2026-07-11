@@ -484,6 +484,7 @@ CREATE TABLE inventory_items (
     asset_code VARCHAR(100) DEFAULT NULL,
     qr_code VARCHAR(100) DEFAULT NULL,
     name VARCHAR(200) NOT NULL,
+    brand_model VARCHAR(150) DEFAULT NULL,
     description TEXT,
     unit VARCHAR(30) DEFAULT 'piece',
     unit_price DECIMAL(15,2) DEFAULT 0.00,
@@ -492,6 +493,10 @@ CREATE TABLE inventory_items (
     asset_type VARCHAR(50) DEFAULT 'Consumable',
     purchase_date DATE DEFAULT NULL,
     warranty_date DATE DEFAULT NULL,
+    asset_status VARCHAR(30) DEFAULT 'Available',
+    asset_condition VARCHAR(30) DEFAULT 'New',
+    funding_source VARCHAR(120) DEFAULT NULL,
+    storage_location VARCHAR(120) DEFAULT NULL,
     image VARCHAR(255) DEFAULT NULL,
     is_active TINYINT(1) DEFAULT 1,
     created_by INT,
@@ -776,6 +781,8 @@ CREATE INDEX idx_inventory_items_branch ON inventory_items(branch_id);
 CREATE INDEX idx_inventory_items_category ON inventory_items(category_id);
 CREATE INDEX idx_inventory_items_supplier ON inventory_items(supplier_id);
 CREATE INDEX idx_inventory_items_code ON inventory_items(item_code);
+CREATE INDEX idx_inventory_items_purchase_date ON inventory_items(purchase_date);
+CREATE INDEX idx_inventory_items_asset_status ON inventory_items(asset_status);
 CREATE INDEX idx_stock_transactions_item ON stock_transactions(item_id);
 CREATE INDEX idx_stock_transactions_branch ON stock_transactions(branch_id);
 CREATE INDEX idx_stock_transactions_date ON stock_transactions(transaction_date);

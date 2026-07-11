@@ -9,6 +9,7 @@ $branchId   = $user['branch_id'];
 $isAdmin    = hasRole('Administrator');
 $canManage  = hasRole('Administrator', 'Store Manager', 'Staff');
 $pdo        = db();
+ensureInventoryDecisionColumns();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -20,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $itemCode     = trim($_POST['item_code'] ?? '');
         $assetCode    = trim($_POST['asset_code'] ?? '');
         $qrCode       = trim($_POST['qr_code'] ?? '');
+        $brandModel   = trim($_POST['brand_model'] ?? '');
         $categoryId   = (int)($_POST['category_id'] ?? 0);
         $supplierId   = (int)($_POST['supplier_id'] ?? 0) ?: null;
         $departmentId = (int)($_POST['department_id'] ?? 0) ?: null;
@@ -28,6 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $currentStock = max(0, (int)($_POST['current_stock'] ?? 0));
         $minStock     = (int)($_POST['minimum_stock'] ?? 5);
         $description  = trim($_POST['description'] ?? '');
+        $assetType    = trim($_POST['inventory_type'] ?? 'Consumable');
+        $purchaseDate = $_POST['purchase_date'] ?: null;
+        $warrantyDate = $_POST['warranty_date'] ?: null;
+        $assetStatus  = trim($_POST['asset_status'] ?? 'Available');
+        $assetCondition = trim($_POST['asset_condition'] ?? 'New');
+        $fundingSource = trim($_POST['funding_source'] ?? '');
+        $storageLocation = trim($_POST['storage_location'] ?? '');
         $itemBranch   = $isAdmin ? (int)($_POST['branch_id'] ?? $branchId) : $branchId;
 
         if (!$name || !$itemCode || !$categoryId) {
@@ -89,13 +98,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         if ($action === 'add') {
-                $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,description,unit,unit_price,current_stock,minimum_stock,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-                $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$description,$unit,$unitPrice,$currentStock,$minStock,$imageName,$user['id']]);
+                $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$user['id']]);
                 auditLog('ADD_ITEM','inventory_items',$pdo->lastInsertId(),"Added: $name");
                 setFlash('success',"Item '$name' added successfully.");
             } else {
-                $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,image=?,branch_id=? WHERE id=?");
-                $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$description,$unit,$unitPrice,$currentStock,$minStock,$imageName,$itemBranch,$itemId]);
+                $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=? WHERE id=?");
+                $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$itemBranch,$itemId]);
                 auditLog('EDIT_ITEM','inventory_items',$itemId,"Updated: $name");
                 setFlash('success',"Item '$name' updated successfully.");
             }
@@ -125,8 +134,8 @@ $params = [];
 if (!$isAdmin) { $where[] = "i.branch_id = ?"; $params[] = $branchId; }
 elseif ($branchFilter) { $where[] = "i.branch_id = ?"; $params[] = $branchFilter; }
 if ($search) {
-    $where[] = "(i.name LIKE ? OR i.item_code LIKE ? OR i.asset_code LIKE ? OR i.qr_code LIKE ? OR i.description LIKE ? OR c.name LIKE ? OR s.company_name LIKE ? OR b.name LIKE ? OR sec.name LIKE ? OR d.name LIKE ?)";
-    $params = array_merge($params, ["%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%"]);
+    $where[] = "(i.name LIKE ? OR i.item_code LIKE ? OR i.asset_code LIKE ? OR i.qr_code LIKE ? OR i.brand_model LIKE ? OR i.description LIKE ? OR c.name LIKE ? OR s.company_name LIKE ? OR b.name LIKE ? OR sec.name LIKE ? OR d.name LIKE ?)";
+    $params = array_merge($params, ["%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%"]);
 }
 if ($catFilter) { $where[] = "i.category_id = ?"; $params[] = $catFilter; }
 if ($supplierFilter) { $where[] = "i.supplier_id = ?"; $params[] = $supplierFilter; }
@@ -282,7 +291,7 @@ include __DIR__ . '/../includes/header.php';
             <thead><tr>
                 <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
                 <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
-                <th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
+                <th>Model / Specs</th><th>Purchased</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
                 <?php if ($canManage): ?><th>Actions</th><?php endif; ?>
             </tr></thead>
             <tbody>
@@ -302,6 +311,8 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= clean($item['section_name'] ?: '—') ?></td>
                 <td><?= clean($item['department_name'] ?: '—') ?></td>
                 <?php if ($isAdmin): ?><td><?= clean($item['branch_name']) ?></td><?php endif; ?>
+                <td><?= clean($item['brand_model'] ?: '—') ?></td>
+                <td><?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?></td>
                 <td><?= ugx($item['unit_price']) ?></td>
                 <td><strong><?= number_format($item['current_stock']) ?> <?= clean($item['unit']) ?></strong></td>
                 <td><?= $item['minimum_stock'] ?></td>
@@ -434,7 +445,7 @@ include __DIR__ . '/../includes/header.php';
                                         </div>
                                         <div class="form-group">
                                             <label>Brand / Model</label>
-                                            <input type="text" name="brand_model" placeholder="e.g. Dell Latitude 7420" value="">
+                                            <input type="text" name="brand_model" id="previewBrandModelInput" placeholder="e.g. Dell Latitude 7420, Core i5, 8GB RAM" value="<?= clean($editItem['brand_model']??'') ?>">
                                         </div>
                                     </div>
                                     <div class="form-group">
@@ -452,34 +463,34 @@ include __DIR__ . '/../includes/header.php';
                                         <div class="form-group">
                                             <label>Inventory Type</label>
                                             <select name="inventory_type">
-                                                <option value="Fixed Asset">Fixed Asset</option>
-                                                <option value="Consumable">Consumable</option>
-                                                <option value="Tool">Tool</option>
-                                                <option value="Spare Part">Spare Part</option>
-                                                <option value="Laboratory Equipment">Laboratory Equipment</option>
-                                                <option value="Office Equipment">Office Equipment</option>
+                                                <?php foreach (['Fixed Asset','Consumable','Tool','Spare Part','Laboratory Equipment','Office Equipment'] as $type): ?>
+                                                <option value="<?= $type ?>" <?= ($editItem['asset_type']??'Consumable')===$type?'selected':'' ?>><?= $type ?></option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </div>
                                         <div class="form-group">
                                             <label>Asset Status</label>
                                             <select name="asset_status">
-                                                <option value="Available">Available</option>
-                                                <option value="In Use">In Use</option>
-                                                <option value="Maintenance">Maintenance</option>
-                                                <option value="Disposed">Disposed</option>
+                                                <?php foreach (['Available','In Use','Maintenance','Disposed'] as $status): ?>
+                                                <option value="<?= $status ?>" <?= ($editItem['asset_status']??'Available')===$status?'selected':'' ?>><?= $status ?></option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </div>
                                         <div class="form-group">
                                             <label>Condition</label>
                                             <select name="asset_condition">
-                                                <option value="New">New</option>
-                                                <option value="Used">Used</option>
-                                                <option value="Refurbished">Refurbished</option>
+                                                <?php foreach (['New','Used','Refurbished'] as $condition): ?>
+                                                <option value="<?= $condition ?>" <?= ($editItem['asset_condition']??'New')===$condition?'selected':'' ?>><?= $condition ?></option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </div>
                                         <div class="form-group">
                                             <label>Funding Source</label>
-                                            <input type="text" name="funding_source" placeholder="e.g. Government Grant">
+                                            <input type="text" name="funding_source" placeholder="e.g. Government Grant" value="<?= clean($editItem['funding_source']??'') ?>">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Date of Purchase</label>
+                                            <input type="date" name="purchase_date" id="previewPurchaseDateInput" value="<?= clean($editItem['purchase_date']??'') ?>">
                                         </div>
                                     </div>
                                 </div>
@@ -520,7 +531,7 @@ include __DIR__ . '/../includes/header.php';
                                         </div>
                                         <div class="form-group">
                                             <label>Storage Location</label>
-                                            <input type="text" name="storage_location" placeholder="e.g. Shelf B4">
+                                            <input type="text" name="storage_location" placeholder="e.g. Shelf B4" value="<?= clean($editItem['storage_location']??'') ?>">
                                         </div>
                                     </div>
                                 </div>
@@ -583,7 +594,7 @@ include __DIR__ . '/../includes/header.php';
                                         </div>
                                         <div class="form-group">
                                             <label>Warranty End</label>
-                                            <input type="date" name="warranty_end">
+                                            <input type="date" name="warranty_date" value="<?= clean($editItem['warranty_date']??'') ?>">
                                         </div>
                                     </div>
                                     <div class="form-grid-2">
@@ -628,6 +639,8 @@ include __DIR__ . '/../includes/header.php';
                                     <div><dt>Section / Unit</dt><dd id="previewDepartment">Unassigned section/unit</dd></div>
                                     <div><dt>Current Stock</dt><dd id="previewStock">0 units</dd></div>
                                     <div><dt>Estimated Value</dt><dd id="previewValue">UGX 0</dd></div>
+                                    <div><dt>Model / Specs</dt><dd id="previewBrandModel">—</dd></div>
+                                    <div><dt>Purchased</dt><dd id="previewPurchaseDate">—</dd></div>
                                     <div><dt>Asset Code</dt><dd id="previewAssetCode">—</dd></div>
                                     <div><dt>QR Code</dt><dd id="previewQrCode">—</dd></div>
                                 </dl>
@@ -686,6 +699,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const unit = document.getElementById('previewUnitInput')?.value || 'unit';
         const stock = parseInt(document.getElementById('previewCurrentStockInput')?.value || '0', 10);
         const price = parseFloat(document.getElementById('previewPriceInput')?.value || '0');
+        const brandModel = document.getElementById('previewBrandModelInput')?.value?.trim() || '—';
+        const purchaseDate = document.getElementById('previewPurchaseDateInput')?.value || '—';
         const assetCode = document.getElementById('previewAssetCodeInput')?.value?.trim() || '—';
         const qrCode = document.getElementById('previewQrCodeInput')?.value?.trim() || '—';
 
@@ -697,6 +712,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('previewSupplier').textContent = supplier;
         document.getElementById('previewStock').textContent = stock + ' ' + unit + (stock === 1 ? '' : 's');
         document.getElementById('previewValue').textContent = formatCurrency(price * Math.max(stock, 1));
+        document.getElementById('previewBrandModel').textContent = brandModel;
+        document.getElementById('previewPurchaseDate').textContent = purchaseDate;
         document.getElementById('previewAssetCode').textContent = assetCode;
         document.getElementById('previewQrCode').textContent = qrCode;
     }
@@ -746,7 +763,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     ['input', 'change'].forEach(eventName => {
-        document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewAssetCodeInput, #previewQrCodeInput').forEach(el => {
+        document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewBrandModelInput, #previewPurchaseDateInput, #previewAssetCodeInput, #previewQrCodeInput').forEach(el => {
             el.addEventListener(eventName, updatePreview);
         });
     });
