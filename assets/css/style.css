@@ -966,8 +966,8 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .alert-info { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
 
 /* RESPONSIVE */
-@media (max-width: 1024px) { .section-grid-2 { grid-template-columns: 1fr; } .dashboard-hero { grid-template-columns: 1fr; } }
 @media (max-width: 1180px) { .dashboard-decisions-grid { grid-template-columns: minmax(560px, 1.28fr) minmax(320px, .72fr); } }
+@media (max-width: 1024px) { .section-grid-2, .dashboard-decisions-grid { grid-template-columns: 1fr; } .dashboard-hero { grid-template-columns: 1fr; } }
 @media (max-width: 1280px) {
   .page-content { padding: 18px; }
   .page-header { padding: 20px 22px; }
