@@ -264,6 +264,11 @@ $sparkMetrics = [
     ['label' => 'Stock Health', 'current' => $healthScore . '%', 'previous' => max(1, $healthScore - 4) . '%', 'change' => '+4%'],
 ];
 
+$recentStockInCount = count(array_filter($recentTx, fn($tx) => in_array($tx['transaction_type'], ['stock_in', 'transfer_in'], true)));
+$recentStockOutCount = count(array_filter($recentTx, fn($tx) => in_array($tx['transaction_type'], ['stock_out', 'transfer_out'], true)));
+$recentActivityQty = array_sum(array_map(fn($tx) => (int)$tx['quantity'], $recentTx));
+$recentActivityDate = $recentTx ? date('d M Y', strtotime($recentTx[0]['transaction_date'])) : 'No activity';
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -602,6 +607,28 @@ include __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <div class="activity-filter-summary">
+                <div>
+                    <span>Current View</span>
+                    <strong><?= clean($scopeText) ?></strong>
+                </div>
+                <div>
+                    <span>Transactions</span>
+                    <strong><?= number_format(count($recentTx)) ?></strong>
+                </div>
+                <div>
+                    <span>Movement Mix</span>
+                    <strong><?= number_format($recentStockInCount) ?> in / <?= number_format($recentStockOutCount) ?> out</strong>
+                </div>
+                <div>
+                    <span>Units Moved</span>
+                    <strong><?= number_format($recentActivityQty) ?></strong>
+                </div>
+                <div>
+                    <span>Latest Entry</span>
+                    <strong><?= clean($recentActivityDate) ?></strong>
+                </div>
+            </div>
         </div>
     </div>
 </section>
