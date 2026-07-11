@@ -33,13 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$records = $pdo->query("SELECT em.*, b.name AS branch_name, u.full_name AS assigned_name FROM equipment_maintenance em JOIN branches b ON em.branch_id = b.id LEFT JOIN users u ON em.assigned_to = u.id ORDER BY em.maintenance_date DESC")->fetchAll();
+$totalRecords = (int)$pdo->query("SELECT COUNT(*) FROM equipment_maintenance")->fetchColumn();
+$pagination = getPagination($totalRecords, 10);
+$records = $pdo->query("SELECT em.*, b.name AS branch_name, u.full_name AS assigned_name FROM equipment_maintenance em JOIN branches b ON em.branch_id = b.id LEFT JOIN users u ON em.assigned_to = u.id ORDER BY em.maintenance_date DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}")->fetchAll();
 $branches = $pdo->query("SELECT id, name FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">Equipment Maintenance</h1><p class="page-sub">Track maintenance schedules, history, service costs and equipment status</p></div>
+    <div><h1 class="page-title">Equipment Maintenance</h1><p class="page-sub"><?= number_format($totalRecords) ?> maintenance schedules, history, service costs and equipment status records</p></div>
     <?php if ($canManage): ?><div class="page-actions"><button class="btn btn-primary" onclick="openModal('maintenanceModal')">Add Record</button></div><?php endif; ?>
 </div>
 
@@ -63,6 +65,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalRecords) ?>
         <?php else: ?><div class="empty-state"><p>No maintenance records found.</p></div><?php endif; ?>
     </div>
 </div>

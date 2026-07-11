@@ -54,15 +54,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$requests = $pdo->query("SELECT pr.*, u.full_name AS requested_by_name, s.company_name AS supplier_name FROM procurement_requests pr JOIN users u ON pr.requested_by = u.id LEFT JOIN suppliers s ON pr.supplier_id = s.id ORDER BY pr.created_at DESC")->fetchAll();
-$purchaseOrders = $pdo->query("SELECT po.*, pr.request_code, s.company_name AS supplier_name FROM purchase_orders po JOIN procurement_requests pr ON po.procurement_request_id = pr.id JOIN suppliers s ON po.supplier_id = s.id ORDER BY po.created_at DESC")->fetchAll();
-$grns = $pdo->query("SELECT grn.*, po.po_code FROM goods_received_notes grn JOIN purchase_orders po ON grn.purchase_order_id = po.id ORDER BY grn.received_date DESC")->fetchAll();
+$totalRequests = (int)$pdo->query("SELECT COUNT(*) FROM procurement_requests")->fetchColumn();
+$requestPagination = getPagination($totalRequests, 10, 'request_page');
+$requests = $pdo->query("SELECT pr.*, u.full_name AS requested_by_name, s.company_name AS supplier_name FROM procurement_requests pr JOIN users u ON pr.requested_by = u.id LEFT JOIN suppliers s ON pr.supplier_id = s.id ORDER BY pr.created_at DESC LIMIT {$requestPagination['per_page']} OFFSET {$requestPagination['offset']}")->fetchAll();
+
+$totalPurchaseOrders = (int)$pdo->query("SELECT COUNT(*) FROM purchase_orders")->fetchColumn();
+$poPagination = getPagination($totalPurchaseOrders, 10, 'po_page');
+$purchaseOrders = $pdo->query("SELECT po.*, pr.request_code, s.company_name AS supplier_name FROM purchase_orders po JOIN procurement_requests pr ON po.procurement_request_id = pr.id JOIN suppliers s ON po.supplier_id = s.id ORDER BY po.created_at DESC LIMIT {$poPagination['per_page']} OFFSET {$poPagination['offset']}")->fetchAll();
+
+$totalGrns = (int)$pdo->query("SELECT COUNT(*) FROM goods_received_notes")->fetchColumn();
+$grnPagination = getPagination($totalGrns, 10, 'grn_page');
+$grns = $pdo->query("SELECT grn.*, po.po_code FROM goods_received_notes grn JOIN purchase_orders po ON grn.purchase_order_id = po.id ORDER BY grn.received_date DESC LIMIT {$grnPagination['per_page']} OFFSET {$grnPagination['offset']}")->fetchAll();
 $suppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active = 1 ORDER BY company_name")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">Procurement Management</h1><p class="page-sub">Purchase requests, orders, and goods received notes</p></div>
+    <div><h1 class="page-title">Procurement Management</h1><p class="page-sub"><?= number_format($totalRequests) ?> requests, <?= number_format($totalPurchaseOrders) ?> orders, and <?= number_format($totalGrns) ?> goods received notes</p></div>
     <?php if ($canManage): ?><div class="page-actions"><button class="btn btn-primary" onclick="openModal('procurementRequestModal')">New Request</button></div><?php endif; ?>
 </div>
 
@@ -98,6 +106,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($requestPagination, $totalRequests, ['po_page', 'grn_page']) ?>
         <?php else: ?><div class="empty-state"><p>No procurement requests found.</p></div><?php endif; ?>
     </div>
 </div>
@@ -131,6 +140,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($poPagination, $totalPurchaseOrders, ['request_page', 'grn_page']) ?>
         <?php else: ?><div class="empty-state"><p>No purchase orders found.</p></div><?php endif; ?>
     </div>
 </div>
@@ -147,6 +157,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($grnPagination, $totalGrns, ['request_page', 'po_page']) ?>
         <?php else: ?><div class="empty-state"><p>No goods received notes found.</p></div><?php endif; ?>
     </div>
 </div>

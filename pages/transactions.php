@@ -20,7 +20,12 @@ if ($dateTo) { $where[] = "t.transaction_date<=?"; $params[] = $dateTo; }
 if ($search) { $where[] = "(i.name LIKE ? OR i.item_code LIKE ? OR t.reference_number LIKE ?)"; $params=array_merge($params,["%$search%","%$search%","%$search%"]); }
 $whereSQL = $where ? 'WHERE '.implode(' AND ',$where) : '';
 
-$stmt = $pdo->prepare("SELECT t.*,i.name AS item_name,i.item_code,u.full_name AS user_name,b.name AS branch_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN users u ON t.user_id=u.id JOIN branches b ON t.branch_id=b.id $whereSQL ORDER BY t.created_at DESC");
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id $whereSQL");
+$countStmt->execute($params);
+$totalTransactions = (int)$countStmt->fetchColumn();
+$pagination = getPagination($totalTransactions, 10);
+
+$stmt = $pdo->prepare("SELECT t.*,i.name AS item_name,i.item_code,u.full_name AS user_name,b.name AS branch_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN users u ON t.user_id=u.id JOIN branches b ON t.branch_id=b.id $whereSQL ORDER BY t.created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
 $stmt->execute($params);
 $transactions = $stmt->fetchAll();
 
@@ -28,7 +33,7 @@ $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")-
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">Stock Transactions</h1><p class="page-sub"><?= count($transactions) ?> transaction(s) found</p></div>
+    <div><h1 class="page-title">Stock Transactions</h1><p class="page-sub"><?= number_format($totalTransactions) ?> transaction(s) found</p></div>
 </div>
 <div class="card filter-bar">
     <form method="GET" class="filter-form">
@@ -72,7 +77,7 @@ include __DIR__ . '/../includes/header.php';
                 $typeBadge = ['stock_in'=>'badge-success','stock_out'=>'badge-blue','transfer_in'=>'badge-purple','transfer_out'=>'badge-purple','adjustment'=>'badge-warn'];
             ?>
             <tr>
-                <td><?= $i+1 ?></td>
+                <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td>
                 <td><?= clean($tx['branch_name']) ?></td>
                 <td><span class="badge <?= $typeBadge[$tx['transaction_type']]??'badge-blue' ?>"><?= str_replace('_',' ',ucfirst($tx['transaction_type'])) ?></span></td>
@@ -86,6 +91,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalTransactions) ?>
         <?php else: ?>
         <div class="empty-state"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><h3>No transactions found</h3><p>Adjust your filters to see results.</p></div>
         <?php endif; ?>

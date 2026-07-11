@@ -143,6 +143,11 @@ if (!$isAdmin && !$canProcess) {
 }
 $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM inventory_requests r $whereSQL");
+$countStmt->execute($params);
+$totalRequests = (int)$countStmt->fetchColumn();
+$pagination = getPagination($totalRequests, 10);
+
 $stmt = $pdo->prepare(
     "SELECT r.*, i.item_code, i.name AS item_name, u.full_name AS requester_name, b.name AS branch_name, d.name AS department_name
      FROM inventory_requests r
@@ -151,7 +156,8 @@ $stmt = $pdo->prepare(
      JOIN branches b ON r.branch_id = b.id
      LEFT JOIN departments d ON r.department_id = d.id
      $whereSQL
-     ORDER BY r.requested_at DESC"
+     ORDER BY r.requested_at DESC
+     LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}"
 );
 $stmt->execute($params);
 $requests = $stmt->fetchAll();
@@ -171,7 +177,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <div>
         <h1 class="page-title">Inventory Requests</h1>
-        <p class="page-sub">Track requests, approvals, and issue status</p>
+        <p class="page-sub"><?= number_format($totalRequests) ?> requests tracked across approvals and issue status</p>
     </div>
     <?php if (!$canProcess): ?>
     <div class="page-actions">
@@ -199,7 +205,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
             <?php foreach ($requests as $i => $row): ?>
             <tr>
-                <td><?= $i + 1 ?></td>
+                <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td>
                     <span class="item-name"><?= clean($row['item_name']) ?></span>
                     <span class="item-code"><?= clean($row['item_code']) ?></span>
@@ -250,6 +256,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalRequests) ?>
         <?php else: ?>
         <div class="empty-state">
             <p>No inventory requests found.</p>

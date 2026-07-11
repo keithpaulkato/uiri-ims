@@ -10,7 +10,12 @@ if ($dateFrom) { $where[]="DATE(a.created_at)>=?"; $params[]=$dateFrom; }
 if ($dateTo) { $where[]="DATE(a.created_at)<=?"; $params[]=$dateTo; }
 $whereSQL = $where ? 'WHERE '.implode(' AND ',$where) : '';
 
-$logs = $pdo->prepare("SELECT a.*, u.full_name, u.username, b.name AS branch_name FROM audit_log a LEFT JOIN users u ON a.user_id=u.id LEFT JOIN branches b ON a.branch_id=b.id $whereSQL ORDER BY a.created_at DESC LIMIT 200");
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM audit_log a LEFT JOIN users u ON a.user_id=u.id $whereSQL");
+$countStmt->execute($params);
+$totalLogs = (int)$countStmt->fetchColumn();
+$pagination = getPagination($totalLogs, 10);
+
+$logs = $pdo->prepare("SELECT a.*, u.full_name, u.username, b.name AS branch_name FROM audit_log a LEFT JOIN users u ON a.user_id=u.id LEFT JOIN branches b ON a.branch_id=b.id $whereSQL ORDER BY a.created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
 $logs->execute($params); $logs=$logs->fetchAll();
 
 $activityLabels = [
@@ -37,7 +42,7 @@ $activityLabels = [
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">Audit Trail</h1><p class="page-sub">Tracked login, logout, item, stock, approval, and transfer activity — last 200 entries</p></div>
+    <div><h1 class="page-title">Audit Trail</h1><p class="page-sub"><?= number_format($totalLogs) ?> tracked login, item, stock, approval, and transfer activities</p></div>
 </div>
 <div class="card filter-bar">
     <form method="GET" class="filter-form">
@@ -57,7 +62,7 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($logs as $i=>$log): ?>
             <?php $dt = new DateTime($log['created_at']); ?>
             <tr>
-                <td><?= $i+1 ?></td>
+                <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td><span class="badge badge-info" style="display:inline-block"><?= clean($activityLabels[$log['action']] ?? $log['action']) ?></span></td>
                 <td><?= clean($log['full_name'] ?? 'System') ?><span class="item-code"><?= clean($log['username'] ?? '') ?></span></td>
                 <td><?= clean($log['branch_name'] ?? '—') ?></td>
@@ -69,6 +74,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalLogs) ?>
         <?php else: ?><div class="empty-state"><p>No audit logs found.</p></div><?php endif; ?>
     </div>
 </div>

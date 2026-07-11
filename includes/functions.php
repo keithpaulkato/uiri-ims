@@ -711,3 +711,82 @@ function ensureInventoryDecisionColumns(): void {
     }
 }
 
+/**
+ * Build pagination values for list pages.
+ */
+function getPagination(int $totalItems, int $itemsPerPage = 10, string $pageParam = 'page'): array {
+    $itemsPerPage = max(1, $itemsPerPage);
+    $totalPages = max(1, (int)ceil($totalItems / $itemsPerPage));
+    $page = max(1, (int)($_GET[$pageParam] ?? 1));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $itemsPerPage;
+    $pageStart = $totalItems ? $offset + 1 : 0;
+    $pageEnd = min($offset + $itemsPerPage, $totalItems);
+
+    return [
+        'page' => $page,
+        'per_page' => $itemsPerPage,
+        'total_pages' => $totalPages,
+        'offset' => $offset,
+        'start' => $pageStart,
+        'end' => $pageEnd,
+        'page_param' => $pageParam,
+    ];
+}
+
+/**
+ * Render the shared pagination bar used by database list pages.
+ */
+function renderPaginationBar(array $pagination, int $totalItems, array $excludeParams = [], ?string $pageParam = null): string {
+    if (($pagination['total_pages'] ?? 1) <= 1) {
+        return '';
+    }
+
+    $page = (int)$pagination['page'];
+    $totalPages = (int)$pagination['total_pages'];
+    $pageParam = $pageParam ?: ($pagination['page_param'] ?? 'page');
+    $params = $_GET;
+    foreach (array_merge([$pageParam], $excludeParams) as $key) {
+        unset($params[$key]);
+    }
+
+    $urlFor = function (int $targetPage) use ($params, $pageParam): string {
+        $query = http_build_query(array_merge($params, [$pageParam => $targetPage]));
+        return basename($_SERVER['PHP_SELF']) . ($query ? '?' . $query : '');
+    };
+
+    $windowStart = max(1, $page - 2);
+    $windowEnd = min($totalPages, $page + 2);
+    if ($windowEnd - $windowStart < 4) {
+        $windowStart = max(1, min($windowStart, $windowEnd - 4));
+        $windowEnd = min($totalPages, max($windowEnd, $windowStart + 4));
+    }
+
+    ob_start();
+    ?>
+    <div class="pagination-bar">
+        <nav class="pagination-nav pagination-nav-left" aria-label="Previous pages">
+            <a class="pagination-link pagination-direction <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $page > 1 ? clean($urlFor($page - 1)) : '#' ?>" aria-disabled="<?= $page <= 1 ? 'true' : 'false' ?>">&lt;&lt;Previous</a>
+            <?php if ($windowStart > 1): ?>
+                <a class="pagination-link" href="<?= clean($urlFor(1)) ?>">1</a>
+                <?php if ($windowStart > 2): ?><span class="pagination-ellipsis">...</span><?php endif; ?>
+            <?php endif; ?>
+            <?php for ($p = $windowStart; $p <= $windowEnd; $p++): ?>
+                <a class="pagination-link <?= $p === $page ? 'active' : '' ?>" href="<?= clean($urlFor($p)) ?>" aria-current="<?= $p === $page ? 'page' : 'false' ?>"><?= $p ?></a>
+            <?php endfor; ?>
+        </nav>
+        <div class="pagination-summary">
+            Showing <?= number_format((int)$pagination['start']) ?>-<?= number_format((int)$pagination['end']) ?> of <?= number_format($totalItems) ?>
+        </div>
+        <nav class="pagination-nav pagination-nav-right" aria-label="Next pages">
+            <?php if ($windowEnd < $totalPages): ?>
+                <?php if ($windowEnd < $totalPages - 1): ?><span class="pagination-ellipsis">...</span><?php endif; ?>
+                <a class="pagination-link" href="<?= clean($urlFor($totalPages)) ?>"><?= $totalPages ?></a>
+            <?php endif; ?>
+            <a class="pagination-link pagination-direction <?= $page >= $totalPages ? 'disabled' : '' ?>" href="<?= $page < $totalPages ? clean($urlFor($page + 1)) : '#' ?>" aria-disabled="<?= $page >= $totalPages ? 'true' : 'false' ?>">Next&gt;&gt;</a>
+        </nav>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+

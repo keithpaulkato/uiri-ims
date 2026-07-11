@@ -101,7 +101,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: users.php'); exit;
 }
 
-$users = $pdo->query("SELECT u.*,r.name AS role_name,b.name AS branch_name,s.name AS section_name,d.name AS department_name FROM users u JOIN roles r ON u.role_id=r.id JOIN branches b ON u.branch_id=b.id LEFT JOIN sections s ON u.section_id=s.id LEFT JOIN departments d ON u.department_id=d.id ORDER BY u.full_name")->fetchAll();
+$totalUsers = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+$pagination = getPagination($totalUsers, 10);
+$users = $pdo->query("SELECT u.*,r.name AS role_name,b.name AS branch_name,s.name AS section_name,d.name AS department_name FROM users u JOIN roles r ON u.role_id=r.id JOIN branches b ON u.branch_id=b.id LEFT JOIN sections s ON u.section_id=s.id LEFT JOIN departments d ON u.department_id=d.id ORDER BY u.full_name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}")->fetchAll();
 $roles = $pdo->query("SELECT * FROM roles ORDER BY id")->fetchAll();
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $departments = $pdo->query("SELECT d.*, s.name AS section_name, b.name AS branch_name FROM departments d JOIN sections s ON d.section_id = s.id JOIN branches b ON s.branch_id = b.id WHERE d.is_active = 1 ORDER BY b.name, s.name, d.name")->fetchAll();
@@ -112,7 +114,7 @@ if (isset($_GET['edit'])) { $es=$pdo->prepare("SELECT * FROM users WHERE id=?");
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">User Management</h1><p class="page-sub"><?= count($users) ?> users registered</p></div>
+    <div><h1 class="page-title">User Management</h1><p class="page-sub"><?= number_format($totalUsers) ?> users registered</p></div>
     <div class="page-actions"><button class="btn btn-primary" onclick="openModal('userModal')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add User</button></div>
 </div>
 <div class="card users-table-card">
@@ -123,7 +125,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
             <?php foreach ($users as $i=>$u): ?>
             <tr>
-                <td><?= $i+1 ?></td>
+                <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td><div class="item-cell"><div class="user-avatar-sm">
                     <img src="<?= clean(profilePhotoUrl($u)) ?>" alt="<?= clean($u['full_name']) ?> avatar">
                 </div><div><span class="item-name"><?= clean($u['full_name']) ?></span><span class="item-code"><?= clean($u['email']) ?></span></div></div></td>
@@ -159,6 +161,7 @@ include __DIR__ . '/../includes/header.php';
             </tbody>
         </table>
         </div>
+        <?= renderPaginationBar($pagination, $totalUsers, ['edit']) ?>
     </div>
 </div>
 

@@ -42,8 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+$totalDepartments = (int)$pdo->query("SELECT COUNT(*) FROM departments d WHERE d.is_active = 1")->fetchColumn();
+$pagination = getPagination($totalDepartments, 10);
 $departments = $pdo->query(
-    "SELECT d.*, s.name AS section_name, b.name AS branch_name FROM departments d JOIN sections s ON d.section_id = s.id JOIN branches b ON s.branch_id = b.id WHERE d.is_active = 1 ORDER BY b.name, s.name, d.name"
+    "SELECT d.*, s.name AS section_name, b.name AS branch_name FROM departments d JOIN sections s ON d.section_id = s.id JOIN branches b ON s.branch_id = b.id WHERE d.is_active = 1 ORDER BY b.name, s.name, d.name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}"
 )->fetchAll();
 $sections = $pdo->query("SELECT s.id, s.name, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name")->fetchAll();
 $editDepartment = null;
@@ -58,7 +60,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <div>
         <h1 class="page-title">Section / Unit Management</h1>
-        <p class="page-sub">Manage sections and units under their parent departments/directorates.</p>
+        <p class="page-sub"><?= number_format($totalDepartments) ?> sections and units under their parent departments/directorates.</p>
     </div>
     <div class="page-actions">
         <button class="btn btn-primary" onclick="openModal('departmentModal')">Add Section / Unit</button>
@@ -74,7 +76,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
             <?php foreach ($departments as $i => $dept): ?>
             <tr>
-                <td><?= $i + 1 ?></td>
+                <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td><strong><?= clean($dept['name']) ?></strong></td>
                 <td><?= clean($dept['code'] ?: '—') ?></td>
                 <td><?= clean($dept['section_name']) ?></td>
@@ -95,6 +97,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalDepartments, ['edit']) ?>
     </div>
 </div>
 

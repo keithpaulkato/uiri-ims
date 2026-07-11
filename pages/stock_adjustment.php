@@ -89,6 +89,13 @@ $items = $pdo->query("
 ")->fetchAll();
 
 // Get recent adjustments
+$adjustmentCount = $pdo->query("
+    SELECT COUNT(*)
+    FROM stock_transactions st
+    JOIN inventory_items i ON st.item_id = i.id
+    WHERE i.branch_id = $branchFilter AND st.reference_number = 'ADJUSTMENT'
+")->fetchColumn();
+$pagination = getPagination((int)$adjustmentCount, 10);
 $recentAdjustments = $pdo->query("
     SELECT st.*, i.name as item_name, i.item_code, u.full_name as user_name
     FROM stock_transactions st
@@ -96,7 +103,7 @@ $recentAdjustments = $pdo->query("
     JOIN users u ON st.user_id = u.id
     WHERE i.branch_id = $branchFilter AND st.reference_number = 'ADJUSTMENT'
     ORDER BY st.created_at DESC
-    LIMIT 20
+    LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}
 ")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
@@ -213,6 +220,7 @@ include __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, (int)$adjustmentCount) ?>
         <?php else: ?>
         <div class="empty-state"><p>No adjustments recorded yet.</p></div>
         <?php endif; ?>

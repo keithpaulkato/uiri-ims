@@ -41,7 +41,9 @@ $bWhere = $isAdmin ? ($branchFilter ? "AND i.branch_id=$branchFilter" : '') : "A
 $items = $pdo->query("SELECT i.id,i.name,i.item_code,i.unit,i.current_stock,b.name AS branch_name FROM inventory_items i JOIN branches b ON i.branch_id=b.id WHERE i.is_active=1 AND i.current_stock>0 $bWhere ORDER BY i.name")->fetchAll();
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $tWhere = $isAdmin ? ($branchFilter ? "AND t.branch_id=$branchFilter" : '') : "AND t.branch_id=$branchId";
-$recent = $pdo->query("SELECT t.*,i.name AS item_name,i.item_code,b.name AS branch_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN branches b ON t.branch_id=b.id WHERE t.transaction_type='stock_out' $tWhere ORDER BY t.created_at DESC LIMIT 20")->fetchAll();
+$recentCount = (int)$pdo->query("SELECT COUNT(*) FROM stock_transactions t WHERE t.transaction_type='stock_out' $tWhere")->fetchColumn();
+$pagination = getPagination($recentCount, 10);
+$recent = $pdo->query("SELECT t.*,i.name AS item_name,i.item_code,b.name AS branch_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN branches b ON t.branch_id=b.id WHERE t.transaction_type='stock_out' $tWhere ORDER BY t.created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -121,6 +123,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $recentCount) ?>
         <?php else: ?><div class="empty-state"><p>No stock-out transactions yet.</p></div><?php endif; ?>
     </div>
 </div>

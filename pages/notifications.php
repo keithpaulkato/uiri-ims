@@ -67,20 +67,15 @@ if ($dateTo) {
 
 $whereSQL = implode(' AND ', $where);
 
-// Pagination
-$page = (int)($_GET['page'] ?? 1);
-$perPage = 20;
-$offset = ($page - 1) * $perPage;
-
 // Get total count
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE $whereSQL");
 $countStmt->execute($params);
 $total = (int)$countStmt->fetchColumn();
-$totalPages = ceil($total / $perPage);
+$pagination = getPagination($total, 10);
 
 // Get notifications
-$stmt = $pdo->prepare("SELECT * FROM notifications WHERE $whereSQL ORDER BY created_at DESC LIMIT ? OFFSET ?");
-$stmt->execute(array_merge($params, [$perPage, $offset]));
+$stmt = $pdo->prepare("SELECT * FROM notifications WHERE $whereSQL ORDER BY created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
+$stmt->execute($params);
 $notifications = $stmt->fetchAll();
 
 // Get unique types for filter
@@ -213,13 +208,7 @@ $flash = getFlash();
             </div>
             <?php endforeach; ?>
 
-            <?php if ($totalPages > 1): ?>
-            <div style="margin-top:20px;text-align:center;">
-                <?php for ($p = 1; $p <= min($totalPages, 5); $p++): ?>
-                    <a href="?page=<?= $p ?>" class="btn btn-sm <?= $page === $p ? 'btn-primary' : 'btn-secondary' ?>"><?= $p ?></a>
-                <?php endfor; ?>
-            </div>
-            <?php endif; ?>
+            <?= renderPaginationBar($pagination, $total, ['mark_read', 'mark_all_read', 'delete', 'csrf_token']) ?>
         <?php else: ?>
             <p style="text-align:center;padding:40px;color:#999;">No notifications found.</p>
         <?php endif; ?>

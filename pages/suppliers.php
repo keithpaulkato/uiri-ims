@@ -47,7 +47,11 @@ $search = trim($_GET['search']??'');
 $where = []; $params = [];
 if ($search) { $where[] = "(company_name LIKE ? OR contact_person LIKE ? OR email LIKE ?)"; $params=array_merge($params,["%$search%","%$search%","%$search%"]); }
 $whereSQL = $where ? 'WHERE '.implode(' AND ',$where) : '';
-$suppliers = $pdo->prepare("SELECT * FROM suppliers $whereSQL ORDER BY company_name");
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM suppliers $whereSQL");
+$countStmt->execute($params);
+$totalSuppliers = (int)$countStmt->fetchColumn();
+$pagination = getPagination($totalSuppliers, 10);
+$suppliers = $pdo->prepare("SELECT * FROM suppliers $whereSQL ORDER BY company_name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
 $suppliers->execute($params); $suppliers = $suppliers->fetchAll();
 
 $selectedSupplierHistory = null;
@@ -71,6 +75,16 @@ if (isset($_GET['history'])) {
         $statsStmt->execute([$supplierId]);
         $supplierStats = $statsStmt->fetch();
 
+        $historyCountStmt = $pdo->prepare(
+            "SELECT COUNT(*)
+             FROM stock_transactions t
+             JOIN inventory_items i ON t.item_id = i.id
+             WHERE i.supplier_id = ?"
+        );
+        $historyCountStmt->execute([$supplierId]);
+        $totalSupplierHistory = (int)$historyCountStmt->fetchColumn();
+        $historyPagination = getPagination($totalSupplierHistory, 10, 'history_page');
+
         $historyStmt = $pdo->prepare(
             "SELECT t.transaction_date, t.transaction_type, t.quantity, t.reference_number, t.remarks,
                     i.item_code, i.name AS item_name, u.full_name AS user_name
@@ -78,7 +92,8 @@ if (isset($_GET['history'])) {
              JOIN inventory_items i ON t.item_id = i.id
              LEFT JOIN users u ON t.user_id = u.id
              WHERE i.supplier_id = ?
-             ORDER BY t.transaction_date DESC, t.created_at DESC"
+             ORDER BY t.transaction_date DESC, t.created_at DESC
+             LIMIT {$historyPagination['per_page']} OFFSET {$historyPagination['offset']}"
         );
         $historyStmt->execute([$supplierId]);
         $supplierHistory = $historyStmt->fetchAll();
@@ -91,7 +106,7 @@ if (isset($_GET['edit'])) { $es=$pdo->prepare("SELECT * FROM suppliers WHERE id=
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">Suppliers</h1><p class="page-sub"><?= count($suppliers) ?> supplier(s)</p></div>
+    <div><h1 class="page-title">Suppliers</h1><p class="page-sub"><?= number_format($totalSuppliers) ?> supplier(s)</p></div>
     <?php if ($canManage): ?>
     <div class="page-actions"><button class="btn btn-primary" onclick="openModal('supplierModal')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Supplier</button></div>
     <?php endif; ?>
@@ -111,7 +126,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
             <?php foreach ($suppliers as $i=>$s): ?>
             <tr>
-                <td><?= $i+1 ?></td>
+                <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td><strong><?= clean($s['company_name']) ?></strong></td>
                 <td><?= clean($s['contact_person']?:'—') ?></td>
                 <td><?= clean($s['email']?:'—') ?></td>
@@ -142,6 +157,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalSuppliers, ['edit', 'history']) ?>
         <?php else: ?>
         <div class="empty-state"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg><h3>No suppliers found</h3><p>Add your first supplier to get started.</p></div>
         <?php endif; ?>
@@ -195,6 +211,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($historyPagination, $totalSupplierHistory, ['edit']) ?>
     </div>
 </div>
 <?php endif; ?>

@@ -47,7 +47,12 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 }
 
 // Normal page view
-$stmt = $pdo->prepare("SELECT lh.*, u.full_name AS user_name, b.name AS branch_name, s.name AS section_name, d.name AS department_name FROM login_history lh LEFT JOIN users u ON lh.user_id = u.id LEFT JOIN branches b ON lh.branch_id = b.id LEFT JOIN sections s ON lh.section_id = s.id LEFT JOIN departments d ON lh.department_id = d.id $where ORDER BY lh.created_at DESC LIMIT 1000");
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM login_history lh $where");
+$countStmt->execute($params);
+$totalRows = (int)$countStmt->fetchColumn();
+$pagination = getPagination($totalRows, 10);
+
+$stmt = $pdo->prepare("SELECT lh.*, u.full_name AS user_name, b.name AS branch_name, s.name AS section_name, d.name AS department_name FROM login_history lh LEFT JOIN users u ON lh.user_id = u.id LEFT JOIN branches b ON lh.branch_id = b.id LEFT JOIN sections s ON lh.section_id = s.id LEFT JOIN departments d ON lh.department_id = d.id $where ORDER BY lh.created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
@@ -57,7 +62,7 @@ $users = $pdo->query("SELECT id, full_name FROM users ORDER BY full_name")->fetc
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
-    <div><h1 class="page-title">Login History</h1><p class="page-sub">View sign-in attempts and export to CSV</p></div>
+    <div><h1 class="page-title">Login History</h1><p class="page-sub"><?= number_format($totalRows) ?> sign-in attempts available for review and CSV export</p></div>
     <div class="page-actions"><a class="btn" href="login_history.php?<?= http_build_query(array_merge($_GET, ['export'=>'csv'])) ?>">Export CSV</a></div>
 </div>
 
@@ -83,7 +88,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
                 <?php foreach ($rows as $i=>$r): ?>
                 <tr>
-                    <td><?= $i+1 ?></td>
+                    <td><?= $pagination['offset'] + $i + 1 ?></td>
                     <td><?= clean($r['user_name'] ?? '—') ?> (<?= $r['user_id'] ?? '—' ?>)</td>
                     <td><?= clean($r['branch_name'] ?? '—') ?></td>
                     <td><?= clean($r['section_name'] ?? '—') ?></td>
@@ -97,6 +102,7 @@ include __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalRows, ['export']) ?>
     </div>
 </div>
 

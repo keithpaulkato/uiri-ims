@@ -163,18 +163,23 @@ function getTransferStatusDescription(string $status, string $fromBranch, string
     }
 }
 
+$transferWhere = '';
+if (!$isAdmin) {
+    $transferWhere = "WHERE (t.from_branch_id = $branchId OR t.to_branch_id = $branchId)";
+} elseif ($branchFilter) {
+    $transferWhere = "WHERE (t.from_branch_id = $branchFilter OR t.to_branch_id = $branchFilter)";
+}
+$totalTransfers = (int)$pdo->query("SELECT COUNT(*) FROM transfers t $transferWhere")->fetchColumn();
+$pagination = getPagination($totalTransfers, 10);
+
 $transfersQuery = "SELECT t.*, f.name AS from_branch, tb.name AS to_branch, u.full_name AS requested_by_name, a.full_name AS approved_by_name
                   FROM transfers t
                   JOIN branches f ON t.from_branch_id = f.id
                   JOIN branches tb ON t.to_branch_id = tb.id
                   JOIN users u ON t.requested_by = u.id
-                  LEFT JOIN users a ON t.approved_by = a.id";
-if (!$isAdmin) {
-    $transfersQuery .= " WHERE (t.from_branch_id = $branchId OR t.to_branch_id = $branchId)";
-} elseif ($branchFilter) {
-    $transfersQuery .= " WHERE (t.from_branch_id = $branchFilter OR t.to_branch_id = $branchFilter)";
-}
-$transfersQuery .= " ORDER BY t.created_at DESC";
+                  LEFT JOIN users a ON t.approved_by = a.id
+                  $transferWhere";
+$transfersQuery .= " ORDER BY t.created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}";
 $transfers = $pdo->query($transfersQuery)->fetchAll();
 
 $items = [];
@@ -189,7 +194,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <div>
         <h1 class="page-title">Transfers</h1>
-        <p class="page-sub">Manage inter-branch transfer requests</p>
+        <p class="page-sub"><?= number_format($totalTransfers) ?> inter-branch transfer requests</p>
     </div>
     <?php if ($canRequest): ?>
     <div class="page-actions">
@@ -275,6 +280,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalTransfers) ?>
         <?php else: ?>
         <div class="empty-state"><p>No transfers found.</p></div>
         <?php endif; ?>

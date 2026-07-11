@@ -61,7 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch data
-$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name")->fetchAll();
+$totalBranches = (int)$pdo->query("SELECT COUNT(*) FROM branches")->fetchColumn();
+$pagination = getPagination($totalBranches, 10);
+$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}")->fetchAll();
 $branch = null;
 
 if (($action === 'edit' || $action === 'view') && $id) {
@@ -106,6 +108,7 @@ $flash = getFlash();
             <a href="?action=add" class="btn btn-primary">+ Add Branch</a>
         </div>
         <div class="card-body">
+            <p class="page-sub"><?= number_format($totalBranches) ?> branch(es)</p>
             <table class="table">
                 <thead>
                     <tr>
@@ -133,6 +136,7 @@ $flash = getFlash();
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            <?= renderPaginationBar($pagination, $totalBranches, ['action', 'id']) ?>
         </div>
     </div>
 

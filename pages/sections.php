@@ -39,8 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: sections.php');
     exit;
 }
+$totalSections = (int)$pdo->query("SELECT COUNT(*) FROM sections s WHERE s.is_active = 1")->fetchColumn();
+$pagination = getPagination($totalSections, 10);
 $sections = $pdo->query(
-        "SELECT s.*, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name"
+        "SELECT s.*, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}"
 )->fetchAll();
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name")->fetchAll();
 $editSection = null;
@@ -55,7 +57,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <div>
         <h1 class="page-title">Department Management</h1>
-        <p class="page-sub">Manage UIRI departments/directorates under each campus.</p>
+        <p class="page-sub"><?= number_format($totalSections) ?> UIRI departments/directorates under each campus.</p>
     </div>
     <div class="page-actions">
         <button class="btn btn-primary" onclick="openModal('sectionModal')">Add Department</button>
@@ -71,7 +73,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
             <?php foreach ($sections as $i => $sec): ?>
             <tr>
-                <td><?= $i + 1 ?></td>
+                <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td><strong><?= clean($sec['name']) ?></strong></td>
                 <td><?= clean($sec['code'] ?: '—') ?></td>
                 <td><?= clean($sec['branch_name']) ?></td>
@@ -91,6 +93,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?= renderPaginationBar($pagination, $totalSections, ['edit']) ?>
     </div>
 </div>
 
