@@ -34,6 +34,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pass = $_POST['password']??'';
         if (!$fullName||!$roleId||!$branchId) { setFlash('error','Full name, role, and campus are required.'); }
         else {
+            if ($sectionId) {
+                $sectionCheck = $pdo->prepare("SELECT COUNT(*) FROM sections WHERE id = ? AND branch_id = ? AND is_active = 1");
+                $sectionCheck->execute([$sectionId, $branchId]);
+                if (!$sectionCheck->fetchColumn()) {
+                    setFlash('error', 'Selected department does not belong to the selected campus.');
+                    header('Location: users.php'); exit;
+                }
+            }
+            if ($departmentId) {
+                $deptCheck = $pdo->prepare("SELECT COUNT(*) FROM departments d JOIN sections s ON d.section_id = s.id WHERE d.id = ? AND d.section_id = ? AND s.branch_id = ? AND d.is_active = 1");
+                $deptCheck->execute([$departmentId, $sectionId, $branchId]);
+                if (!$deptCheck->fetchColumn()) {
+                    setFlash('error', 'Selected section/unit does not belong to the selected department and campus.');
+                    header('Location: users.php'); exit;
+                }
+            }
             if ($action==='add') {
                 // Auto-generate username/password when left blank
                 if (!$username) {
@@ -106,7 +122,7 @@ $pagination = getPagination($totalUsers, 10);
 $users = $pdo->query("SELECT u.*,r.name AS role_name,b.name AS branch_name,s.name AS section_name,d.name AS department_name FROM users u JOIN roles r ON u.role_id=r.id JOIN branches b ON u.branch_id=b.id LEFT JOIN sections s ON u.section_id=s.id LEFT JOIN departments d ON u.department_id=d.id ORDER BY u.full_name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}")->fetchAll();
 $roles = $pdo->query("SELECT * FROM roles ORDER BY id")->fetchAll();
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
-$departments = $pdo->query("SELECT d.*, s.name AS section_name, b.name AS branch_name FROM departments d JOIN sections s ON d.section_id = s.id JOIN branches b ON s.branch_id = b.id WHERE d.is_active = 1 ORDER BY b.name, s.name, d.name")->fetchAll();
+$departments = $pdo->query("SELECT d.*, s.name AS section_name, b.id AS branch_id, b.name AS branch_name FROM departments d JOIN sections s ON d.section_id = s.id JOIN branches b ON s.branch_id = b.id WHERE d.is_active = 1 ORDER BY b.name, s.name, d.name")->fetchAll();
 $sections = $pdo->query("SELECT s.*, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name")->fetchAll();
 $editUser = null;
 if (isset($_GET['edit'])) { $es=$pdo->prepare("SELECT * FROM users WHERE id=?"); $es->execute([(int)$_GET['edit']]); $editUser=$es->fetch(); }
@@ -188,23 +204,23 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-group"><label>Campus *</label>
                         <select id="modal_branch_id" name="branch_id" required>
                             <?php foreach ($branches as $b): ?>
-                            <option value="<?= $b['id'] ?>" <?= ($editUser['branch_id']??0)==$b['id']?'selected':'' ?>><?= clean($b['name']) ?></option>
+                            <option value="<?= $b['id'] ?>" <?= ($editUser['branch_id']??$user['branch_id'])==$b['id']?'selected':'' ?>><?= clean($b['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group"><label>Department</label>
-                        <select name="section_id">
+                        <select id="modal_section_id" name="section_id">
                             <option value="0">-- None --</option>
                             <?php foreach ($sections as $s): ?>
-                            <option value="<?= $s['id'] ?>" <?= ($editUser['section_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['name']) ?> (<?= clean($s['branch_name']) ?>)</option>
+                            <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?>" <?= ($editUser['section_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['name']) ?> (<?= clean($s['branch_name']) ?>)</option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group"><label>Section / Unit</label>
-                        <select name="department_id">
+                        <select id="modal_department_id" name="department_id">
                             <option value="0">-- None --</option>
                             <?php foreach ($departments as $d): ?>
-                            <option value="<?= $d['id'] ?>" <?= ($editUser['department_id']??0)==$d['id']?'selected':'' ?>><?= clean($d['name']) ?> (<?= clean($d['section_name']) ?>)</option>
+                            <option value="<?= $d['id'] ?>" data-section="<?= $d['section_id'] ?>" data-branch="<?= $d['branch_id'] ?>" <?= ($editUser['department_id']??0)==$d['id']?'selected':'' ?>><?= clean($d['name']) ?> (<?= clean($d['section_name']) ?>)</option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -273,11 +289,52 @@ function updateModalCredentials() {
         pwd.value = p;
     }
 }
+function filterUserOrgOptions() {
+    const branch = document.getElementById('modal_branch_id');
+    const department = document.getElementById('modal_section_id');
+    const sectionUnit = document.getElementById('modal_department_id');
+    const branchId = branch?.value || '';
+
+    if (department) {
+        Array.from(department.options).forEach(option => {
+            if (!option.value || option.value === '0') {
+                option.hidden = false;
+                return;
+            }
+            option.hidden = branchId && option.dataset.branch !== branchId;
+        });
+        if (department.selectedOptions[0]?.hidden) {
+            department.value = '0';
+        }
+    }
+
+    const departmentId = department?.value || '';
+    if (sectionUnit) {
+        Array.from(sectionUnit.options).forEach(option => {
+            if (!option.value || option.value === '0') {
+                option.hidden = false;
+                return;
+            }
+            const matchesBranch = !branchId || option.dataset.branch === branchId;
+            const matchesDepartment = departmentId && departmentId !== '0' && option.dataset.section === departmentId;
+            option.hidden = !(matchesBranch && matchesDepartment);
+        });
+        if (sectionUnit.selectedOptions[0]?.hidden || !departmentId || departmentId === '0') {
+            sectionUnit.value = '0';
+        }
+    }
+}
 document.addEventListener('DOMContentLoaded', function(){
     const f = document.getElementById('modal_full_name');
     const b = document.getElementById('modal_branch_id');
+    const department = document.getElementById('modal_section_id');
     if (f) f.addEventListener('input', updateModalCredentials);
-    if (b) b.addEventListener('change', updateModalCredentials);
+    if (b) b.addEventListener('change', function () {
+        updateModalCredentials();
+        filterUserOrgOptions();
+    });
+    if (department) department.addEventListener('change', filterUserOrgOptions);
+    filterUserOrgOptions();
 });
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
