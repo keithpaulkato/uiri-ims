@@ -1,5 +1,11 @@
 <?php
 require_once __DIR__ . '/config.php';
+
+$redirectTarget = BASE_URL . 'index.php?msg=logged_out';
+if (($_GET['redirect'] ?? '') === 'landing') {
+    $redirectTarget = BASE_URL . 'pages/landing.html';
+}
+
 if (isLoggedIn()) {
     auditLog('LOGOUT', 'users', $_SESSION['user_id'], 'User logged out');
 
@@ -19,5 +25,6 @@ if (session_status() === PHP_SESSION_ACTIVE) {
 }
 
 setcookie('remember_token', '', time() - 3600, '/', '', false, true);
-header('Location: ' . BASE_URL . 'index.php?msg=logged_out');
+setcookie('csrf_token', '', time() - 3600, '/', '', false, true);
+header('Location: ' . $redirectTarget);
 exit;

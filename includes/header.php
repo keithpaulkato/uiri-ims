@@ -94,7 +94,7 @@ $notifications = $notifStmt->fetchAll();
         <ul>
             <li class="nav-section">Public</li>
             <li class="<?= ($activePage ?? '') === 'landing' ? 'active' : '' ?>">
-                <a href="<?= BASE_URL ?>pages/landing.html">
+                <a href="<?= BASE_URL ?>includes/logout.php?redirect=landing">
                     <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5v9a1.5 1.5 0 01-1.5 1.5h-3v-7h-9v7h-3A1.5 1.5 0 013 19.5z"/></svg></span>
                     Landing Page
                 </a>
