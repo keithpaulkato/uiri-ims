@@ -556,8 +556,8 @@ include __DIR__ . '/../includes/header.php';
 </section>
 <?php endif; ?>
 
-<section class="section-grid-2">
-    <div class="card enterprise-list-card">
+<section class="section-grid-2 dashboard-decisions-grid">
+    <div class="card enterprise-list-card priority-decisions-card">
         <div class="card-header">
             <h3>Priority Stock Decisions</h3>
             <a class="card-link" href="<?= BASE_URL ?>pages/items.php?filter=low">View all</a>
@@ -583,7 +583,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
-    <div class="card enterprise-list-card">
+    <div class="card enterprise-list-card recent-activity-card">
         <div class="card-header">
             <h3>Recent Inventory Activity</h3>
             <a class="card-link" href="<?= BASE_URL ?>pages/transactions.php">Transactions</a>
