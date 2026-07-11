@@ -471,7 +471,7 @@ include __DIR__ . '/../includes/header.php';
                                         <div class="form-group">
                                             <label>Asset Status</label>
                                             <select name="asset_status">
-                                                <?php foreach (['Available','In Use','Maintenance','Disposed'] as $status): ?>
+                                                <?php foreach (['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'] as $status): ?>
                                                 <option value="<?= $status ?>" <?= ($editItem['asset_status']??'Available')===$status?'selected':'' ?>><?= $status ?></option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -479,7 +479,7 @@ include __DIR__ . '/../includes/header.php';
                                         <div class="form-group">
                                             <label>Condition</label>
                                             <select name="asset_condition">
-                                                <?php foreach (['New','Used','Refurbished'] as $condition): ?>
+                                                <?php foreach (['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'] as $condition): ?>
                                                 <option value="<?= $condition ?>" <?= ($editItem['asset_condition']??'New')===$condition?'selected':'' ?>><?= $condition ?></option>
                                                 <?php endforeach; ?>
                                             </select>

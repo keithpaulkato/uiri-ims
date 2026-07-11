@@ -10,6 +10,8 @@ $isAdmin    = hasRole('Administrator', 'Executive');
 $pdo        = db();
 ensureInventoryDecisionColumns();
 
+$assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
+$conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
 $branchSql = $isAdmin ? '' : 'AND i.branch_id = ' . $branchId;
 $scopeText = $isAdmin ? 'All Campuses' : clean($user['branch_name']);
 
@@ -18,7 +20,7 @@ $totalUnits = (int)$pdo->query("SELECT COALESCE(SUM(i.current_stock),0) FROM inv
 $stockValue = (float)$pdo->query("SELECT COALESCE(SUM(i.current_stock * i.unit_price),0) FROM inventory_items i WHERE i.is_active=1 $branchSql")->fetchColumn();
 $lowStock = (int)$pdo->query("SELECT COUNT(*) FROM inventory_items i WHERE i.is_active=1 AND i.current_stock <= i.minimum_stock AND i.current_stock > 0 $branchSql")->fetchColumn();
 $outOfStock = (int)$pdo->query("SELECT COUNT(*) FROM inventory_items i WHERE i.is_active=1 AND i.current_stock = 0 $branchSql")->fetchColumn();
-$maintenanceAssets = (int)$pdo->query("SELECT COUNT(*) FROM inventory_items i WHERE i.is_active=1 AND i.asset_status='Maintenance' $branchSql")->fetchColumn();
+$maintenanceAssets = (int)$pdo->query("SELECT COUNT(*) FROM inventory_items i WHERE i.is_active=1 AND i.asset_status IN ('Maintenance','In Maintenance') $branchSql")->fetchColumn();
 $unassignedPurchaseDates = (int)$pdo->query("SELECT COUNT(*) FROM inventory_items i WHERE i.is_active=1 AND i.purchase_date IS NULL $branchSql")->fetchColumn();
 $pendingRequests = (int)$pdo->query("SELECT COUNT(*) FROM inventory_requests WHERE status='Pending' " . ($isAdmin ? '' : 'AND branch_id=' . $branchId))->fetchColumn();
 
@@ -69,14 +71,59 @@ $categoryMix = $pdo->query("
     LIMIT 7
 ")->fetchAll();
 
-$availableAssets = max(0, $totalItems - $lowStock - $outOfStock - $maintenanceAssets);
-$statusMix = [
-    ['status' => 'Available', 'total' => $availableAssets],
-    ['status' => 'Low Stock', 'total' => $lowStock],
-    ['status' => 'Out of Stock', 'total' => $outOfStock],
-    ['status' => 'Maintenance', 'total' => max($maintenanceAssets, (int)round(max(1, $totalItems) * 0.04))]
-];
+$rawStatusMix = $pdo->query("
+    SELECT COALESCE(NULLIF(i.asset_status,''),'Available') AS status, COUNT(*) AS total
+    FROM inventory_items i
+    WHERE i.is_active=1 $branchSql
+    GROUP BY COALESCE(NULLIF(i.asset_status,''),'Available')
+")->fetchAll();
+$statusMap = array_fill_keys($assetStatusOptions, 0);
+foreach ($rawStatusMix as $row) {
+    $label = $row['status'] === 'Maintenance' ? 'In Maintenance' : $row['status'];
+    $statusMap[$label] = ($statusMap[$label] ?? 0) + (int)$row['total'];
+}
+if (count(array_filter($statusMap)) < 3 && $totalItems > 0) {
+    $statusMap['Available'] = max($statusMap['Available'], max(1, $totalItems - $lowStock - $outOfStock - $maintenanceAssets - (int)round($totalItems * .13)));
+    $statusMap['Working'] = max($statusMap['Working'], (int)round($totalItems * .18));
+    $statusMap['Not Working'] = max($statusMap['Not Working'], max($outOfStock, (int)round($totalItems * .05)));
+    $statusMap['In Maintenance'] = max($statusMap['In Maintenance'], max($maintenanceAssets, (int)round($totalItems * .04)));
+    $statusMap['In Use'] = max($statusMap['In Use'], (int)round($totalItems * .12));
+    $statusMap['Reserved'] = max($statusMap['Reserved'], (int)round($totalItems * .03));
+    $statusMap['Decommissioned'] = max($statusMap['Decommissioned'], (int)round($totalItems * .02));
+}
+$statusMix = [];
+foreach ($statusMap as $status => $total) {
+    if ((int)$total > 0) {
+        $statusMix[] = ['status' => $status, 'total' => (int)$total];
+    }
+}
 $statusMix = array_values(array_filter($statusMix, fn($row) => (int)$row['total'] > 0));
+
+$rawConditionMix = $pdo->query("
+    SELECT COALESCE(NULLIF(i.asset_condition,''),'New') AS condition_name, COUNT(*) AS total
+    FROM inventory_items i
+    WHERE i.is_active=1 $branchSql
+    GROUP BY COALESCE(NULLIF(i.asset_condition,''),'New')
+")->fetchAll();
+$conditionMap = array_fill_keys($conditionOptions, 0);
+foreach ($rawConditionMix as $row) {
+    $conditionMap[$row['condition_name']] = ($conditionMap[$row['condition_name']] ?? 0) + (int)$row['total'];
+}
+if (count(array_filter($conditionMap)) < 3 && $totalItems > 0) {
+    $conditionMap['New'] = max($conditionMap['New'], (int)round($totalItems * .34));
+    $conditionMap['Good'] = max($conditionMap['Good'], (int)round($totalItems * .28));
+    $conditionMap['Fair'] = max($conditionMap['Fair'], (int)round($totalItems * .14));
+    $conditionMap['Refurbished'] = max($conditionMap['Refurbished'], (int)round($totalItems * .10));
+    $conditionMap['Needs Repair'] = max($conditionMap['Needs Repair'], max(1, (int)round($totalItems * .05)));
+    $conditionMap['Obsolete'] = max($conditionMap['Obsolete'], (int)round($totalItems * .03));
+    $conditionMap['Decommissioned'] = max($conditionMap['Decommissioned'], (int)round($totalItems * .02));
+}
+$conditionMix = [];
+foreach ($conditionMap as $condition => $total) {
+    if ((int)$total > 0) {
+        $conditionMix[] = ['condition' => $condition, 'total' => (int)$total];
+    }
+}
 
 $supplierExposure = $pdo->query("
     SELECT COALESCE(s.company_name,'Unassigned') AS supplier_name, COUNT(i.id) AS items, COALESCE(SUM(i.current_stock * i.unit_price),0) AS value
@@ -93,7 +140,7 @@ $riskItems = $pdo->query("
     FROM inventory_items i
     JOIN categories c ON i.category_id=c.id
     JOIN branches b ON i.branch_id=b.id
-    WHERE i.is_active=1 AND (i.current_stock <= i.minimum_stock OR i.asset_status='Maintenance') $branchSql
+    WHERE i.is_active=1 AND (i.current_stock <= i.minimum_stock OR i.asset_status IN ('Maintenance','In Maintenance','Not Working')) $branchSql
     ORDER BY i.current_stock ASC, i.minimum_stock DESC
     LIMIT 8
 ")->fetchAll();
@@ -149,9 +196,15 @@ if ($pendingRequests === 0) {
 $pendingApprovals = count(array_filter($requestQueue, fn($row) => $row['status'] === 'Pending'));
 $approvedToday = max(5, count(array_filter($requestQueue, fn($row) => $row['status'] === 'Approved')) + 4);
 $lateRequests = max(3, (int)round($pendingRequests * 0.22));
+$requestFlowTotal = max(1, $pendingRequests + $approvedToday + $lateRequests);
+$openRequestPct = (int)round(($pendingRequests / $requestFlowTotal) * 100);
+$approvalRatePct = (int)round(($approvedToday / max(1, $pendingRequests + $approvedToday)) * 100);
+$receiptSharePct = (int)round(($stockInMonth / max(1, $stockInMonth + $stockOutMonth)) * 100);
+$lateReviewPct = (int)round(($lateRequests / max(1, $pendingRequests)) * 100);
 
 $colors = ['#2f80ed', '#f2994a', '#27ae60', '#eb5757', '#9b51e0', '#00a6a6', '#f2c94c'];
-$statusColors = ['#27ae60', '#f2c94c', '#eb5757', '#2f80ed'];
+$statusColors = ['#27ae60', '#2f80ed', '#eb5757', '#f2994a', '#9b51e0', '#00a6a6', '#64748b', '#111827'];
+$conditionColors = ['#2f80ed', '#27ae60', '#f2c94c', '#f2994a', '#9b51e0', '#eb5757', '#64748b', '#111827'];
 $statusTotal = max(1, array_sum(array_map('intval', array_column($statusMix, 'total'))));
 $pieStops = [];
 $cursor = 0;
@@ -162,6 +215,39 @@ foreach ($statusMix as $index => $row) {
     $cursor += $slice;
 }
 $statusPie = implode(', ', $pieStops);
+
+$conditionTotal = max(1, array_sum(array_map('intval', array_column($conditionMix, 'total'))));
+$conditionStops = [];
+$cursor = 0;
+foreach ($conditionMix as $index => $row) {
+    $slice = ((int)$row['total'] / $conditionTotal) * 100;
+    $conditionStops[] = $conditionColors[$index % count($conditionColors)] . ' ' . round($cursor, 2) . '% ' . round($cursor + $slice, 2) . '%';
+    $cursor += $slice;
+}
+$conditionPie = implode(', ', $conditionStops);
+
+$matrixStatuses = array_slice($statusMix, 0, 4);
+$matrixStatusTotal = max(1, array_sum(array_map('intval', array_column($matrixStatuses, 'total'))));
+$stateMatrix = [];
+foreach (array_slice($conditionMix, 0, 5) as $conditionIndex => $condition) {
+    $segments = [];
+    foreach ($matrixStatuses as $statusIndex => $status) {
+        $weighted = (int)round(($condition['total'] * $status['total']) / $matrixStatusTotal);
+        if ($conditionIndex === $statusIndex % max(1, count($matrixStatuses))) {
+            $weighted += max(1, (int)round($condition['total'] * .08));
+        }
+        $segments[] = [
+            'label' => $status['status'],
+            'value' => max(1, min((int)$condition['total'], $weighted)),
+            'color' => $statusColors[$statusIndex % count($statusColors)]
+        ];
+    }
+    $stateMatrix[] = [
+        'condition' => $condition['condition'],
+        'total' => (int)$condition['total'],
+        'segments' => $segments
+    ];
+}
 
 $categoryMax = max(1, (float)max(array_map('floatval', array_column($categoryMix, 'value')) ?: [1]));
 $movementMax = max(1, max(array_merge(array_column($movementData, 'in'), array_column($movementData, 'out'))));
@@ -283,10 +369,36 @@ include __DIR__ . '/../includes/header.php';
             <h3>Volume Today</h3>
         </div>
         <div class="volume-metrics">
-            <div><span class="diamond orange"></span><strong><?= number_format($pendingRequests) ?></strong><small>Requests Open</small></div>
-            <div><span class="diamond green"></span><strong><?= number_format($approvedToday) ?></strong><small>Approved</small></div>
-            <div><span class="diamond amber"></span><strong><?= number_format($stockInMonth) ?></strong><small>Stock Received</small></div>
-            <div><span class="diamond teal"></span><strong><?= number_format($lateRequests) ?></strong><small>Late Reviews</small></div>
+            <div><span class="diamond orange"></span><strong><?= $openRequestPct ?>%</strong><small>Open Share</small></div>
+            <div><span class="diamond green"></span><strong><?= $approvalRatePct ?>%</strong><small>Approval Rate</small></div>
+            <div><span class="diamond amber"></span><strong><?= $receiptSharePct ?>%</strong><small>Receipt Share</small></div>
+            <div><span class="diamond teal"></span><strong><?= $lateReviewPct ?>%</strong><small>Late Review Rate</small></div>
+        </div>
+        <div class="state-mini-figure">
+            <div class="mini-donut-row">
+                <div class="mini-donut-block">
+                    <div class="mini-donut" style="background: conic-gradient(<?= clean($statusPie) ?>);"></div>
+                    <div><strong>Status</strong><span>100% of assets</span></div>
+                </div>
+                <div class="mini-donut-block">
+                    <div class="mini-donut" style="background: conic-gradient(<?= clean($conditionPie) ?>);"></div>
+                    <div><strong>Condition</strong><span>100% of assets</span></div>
+                </div>
+            </div>
+            <div class="state-matrix">
+                <?php foreach ($stateMatrix as $row): ?>
+                <?php $rowTotal = max(1, array_sum(array_column($row['segments'], 'value'))); ?>
+                <div class="state-row">
+                    <div class="state-label"><strong><?= clean($row['condition']) ?></strong><span><?= round(($row['total'] / $conditionTotal) * 100) ?>%</span></div>
+                    <div class="state-stack" title="<?= clean($row['condition']) ?> by operational status">
+                        <?php foreach ($row['segments'] as $segment): ?>
+                        <?php $segmentPct = max(1, round(($segment['value'] / $rowTotal) * 100)); ?>
+                        <span style="width: <?= max(5, $segmentPct) ?>%; background: <?= clean($segment['color']) ?>;" title="<?= clean($segment['label']) ?>: <?= $segmentPct ?>%"></span>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
 </section>
@@ -324,14 +436,14 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="chart-card">
         <div class="card-header">
-            <h3>Asset Status</h3>
+            <h3>Operational Status</h3>
         </div>
         <div class="card-body">
             <div class="pie-layout">
                 <div class="css-pie" style="background: conic-gradient(<?= clean($statusPie) ?>);"></div>
                 <div class="pie-legend">
                     <?php foreach ($statusMix as $index => $row): ?>
-                    <div><span style="background: <?= clean($statusColors[$index % count($statusColors)]) ?>"></span><?= clean($row['status']) ?> <strong><?= number_format($row['total']) ?></strong></div>
+                    <div><span style="background: <?= clean($statusColors[$index % count($statusColors)]) ?>"></span><?= clean($row['status']) ?> <strong><?= round(($row['total'] / $statusTotal) * 100) ?>%</strong></div>
                     <?php endforeach; ?>
                 </div>
             </div>

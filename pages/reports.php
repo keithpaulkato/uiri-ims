@@ -39,9 +39,11 @@ $catSql = $catFilter ? "AND i.category_id=$catFilter" : '';
 $departmentSql = $departmentFilter ? "AND i.department_id=$departmentFilter" : '';
 $supplierSql = $supplierFilter ? "AND i.supplier_id=$supplierFilter" : '';
 $sectionSql = $sectionFilter ? "AND d.section_id=$sectionFilter" : '';
-$assetStatusSql = in_array($assetStatusFilter, ['Available','In Use','Maintenance','Disposed'], true) ? "AND i.asset_status=" . $pdo->quote($assetStatusFilter) : '';
+$assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
+$conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
+$assetStatusSql = in_array($assetStatusFilter, $assetStatusOptions, true) ? "AND i.asset_status=" . $pdo->quote($assetStatusFilter) : '';
 $assetTypeSql = $assetTypeFilter !== '' ? "AND i.asset_type=" . $pdo->quote($assetTypeFilter) : '';
-$conditionSql = in_array($conditionFilter, ['New','Used','Refurbished'], true) ? "AND i.asset_condition=" . $pdo->quote($conditionFilter) : '';
+$conditionSql = in_array($conditionFilter, $conditionOptions, true) ? "AND i.asset_condition=" . $pdo->quote($conditionFilter) : '';
 $purchaseFromSql = preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseFrom) ? "AND i.purchase_date >= " . $pdo->quote($purchaseFrom) : '';
 $purchaseToSql = preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseTo) ? "AND i.purchase_date <= " . $pdo->quote($purchaseTo) : '';
 $stockStatusSql = '';
@@ -320,7 +322,7 @@ include __DIR__ . '/../includes/header.php';
         <label for="assetStatusSelect" class="form-label">Asset Status</label>
         <select id="assetStatusSelect" name="asset_status" class="form-control">
             <option value="">All Asset Statuses</option>
-            <?php foreach (['Available','In Use','Maintenance','Disposed'] as $status): ?>
+            <?php foreach ($assetStatusOptions as $status): ?>
             <option value="<?= $status ?>" <?= $assetStatusFilter===$status?'selected':'' ?>><?= $status ?></option>
             <?php endforeach; ?>
         </select>
@@ -340,7 +342,7 @@ include __DIR__ . '/../includes/header.php';
         <label for="conditionSelect" class="form-label">Condition</label>
         <select id="conditionSelect" name="condition" class="form-control">
             <option value="">All Conditions</option>
-            <?php foreach (['New','Used','Refurbished'] as $condition): ?>
+            <?php foreach ($conditionOptions as $condition): ?>
             <option value="<?= $condition ?>" <?= $conditionFilter===$condition?'selected':'' ?>><?= $condition ?></option>
             <?php endforeach; ?>
         </select>
