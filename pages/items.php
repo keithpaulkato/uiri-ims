@@ -128,6 +128,9 @@ $branchFilter   = $isAdmin ? ($showAllBranches ? 0 : ($branchParam !== '' ? (int
 $deptFilter     = (int)($_GET['department'] ?? 0);
 $sectionFilter  = (int)($_GET['section'] ?? 0);
 $stockFilter    = $_GET['filter'] ?? '';
+$assetStatusFilter = $_GET['asset_status'] ?? '';
+$conditionFilter = $_GET['condition'] ?? '';
+$missingPurchase = ($_GET['missing_purchase'] ?? '') === '1';
 
 $where  = ["i.is_active = 1"];
 $params = [];
@@ -144,6 +147,10 @@ if ($deptFilter) { $where[] = "i.department_id = ?"; $params[] = $deptFilter; }
 if ($stockFilter === 'low') $where[] = "i.current_stock <= i.minimum_stock AND i.current_stock > 0";
 if ($stockFilter === 'out') $where[] = "i.current_stock = 0";
 if ($stockFilter === 'good') $where[] = "i.current_stock > i.minimum_stock";
+if ($stockFilter === 'risk') $where[] = "(i.current_stock <= i.minimum_stock OR i.asset_status IN ('Maintenance','In Maintenance','Not Working'))";
+if ($assetStatusFilter !== '') { $where[] = "i.asset_status = ?"; $params[] = $assetStatusFilter; }
+if ($conditionFilter !== '') { $where[] = "i.asset_condition = ?"; $params[] = $conditionFilter; }
+if ($missingPurchase) $where[] = "i.purchase_date IS NULL";
 $whereSQL = implode(' AND ', $where);
 
 $itemsPerPage = 10;
@@ -275,10 +282,14 @@ include __DIR__ . '/../includes/header.php';
             <select name="filter">
                 <option value="">All Stock Levels</option>
                 <option value="good" <?= $stockFilter==='good'?'selected':'' ?>>Good Stock</option>
+                <option value="risk" <?= $stockFilter==='risk'?'selected':'' ?>>All Stock Risks</option>
                 <option value="low"  <?= $stockFilter==='low'?'selected':'' ?>>Low Stock</option>
                 <option value="out"  <?= $stockFilter==='out'?'selected':'' ?>>Out of Stock</option>
             </select>
         </div>
+        <?php if ($missingPurchase): ?>
+        <input type="hidden" name="missing_purchase" value="1">
+        <?php endif; ?>
         <button type="submit" class="btn btn-primary">Filter</button>
         <a href="items.php" class="btn btn-outline">Reset</a>
     </form>

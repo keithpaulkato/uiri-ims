@@ -18,6 +18,7 @@ $sectionFilter    = (int)($_GET['section'] ?? 0);
 $departmentFilter = (int)($_GET['department'] ?? 0);
 $supplierFilter   = (int)($_GET['supplier'] ?? 0);
 $statusFilter     = $_GET['status'] ?? '';
+$txTypeFilter     = $_GET['tx_type'] ?? '';
 $assetStatusFilter = $_GET['asset_status'] ?? '';
 $assetTypeFilter   = $_GET['asset_type'] ?? '';
 $conditionFilter   = $_GET['condition'] ?? '';
@@ -54,6 +55,8 @@ if ($statusFilter === 'low_stock') {
 } elseif ($statusFilter === 'available') {
     $stockStatusSql = 'AND i.current_stock > i.minimum_stock';
 }
+$validTxTypes = ['stock_in', 'stock_out', 'transfer_in', 'transfer_out', 'adjustment'];
+$txTypeFilter = in_array($txTypeFilter, $validTxTypes, true) ? $txTypeFilter : '';
 
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 if (!$isAdmin) {
@@ -100,6 +103,7 @@ $printFilters = [
     'Section / Unit' => $departmentFilter ? ($departmentNames[$departmentFilter] ?? 'Selected section/unit') : 'All Sections / Units',
     'Supplier' => $supplierFilter ? ($supplierNames[$supplierFilter] ?? 'Selected supplier') : 'All Suppliers',
     'Stock Status' => $statusFilter ?: 'All Stock Statuses',
+    'Movement Type' => $txTypeFilter ? str_replace('_', ' ', $txTypeFilter) : 'All Movement Types',
     'Asset Status' => $assetStatusFilter ?: 'All Asset Statuses',
     'Asset Type' => $assetTypeFilter ?: 'All Asset Types',
     'Condition' => $conditionFilter ?: 'All Conditions',
@@ -137,6 +141,7 @@ if ($reportType === 'summary') {
     if ($departmentFilter) { $sql .= " AND i.department_id = ?"; $params[] = $departmentFilter; }
     if ($supplierFilter) { $sql .= " AND i.supplier_id = ?"; $params[] = $supplierFilter; }
     if ($sectionFilter) { $sql .= " AND d.section_id = ?"; $params[] = $sectionFilter; }
+    if ($txTypeFilter) { $sql .= " AND t.transaction_type = ?"; $params[] = $txTypeFilter; }
     if ($assetStatusSql) { $sql .= " $assetStatusSql"; }
     if ($assetTypeSql) { $sql .= " $assetTypeSql"; }
     if ($conditionSql) { $sql .= " $conditionSql"; }
@@ -256,6 +261,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="card filter-bar shadow-sm p-4 animate__animated animate__fadeInUp" data-aos="fade-up">
     <form method="GET" class="filter-form">
         <input type="hidden" name="report" value="<?= clean($reportType) ?>">
+        <?php if ($txTypeFilter): ?><input type="hidden" name="tx_type" value="<?= clean($txTypeFilter) ?>"><?php endif; ?>
         <?php if ($isAdmin): ?>
         <div class="filter-group">
             <label for="branchSelect" class="form-label">Branch</label>

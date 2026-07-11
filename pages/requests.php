@@ -9,6 +9,9 @@ $pdo = db();
 $canProcess = hasRole('Administrator', 'Store Manager');
 $isAdmin = hasRole('Administrator');
 $branchId = $user['branch_id'];
+$statusFilter = $_GET['status'] ?? '';
+$validRequestStatuses = ['Pending', 'Approved', 'Issued', 'Rejected', 'Cancelled'];
+$statusFilter = in_array($statusFilter, $validRequestStatuses, true) ? $statusFilter : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -141,6 +144,10 @@ if (!$isAdmin && !$canProcess) {
     $where[] = 'r.branch_id = ?';
     $params[] = $branchId;
 }
+if ($statusFilter) {
+    $where[] = 'r.status = ?';
+    $params[] = $statusFilter;
+}
 $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM inventory_requests r $whereSQL");
@@ -177,7 +184,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <div>
         <h1 class="page-title">Inventory Requests</h1>
-        <p class="page-sub"><?= number_format($totalRequests) ?> requests tracked across approvals and issue status</p>
+        <p class="page-sub"><?= number_format($totalRequests) ?> <?= $statusFilter ? clean(strtolower($statusFilter)) . ' ' : '' ?>requests tracked across approvals and issue status</p>
     </div>
     <?php if (!$canProcess): ?>
     <div class="page-actions">

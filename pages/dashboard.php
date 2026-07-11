@@ -29,10 +29,12 @@ $stockOutMonth = (int)$pdo->query("SELECT COALESCE(SUM(t.quantity),0) FROM stock
 
 $riskCount = $lowStock + $outOfStock + $maintenanceAssets;
 $weightedRisk = $totalItems > 0 ? (($lowStock * 0.75) + ($outOfStock * 1.15) + ($maintenanceAssets * 0.85)) / max(1, $totalItems) : 0;
-$healthScore = max(54, min(98, (int)round(100 - ($weightedRisk * 100))));
+$healthScore = max(0, min(100, (int)round(100 - ($weightedRisk * 100))));
 $healthLabel = $healthScore >= 85 ? 'Stable' : ($healthScore >= 65 ? 'Watch' : 'Critical');
 $healthClass = $healthScore >= 85 ? 'good' : ($healthScore >= 65 ? 'warn' : 'critical');
 $turnoverRatio = $stockInMonth > 0 ? round(($stockOutMonth / max(1, $stockInMonth)) * 100) : 0;
+$monthStart = date('Y-m-01');
+$today = date('Y-m-d');
 
 $movementData = [];
 for ($i = 5; $i >= 0; $i--) {
@@ -44,25 +46,8 @@ for ($i = 5; $i >= 0; $i--) {
     ];
 }
 
-if (array_sum(array_column($movementData, 'in')) + array_sum(array_column($movementData, 'out')) === 0) {
-    $movementBase = max(24, (int)round($totalUnits / 140));
-    foreach ($movementData as $index => &$point) {
-        $point['in'] = $movementBase + (int)round(($index + 1) * 4.5) + [8, 15, 9, 21, 13, 24][$index];
-        $point['out'] = max(8, $movementBase - 5 + (int)round(($index + 1) * 3.5) + [5, 8, 14, 10, 18, 15][$index]);
-    }
-    unset($point);
-}
-
-if ($stockInMonth === 0) {
-    $stockInMonth = (int)end($movementData)['in'];
-}
-if ($stockOutMonth === 0) {
-    $stockOutMonth = (int)end($movementData)['out'];
-}
-$turnoverRatio = round(($stockOutMonth / max(1, $stockInMonth)) * 100);
-
 $categoryMix = $pdo->query("
-    SELECT c.name, COUNT(i.id) AS item_count, COALESCE(SUM(i.current_stock * i.unit_price),0) AS value
+    SELECT c.id AS category_id, c.name, COUNT(i.id) AS item_count, COALESCE(SUM(i.current_stock * i.unit_price),0) AS value
     FROM categories c
     LEFT JOIN inventory_items i ON i.category_id=c.id AND i.is_active=1 " . ($isAdmin ? '' : 'AND i.branch_id=' . $branchId) . "
     GROUP BY c.id, c.name
@@ -82,15 +67,6 @@ foreach ($rawStatusMix as $row) {
     $label = $row['status'] === 'Maintenance' ? 'In Maintenance' : $row['status'];
     $statusMap[$label] = ($statusMap[$label] ?? 0) + (int)$row['total'];
 }
-if (count(array_filter($statusMap)) < 3 && $totalItems > 0) {
-    $statusMap['Available'] = max($statusMap['Available'], max(1, $totalItems - $lowStock - $outOfStock - $maintenanceAssets - (int)round($totalItems * .13)));
-    $statusMap['Working'] = max($statusMap['Working'], (int)round($totalItems * .18));
-    $statusMap['Not Working'] = max($statusMap['Not Working'], max($outOfStock, (int)round($totalItems * .05)));
-    $statusMap['In Maintenance'] = max($statusMap['In Maintenance'], max($maintenanceAssets, (int)round($totalItems * .04)));
-    $statusMap['In Use'] = max($statusMap['In Use'], (int)round($totalItems * .12));
-    $statusMap['Reserved'] = max($statusMap['Reserved'], (int)round($totalItems * .03));
-    $statusMap['Decommissioned'] = max($statusMap['Decommissioned'], (int)round($totalItems * .02));
-}
 $statusMix = [];
 foreach ($statusMap as $status => $total) {
     if ((int)$total > 0) {
@@ -109,15 +85,6 @@ $conditionMap = array_fill_keys($conditionOptions, 0);
 foreach ($rawConditionMix as $row) {
     $conditionMap[$row['condition_name']] = ($conditionMap[$row['condition_name']] ?? 0) + (int)$row['total'];
 }
-if (count(array_filter($conditionMap)) < 3 && $totalItems > 0) {
-    $conditionMap['New'] = max($conditionMap['New'], (int)round($totalItems * .34));
-    $conditionMap['Good'] = max($conditionMap['Good'], (int)round($totalItems * .28));
-    $conditionMap['Fair'] = max($conditionMap['Fair'], (int)round($totalItems * .14));
-    $conditionMap['Refurbished'] = max($conditionMap['Refurbished'], (int)round($totalItems * .10));
-    $conditionMap['Needs Repair'] = max($conditionMap['Needs Repair'], max(1, (int)round($totalItems * .05)));
-    $conditionMap['Obsolete'] = max($conditionMap['Obsolete'], (int)round($totalItems * .03));
-    $conditionMap['Decommissioned'] = max($conditionMap['Decommissioned'], (int)round($totalItems * .02));
-}
 $conditionMix = [];
 foreach ($conditionMap as $condition => $total) {
     if ((int)$total > 0) {
@@ -126,7 +93,7 @@ foreach ($conditionMap as $condition => $total) {
 }
 
 $supplierExposure = $pdo->query("
-    SELECT COALESCE(s.company_name,'Unassigned') AS supplier_name, COUNT(i.id) AS items, COALESCE(SUM(i.current_stock * i.unit_price),0) AS value
+    SELECT i.supplier_id, COALESCE(s.company_name,'Unassigned') AS supplier_name, COUNT(i.id) AS items, COALESCE(SUM(i.current_stock * i.unit_price),0) AS value
     FROM inventory_items i
     LEFT JOIN suppliers s ON i.supplier_id=s.id
     WHERE i.is_active=1 $branchSql
@@ -179,23 +146,9 @@ $requestQueue = $pdo->query("
     LIMIT 7
 ")->fetchAll();
 
-if (!$requestQueue) {
-    $requestQueue = [
-        ['quantity' => 12, 'status' => 'Pending', 'requested_at' => date('Y-m-d H:i:s', strtotime('-2 hours')), 'item_name' => 'Desktop Computer', 'item_code' => 'NK-ICT-001', 'requester_name' => 'Sarah Nakato', 'branch_name' => 'UIRI Nakawa'],
-        ['quantity' => 6, 'status' => 'Pending', 'requested_at' => date('Y-m-d H:i:s', strtotime('-4 hours')), 'item_name' => 'Precision Measuring Caliper', 'item_code' => 'NM-PREC-001', 'requester_name' => 'Moses Kabuye', 'branch_name' => 'UIRI Namanve'],
-        ['quantity' => 25, 'status' => 'Approved', 'requested_at' => date('Y-m-d H:i:s', strtotime('-1 day')), 'item_name' => 'A4 Paper (Ream)', 'item_code' => 'NK-OFF-001', 'requester_name' => 'Grace Akello', 'branch_name' => 'UIRI Nakawa'],
-        ['quantity' => 3, 'status' => 'Pending', 'requested_at' => date('Y-m-d H:i:s', strtotime('-1 day -3 hours')), 'item_name' => 'PLC Controller', 'item_code' => 'NM-PLC-001', 'requester_name' => 'Daniel Lubwama', 'branch_name' => 'UIRI Namanve'],
-        ['quantity' => 8, 'status' => 'Issued', 'requested_at' => date('Y-m-d H:i:s', strtotime('-2 days')), 'item_name' => 'Safety Harness (10-Pack)', 'item_code' => 'NM-MAINT-002', 'requester_name' => 'Vincent Walukale', 'branch_name' => 'UIRI Namanve'],
-    ];
-}
-
-if ($pendingRequests === 0) {
-    $pendingRequests = count(array_filter($requestQueue, fn($row) => $row['status'] === 'Pending')) + 9;
-}
-
 $pendingApprovals = count(array_filter($requestQueue, fn($row) => $row['status'] === 'Pending'));
-$approvedToday = max(5, count(array_filter($requestQueue, fn($row) => $row['status'] === 'Approved')) + 4);
-$lateRequests = max(3, (int)round($pendingRequests * 0.22));
+$approvedToday = (int)$pdo->query("SELECT COUNT(*) FROM inventory_requests WHERE status='Approved' AND DATE(COALESCE(approved_at, requested_at))=CURDATE() " . ($isAdmin ? '' : 'AND branch_id=' . $branchId))->fetchColumn();
+$lateRequests = (int)$pdo->query("SELECT COUNT(*) FROM inventory_requests WHERE status='Pending' AND requested_at < DATE_SUB(NOW(), INTERVAL 2 DAY) " . ($isAdmin ? '' : 'AND branch_id=' . $branchId))->fetchColumn();
 $requestFlowTotal = max(1, $pendingRequests + $approvedToday + $lateRequests);
 $openRequestPct = (int)round(($pendingRequests / $requestFlowTotal) * 100);
 $approvalRatePct = (int)round(($approvedToday / max(1, $pendingRequests + $approvedToday)) * 100);
@@ -214,7 +167,7 @@ foreach ($statusMix as $index => $row) {
     $pieStops[] = $color . ' ' . round($cursor, 2) . '% ' . round($cursor + $slice, 2) . '%';
     $cursor += $slice;
 }
-$statusPie = implode(', ', $pieStops);
+$statusPie = $pieStops ? implode(', ', $pieStops) : '#e2e8f0 0% 100%';
 
 $conditionTotal = max(1, array_sum(array_map('intval', array_column($conditionMix, 'total'))));
 $conditionStops = [];
@@ -224,24 +177,41 @@ foreach ($conditionMix as $index => $row) {
     $conditionStops[] = $conditionColors[$index % count($conditionColors)] . ' ' . round($cursor, 2) . '% ' . round($cursor + $slice, 2) . '%';
     $cursor += $slice;
 }
-$conditionPie = implode(', ', $conditionStops);
+$conditionPie = $conditionStops ? implode(', ', $conditionStops) : '#e2e8f0 0% 100%';
 
 $matrixStatuses = array_slice($statusMix, 0, 4);
-$matrixStatusTotal = max(1, array_sum(array_map('intval', array_column($matrixStatuses, 'total'))));
+$statusColorMap = [];
+foreach ($statusMix as $index => $row) {
+    $statusColorMap[$row['status']] = $statusColors[$index % count($statusColors)];
+}
+$conditionStatusRows = $pdo->query("
+    SELECT
+        COALESCE(NULLIF(i.asset_condition,''),'New') AS condition_name,
+        COALESCE(NULLIF(i.asset_status,''),'Available') AS status_name,
+        COUNT(*) AS total
+    FROM inventory_items i
+    WHERE i.is_active=1 $branchSql
+    GROUP BY COALESCE(NULLIF(i.asset_condition,''),'New'), COALESCE(NULLIF(i.asset_status,''),'Available')
+")->fetchAll();
+$conditionStatusMap = [];
+foreach ($conditionStatusRows as $row) {
+    $conditionName = $row['condition_name'];
+    $statusName = $row['status_name'] === 'Maintenance' ? 'In Maintenance' : $row['status_name'];
+    $conditionStatusMap[$conditionName][$statusName] = (int)$row['total'];
+}
 $stateMatrix = [];
 foreach (array_slice($conditionMix, 0, 5) as $conditionIndex => $condition) {
     $segments = [];
     foreach ($matrixStatuses as $statusIndex => $status) {
-        $weighted = (int)round(($condition['total'] * $status['total']) / $matrixStatusTotal);
-        if ($conditionIndex === $statusIndex % max(1, count($matrixStatuses))) {
-            $weighted += max(1, (int)round($condition['total'] * .08));
-        }
+        $weighted = $conditionStatusMap[$condition['condition']][$status['status']] ?? 0;
+        if ($weighted <= 0) continue;
         $segments[] = [
             'label' => $status['status'],
-            'value' => max(1, min((int)$condition['total'], $weighted)),
-            'color' => $statusColors[$statusIndex % count($statusColors)]
+            'value' => $weighted,
+            'color' => $statusColorMap[$status['status']] ?? $statusColors[$statusIndex % count($statusColors)]
         ];
     }
+    if (!$segments) continue;
     $stateMatrix[] = [
         'condition' => $condition['condition'],
         'total' => (int)$condition['total'],
@@ -258,16 +228,24 @@ foreach ($movementData as $index => $point) {
     $linePoints[] = round($x, 1) . ',' . round($y, 1);
 }
 $sparkMetrics = [
-    ['label' => 'Inventory Value', 'current' => ugx($stockValue), 'previous' => ugx($stockValue * 0.93), 'change' => '+7%'],
-    ['label' => 'Stock Requests', 'current' => number_format($pendingRequests), 'previous' => number_format(max(1, $pendingRequests - 6)), 'change' => '+18%'],
-    ['label' => 'Stock Issued', 'current' => number_format($stockOutMonth), 'previous' => number_format(max(1, $stockOutMonth - 11)), 'change' => '+12%'],
-    ['label' => 'Stock Health', 'current' => $healthScore . '%', 'previous' => max(1, $healthScore - 4) . '%', 'change' => '+4%'],
+    ['label' => 'Inventory Value', 'current' => ugx($stockValue), 'previous' => ugx($stockValue), 'change' => 'Live'],
+    ['label' => 'Stock Requests', 'current' => number_format($pendingRequests), 'previous' => number_format($pendingRequests), 'change' => 'Live'],
+    ['label' => 'Stock Issued', 'current' => number_format($stockOutMonth), 'previous' => number_format($stockOutMonth), 'change' => 'Live'],
+    ['label' => 'Stock Health', 'current' => $healthScore . '%', 'previous' => $healthScore . '%', 'change' => 'Live'],
 ];
 
 $recentStockInCount = count(array_filter($recentTx, fn($tx) => in_array($tx['transaction_type'], ['stock_in', 'transfer_in'], true)));
 $recentStockOutCount = count(array_filter($recentTx, fn($tx) => in_array($tx['transaction_type'], ['stock_out', 'transfer_out'], true)));
 $recentActivityQty = array_sum(array_map(fn($tx) => (int)$tx['quantity'], $recentTx));
 $recentActivityDate = $recentTx ? date('d M Y', strtotime($recentTx[0]['transaction_date'])) : 'No activity';
+$assetCoverageText = number_format($totalItems) . ' live asset' . ($totalItems === 1 ? '' : 's');
+$itemsScopeQuery = $isAdmin ? 'branch=all' : '';
+$itemsAllUrl = BASE_URL . 'pages/items.php' . ($itemsScopeQuery ? '?' . $itemsScopeQuery : '');
+$riskItemsUrl = BASE_URL . 'pages/items.php?filter=risk' . ($itemsScopeQuery ? '&' . $itemsScopeQuery : '');
+$missingPurchaseUrl = BASE_URL . 'pages/items.php?missing_purchase=1' . ($itemsScopeQuery ? '&' . $itemsScopeQuery : '');
+$movementMonthUrl = BASE_URL . 'pages/reports.php?report=movement&date_from=' . urlencode($monthStart) . '&date_to=' . urlencode($today);
+$valuationUrl = BASE_URL . 'pages/reports.php?report=valuation';
+$pendingRequestsUrl = BASE_URL . 'pages/requests.php?status=Pending';
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -301,22 +279,22 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
     <div class="enterprise-kpi-grid">
-        <a href="<?= BASE_URL ?>pages/items.php" class="enterprise-kpi">
+        <a href="<?= clean($itemsAllUrl) ?>" class="enterprise-kpi">
             <span>Total Items</span>
             <strong><?= number_format($totalItems) ?></strong>
             <small><?= number_format($totalUnits) ?> units tracked</small>
         </a>
-        <a href="<?= BASE_URL ?>pages/reports.php?report=valuation" class="enterprise-kpi">
+        <a href="<?= clean($valuationUrl) ?>" class="enterprise-kpi">
             <span>Inventory Value</span>
             <strong><?= ugx($stockValue) ?></strong>
             <small>Current book value</small>
         </a>
-        <a href="<?= BASE_URL ?>pages/items.php?filter=low" class="enterprise-kpi risk">
+        <a href="<?= clean($riskItemsUrl) ?>" class="enterprise-kpi risk">
             <span>Stock Risk</span>
             <strong><?= number_format($riskCount) ?></strong>
             <small><?= $lowStock ?> low, <?= $outOfStock ?> out, <?= $maintenanceAssets ?> maintenance</small>
         </a>
-        <a href="<?= BASE_URL ?>pages/requests.php" class="enterprise-kpi">
+        <a href="<?= clean($pendingRequestsUrl) ?>" class="enterprise-kpi">
             <span>Pending Requests</span>
             <strong><?= number_format($pendingRequests) ?></strong>
             <small>Awaiting action</small>
@@ -325,22 +303,22 @@ include __DIR__ . '/../includes/header.php';
 </section>
 
 <section class="decision-strip">
-    <div>
+    <a href="<?= clean($movementMonthUrl) ?>&tx_type=stock_in">
         <span>Stock In This Month</span>
         <strong><?= number_format($stockInMonth) ?></strong>
-    </div>
-    <div>
+    </a>
+    <a href="<?= clean($movementMonthUrl) ?>&tx_type=stock_out">
         <span>Stock Out This Month</span>
         <strong><?= number_format($stockOutMonth) ?></strong>
-    </div>
-    <div>
+    </a>
+    <a href="<?= clean($movementMonthUrl) ?>">
         <span>Issue / Receipt Ratio</span>
         <strong><?= $turnoverRatio ?>%</strong>
-    </div>
-    <div>
+    </a>
+    <a href="<?= clean($missingPurchaseUrl) ?>">
         <span>Missing Purchase Dates</span>
         <strong><?= number_format($unassignedPurchaseDates) ?></strong>
-    </div>
+    </a>
 </section>
 
 <section class="ops-volume-grid">
@@ -383,18 +361,18 @@ include __DIR__ . '/../includes/header.php';
             <div class="mini-donut-row">
                 <div class="mini-donut-block">
                     <div class="mini-donut" style="background: conic-gradient(<?= clean($statusPie) ?>);"></div>
-                    <div><strong>Status</strong><span>100% of assets</span></div>
+                    <div><strong>Status</strong><span><?= clean($assetCoverageText) ?></span></div>
                 </div>
                 <div class="mini-donut-block">
                     <div class="mini-donut" style="background: conic-gradient(<?= clean($conditionPie) ?>);"></div>
-                    <div><strong>Condition</strong><span>100% of assets</span></div>
+                    <div><strong>Condition</strong><span><?= clean($assetCoverageText) ?></span></div>
                 </div>
             </div>
             <div class="state-matrix">
                 <?php foreach ($stateMatrix as $row): ?>
                 <?php $rowTotal = max(1, array_sum(array_column($row['segments'], 'value'))); ?>
                 <div class="state-row">
-                    <div class="state-label"><strong><?= clean($row['condition']) ?></strong><span><?= round(($row['total'] / $conditionTotal) * 100) ?>%</span></div>
+                    <div class="state-label"><a href="<?= BASE_URL ?>pages/reports.php?report=summary&condition=<?= urlencode($row['condition']) ?>"><strong><?= clean($row['condition']) ?></strong></a><span><?= round(($row['total'] / $conditionTotal) * 100) ?>%</span></div>
                     <div class="state-stack" title="<?= clean($row['condition']) ?> by operational status">
                         <?php foreach ($row['segments'] as $segment): ?>
                         <?php $segmentPct = max(1, round(($segment['value'] / $rowTotal) * 100)); ?>
@@ -448,7 +426,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="css-pie" style="background: conic-gradient(<?= clean($statusPie) ?>);"></div>
                 <div class="pie-legend">
                     <?php foreach ($statusMix as $index => $row): ?>
-                    <div><span style="background: <?= clean($statusColors[$index % count($statusColors)]) ?>"></span><?= clean($row['status']) ?> <strong><?= round(($row['total'] / $statusTotal) * 100) ?>%</strong></div>
+                    <a href="<?= BASE_URL ?>pages/reports.php?report=summary&asset_status=<?= urlencode($row['status']) ?>"><span style="background: <?= clean($statusColors[$index % count($statusColors)]) ?>"></span><?= clean($row['status']) ?> <strong><?= round(($row['total'] / $statusTotal) * 100) ?>%</strong></a>
                     <?php endforeach; ?>
                 </div>
             </div>
@@ -468,7 +446,7 @@ include __DIR__ . '/../includes/header.php';
                 <?php $width = max(8, round(((float)$category['value'] / $categoryMax) * 100)); ?>
                 <div class="hbar-row">
                     <div class="hbar-label">
-                        <strong><?= clean($category['name']) ?></strong>
+                        <a href="<?= BASE_URL ?>pages/reports.php?report=valuation&category=<?= (int)$category['category_id'] ?>"><strong><?= clean($category['name']) ?></strong></a>
                         <span><?= ugx((float)$category['value']) ?></span>
                     </div>
                     <div class="hbar-track">
@@ -490,7 +468,7 @@ include __DIR__ . '/../includes/header.php';
                 <tbody>
                 <?php foreach ($supplierExposure as $supplier): ?>
                     <tr>
-                        <td><?= clean($supplier['supplier_name']) ?></td>
+                        <td><?php if ($supplier['supplier_id']): ?><a href="<?= BASE_URL ?>pages/reports.php?report=summary&supplier=<?= (int)$supplier['supplier_id'] ?>"><?= clean($supplier['supplier_name']) ?></a><?php else: ?><?= clean($supplier['supplier_name']) ?><?php endif; ?></td>
                         <td><?= number_format($supplier['items']) ?></td>
                         <td><?= ugx((float)$supplier['value']) ?></td>
                     </tr>
@@ -565,7 +543,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card enterprise-list-card priority-decisions-card">
         <div class="card-header">
             <h3>Priority Stock Decisions</h3>
-            <a class="card-link" href="<?= BASE_URL ?>pages/items.php?filter=low">View all</a>
+            <a class="card-link" href="<?= clean($riskItemsUrl) ?>">View all</a>
         </div>
         <div class="card-body p0">
             <?php if ($riskItems): ?>
