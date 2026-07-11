@@ -876,9 +876,10 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 }
 
 .login-panel-left {
-  width: 440px;
+  width: 470px;
+  min-height: 430px;
   background: linear-gradient(145deg, rgba(8, 20, 35, 0.95) 0%, rgba(15, 37, 64, 0.96) 100%);
-  padding: 48px 40px;
+  padding: 56px 48px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -956,8 +957,13 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .login-form-wrap .form-group label { font-size: .9rem; margin-bottom: 8px; }
 .login-form-wrap .input-wrap { min-height: 62px; padding: 12px 16px; border-radius: 15px; position: relative; }
 .login-form-wrap .input-wrap input { font-size: 1rem; padding: 14px 34px 14px 0; }
+.login-form-wrap .input-wrap input[type="password"] { padding-right: 58px; }
 .login-form-wrap .input-wrap .input-icon { width: 30px; height: 30px; border-radius: 11px; }
-.login-form-wrap .toggle-password { right: 16px; top: 50%; transform: translateY(-50%); }
+.login-form-wrap .toggle-password { right: 22px; top: 50%; width: 30px; height: 30px; align-items: center; justify-content: center; transform: translateY(-50%); }
+.login-form-wrap .toggle-password svg { width: 17px; height: 17px; }
+.login-form-wrap .checkbox-group { margin-top: 2px; padding-left: 2px; }
+.login-form-wrap .checkbox-group label { min-height: 24px; align-items: center; gap: 11px; font-size: .9rem; line-height: 1.4; }
+.login-form-wrap .checkbox-group input { width: 16px; height: 16px; flex: 0 0 16px; }
 .login-form-wrap .btn-primary { min-height: 58px; padding: 15px 22px; font-size: 1rem; box-shadow: 0 12px 24px rgba(201,162,39,.2); }
 .login-form-wrap .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 30px rgba(201,162,39,.25); }
 
