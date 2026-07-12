@@ -30,6 +30,200 @@ $printMode        = (int)($_GET['print'] ?? 0) === 1;
 $validReports = ['summary', 'movement', 'valuation', 'low_stock'];
 $reportType = in_array($reportType, $validReports, true) ? $reportType : 'summary';
 
+$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
+$assetStatusMaster = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
+$conditionMaster = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
+
+$buildOptionWhere = function (array $keys) use (
+    &$branchFilter,
+    &$catFilter,
+    &$sectionFilter,
+    &$departmentFilter,
+    &$supplierFilter,
+    &$statusFilter,
+    &$assetStatusFilter,
+    &$assetTypeFilter,
+    &$conditionFilter,
+    $isAdmin,
+    $branchId
+) {
+    $where = ['i.is_active = 1'];
+    $params = [];
+
+    if (!$isAdmin) {
+        $where[] = 'i.branch_id = ?';
+        $params[] = $branchId;
+    } elseif (in_array('branch', $keys, true) && $branchFilter) {
+        $where[] = 'i.branch_id = ?';
+        $params[] = $branchFilter;
+    }
+
+    if (in_array('category', $keys, true) && $catFilter) {
+        $where[] = 'i.category_id = ?';
+        $params[] = $catFilter;
+    }
+    if (in_array('section', $keys, true) && $sectionFilter) {
+        $where[] = 'i.section_id = ?';
+        $params[] = $sectionFilter;
+    }
+    if (in_array('department', $keys, true) && $departmentFilter) {
+        $where[] = 'i.department_id = ?';
+        $params[] = $departmentFilter;
+    }
+    if (in_array('supplier', $keys, true) && $supplierFilter) {
+        $where[] = 'i.supplier_id = ?';
+        $params[] = $supplierFilter;
+    }
+    if (in_array('status', $keys, true) && $statusFilter) {
+        if ($statusFilter === 'low_stock') {
+            $where[] = 'i.current_stock <= i.minimum_stock';
+        } elseif ($statusFilter === 'out_of_stock') {
+            $where[] = 'i.current_stock = 0';
+        } elseif ($statusFilter === 'available') {
+            $where[] = 'i.current_stock > i.minimum_stock';
+        }
+    }
+    if (in_array('asset_status', $keys, true) && $assetStatusFilter !== '') {
+        $where[] = 'i.asset_status = ?';
+        $params[] = $assetStatusFilter;
+    }
+    if (in_array('asset_type', $keys, true) && $assetTypeFilter !== '') {
+        $where[] = 'i.asset_type = ?';
+        $params[] = $assetTypeFilter;
+    }
+    if (in_array('condition', $keys, true) && $conditionFilter !== '') {
+        $where[] = 'i.asset_condition = ?';
+        $params[] = $conditionFilter;
+    }
+
+    return ['WHERE ' . implode(' AND ', $where), $params];
+};
+
+$fetchOptionRows = function (string $sql, array $keys) use ($pdo, $buildOptionWhere) {
+    [$where, $params] = $buildOptionWhere($keys);
+    $stmt = $pdo->prepare(str_replace('{WHERE}', $where, $sql));
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+};
+
+$hasSelectedId = static function (array $rows, int $selected): bool {
+    return $selected === 0 || in_array($selected, array_map('intval', array_column($rows, 'id')), true);
+};
+
+$categories = $fetchOptionRows("
+    SELECT c.id, c.name, c.branch_id, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN categories c ON c.id = i.category_id
+    {WHERE}
+    GROUP BY c.id, c.name, c.branch_id
+    ORDER BY c.branch_id, c.name
+", ['branch']);
+if (!$hasSelectedId($categories, $catFilter)) {
+    $catFilter = 0;
+}
+
+$sections = $fetchOptionRows("
+    SELECT sec.id, sec.name, sec.code, sec.branch_id, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN sections sec ON sec.id = i.section_id
+    {WHERE}
+    GROUP BY sec.id, sec.name, sec.code, sec.branch_id
+    ORDER BY sec.name
+", ['branch', 'category']);
+if (!$hasSelectedId($sections, $sectionFilter)) {
+    $sectionFilter = 0;
+    $departmentFilter = 0;
+}
+
+$departments = $fetchOptionRows("
+    SELECT d.id, d.name, d.section_id, sec.name AS section_name, sec.branch_id, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN departments d ON d.id = i.department_id
+    JOIN sections sec ON sec.id = d.section_id
+    {WHERE}
+    GROUP BY d.id, d.name, d.section_id, sec.name, sec.branch_id
+    ORDER BY sec.name, d.name
+", ['branch', 'category', 'section']);
+if (!$hasSelectedId($departments, $departmentFilter)) {
+    $departmentFilter = 0;
+}
+
+$suppliers = $fetchOptionRows("
+    SELECT s.id, s.company_name, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN suppliers s ON s.id = i.supplier_id
+    {WHERE}
+    GROUP BY s.id, s.company_name
+    ORDER BY s.company_name
+", ['branch', 'category', 'section', 'department']);
+if (!$hasSelectedId($suppliers, $supplierFilter)) {
+    $supplierFilter = 0;
+}
+
+$stockStatusOptions = [];
+[$stockWhere, $stockParams] = $buildOptionWhere(['branch', 'category', 'section', 'department', 'supplier']);
+$stockStmt = $pdo->prepare("
+    SELECT
+        SUM(CASE WHEN i.current_stock <= i.minimum_stock THEN 1 ELSE 0 END) AS low_stock,
+        SUM(CASE WHEN i.current_stock = 0 THEN 1 ELSE 0 END) AS out_of_stock,
+        SUM(CASE WHEN i.current_stock > i.minimum_stock THEN 1 ELSE 0 END) AS available
+    FROM inventory_items i
+    {$stockWhere}
+");
+$stockStmt->execute($stockParams);
+$stockCounts = $stockStmt->fetch() ?: [];
+foreach ([
+    'low_stock' => 'Low Stock',
+    'out_of_stock' => 'Out of Stock',
+    'available' => 'Available',
+] as $value => $label) {
+    if ((int)($stockCounts[$value] ?? 0) > 0) {
+        $stockStatusOptions[] = ['value' => $value, 'label' => $label, 'item_count' => (int)$stockCounts[$value]];
+    }
+}
+if ($statusFilter && !in_array($statusFilter, array_column($stockStatusOptions, 'value'), true)) {
+    $statusFilter = '';
+}
+
+$assetStatusOptions = $fetchOptionRows("
+    SELECT i.asset_status AS value, i.asset_status AS label, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    {WHERE}
+      AND i.asset_status IS NOT NULL
+      AND i.asset_status <> ''
+    GROUP BY i.asset_status
+    ORDER BY i.asset_status
+", ['branch', 'category', 'section', 'department', 'supplier', 'status']);
+if ($assetStatusFilter && !in_array($assetStatusFilter, array_column($assetStatusOptions, 'value'), true)) {
+    $assetStatusFilter = '';
+}
+
+$assetTypeOptions = $fetchOptionRows("
+    SELECT i.asset_type AS value, i.asset_type AS label, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    {WHERE}
+      AND i.asset_type IS NOT NULL
+      AND i.asset_type <> ''
+    GROUP BY i.asset_type
+    ORDER BY i.asset_type
+", ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status']);
+if ($assetTypeFilter && !in_array($assetTypeFilter, array_column($assetTypeOptions, 'value'), true)) {
+    $assetTypeFilter = '';
+}
+
+$conditionOptions = $fetchOptionRows("
+    SELECT i.asset_condition AS value, i.asset_condition AS label, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    {WHERE}
+      AND i.asset_condition IS NOT NULL
+      AND i.asset_condition <> ''
+    GROUP BY i.asset_condition
+    ORDER BY i.asset_condition
+", ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'asset_type']);
+if ($conditionFilter && !in_array($conditionFilter, array_column($conditionOptions, 'value'), true)) {
+    $conditionFilter = '';
+}
+
 $searchSql = '';
 if ($searchQuery) {
     $searchLike = $pdo->quote('%' . $searchQuery . '%');
@@ -40,12 +234,10 @@ $branchSql = !$isAdmin ? "AND i.branch_id=$branchId" : ($branchFilter ? "AND i.b
 $catSql = $catFilter ? "AND i.category_id=$catFilter" : '';
 $departmentSql = $departmentFilter ? "AND i.department_id=$departmentFilter" : '';
 $supplierSql = $supplierFilter ? "AND i.supplier_id=$supplierFilter" : '';
-$sectionSql = $sectionFilter ? "AND d.section_id=$sectionFilter" : '';
-$assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
-$conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
-$assetStatusSql = in_array($assetStatusFilter, $assetStatusOptions, true) ? "AND i.asset_status=" . $pdo->quote($assetStatusFilter) : '';
+$sectionSql = $sectionFilter ? "AND i.section_id=$sectionFilter" : '';
+$assetStatusSql = in_array($assetStatusFilter, $assetStatusMaster, true) ? "AND i.asset_status=" . $pdo->quote($assetStatusFilter) : '';
 $assetTypeSql = $assetTypeFilter !== '' ? "AND i.asset_type=" . $pdo->quote($assetTypeFilter) : '';
-$conditionSql = in_array($conditionFilter, $conditionOptions, true) ? "AND i.asset_condition=" . $pdo->quote($conditionFilter) : '';
+$conditionSql = in_array($conditionFilter, $conditionMaster, true) ? "AND i.asset_condition=" . $pdo->quote($conditionFilter) : '';
 $purchaseFromSql = preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseFrom) ? "AND i.purchase_date >= " . $pdo->quote($purchaseFrom) : '';
 $purchaseToSql = preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseTo) ? "AND i.purchase_date <= " . $pdo->quote($purchaseTo) : '';
 $stockStatusSql = '';
@@ -58,22 +250,6 @@ if ($statusFilter === 'low_stock') {
 }
 $validTxTypes = ['stock_in', 'stock_out', 'transfer_in', 'transfer_out', 'adjustment'];
 $txTypeFilter = in_array($txTypeFilter, $validTxTypes, true) ? $txTypeFilter : '';
-
-$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
-if (!$isAdmin) {
-    $categories = $pdo->prepare("SELECT * FROM categories WHERE branch_id = ? ORDER BY name");
-    $categories->execute([$branchId]);
-    $categories = $categories->fetchAll();
-} elseif ($branchFilter) {
-    $categories = $pdo->prepare("SELECT * FROM categories WHERE branch_id = ? ORDER BY name");
-    $categories->execute([$branchFilter]);
-    $categories = $categories->fetchAll();
-} else {
-    $categories = $pdo->query("SELECT * FROM categories ORDER BY branch_id, name")->fetchAll();
-}
-$sections = $pdo->query("SELECT * FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
-$departments = $pdo->query("SELECT d.*, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
-$suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 
 $totalInventory = (int)$pdo->query("SELECT COUNT(*) FROM inventory_items i WHERE i.is_active=1 $branchSql")->fetchColumn();
 $inventoryValue = (float)$pdo->query("SELECT COALESCE(SUM(i.current_stock * i.unit_price), 0) FROM inventory_items i WHERE i.is_active=1 $branchSql")->fetchColumn();
@@ -361,7 +537,16 @@ include __DIR__ . '/../includes/header.php';
             <input id="dateTo" type="date" name="date_to" value="<?= $dateTo ?>" class="form-control">
         </div>
         <?php endif; ?>
-        <button type="submit" class="btn btn-primary mt-4">Generate Report</button>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-filter"></i>
+                Apply Filters
+            </button>
+            <a class="btn btn-outline-secondary" href="?report=<?= clean($reportType) ?>">
+                <i class="fa-solid fa-rotate-left"></i>
+                Reset
+            </a>
+        </div>
     </form>
 </div>
 
@@ -522,11 +707,19 @@ function exportCurrentReport() {
 .report-tabs .nav-link{margin:0!important;min-height:36px;display:inline-flex;align-items:center;gap:7px;padding:8px 12px!important;border:1px solid #cbd5e1!important;border-radius:7px!important;background:#fff!important;color:#0A1628!important;font-size:.82rem;font-weight:850;text-decoration:none!important;}
 .report-tabs .nav-link.active{background:#0f2744!important;border-color:#0f2744!important;color:#fff!important;box-shadow:0 8px 16px rgba(15,39,68,.14);}
 .report-tabs .nav-link::selection,.report-tabs .nav-link *::selection{background:transparent;color:inherit;}
-.filter-bar .filter-form{display:flex;align-items:end;gap:12px;flex-wrap:wrap;}
-.filter-bar .filter-group{margin-bottom:0;max-width:280px;min-width:150px;}
-.filter-bar .form-label{font-size:.72rem;font-weight:850;color:#334155;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
-.filter-bar .form-control,.report-search-control{height:38px;border:1px solid #cbd5e1!important;border-radius:7px!important;background:#fff;color:#0A1628;padding:7px 10px;font-size:.82rem;font-weight:700;box-shadow:none!important;}
-.report-search-control{min-width:210px;}
+.filter-bar{border:1px solid #b8c9dc!important;border-radius:8px!important;background:#f8fbff!important;}
+.filter-bar .filter-form{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));align-items:end;gap:12px;}
+.filter-bar .filter-group{min-width:0;margin-bottom:0;padding:10px 11px;border:1px solid #d4e0ec;border-radius:8px;background:#fff;box-shadow:0 8px 18px rgba(15,23,42,.04);}
+.filter-bar .filter-group:not(.flex-fill){grid-column:span 2;}
+.filter-bar .filter-group.flex-fill{grid-column:span 3;}
+.filter-bar .form-label{display:block;font-size:.68rem;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;line-height:1.1;}
+.filter-bar .form-control,.report-search-control{width:100%;height:34px;border:1px solid #cbd5e1!important;border-radius:7px!important;background:#fff;color:#0A1628;padding:6px 9px;font-size:.8rem;font-weight:750;box-shadow:none!important;outline:none!important;}
+.filter-bar .form-control:focus,.report-search-control:focus{border-color:#8bb8dd!important;box-shadow:0 0 0 3px rgba(47,128,237,.12)!important;}
+.filter-actions{grid-column:span 4;display:flex;align-items:center;gap:10px;align-self:end;min-height:56px;padding:8px 0;}
+.filter-actions .btn{min-height:40px;margin-top:0!important;box-shadow:0 10px 22px rgba(15,23,42,.08);}
+.filter-actions .btn-primary{min-width:180px;}
+.filter-actions .btn-outline-secondary{min-width:110px;background:#fff;border:1px solid #cbd5e1;color:#0A1628;}
+.report-search-control{min-width:0;}
 .print-area{overflow:hidden;}
 .report-table-scroll{width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:10px;border-bottom:1px solid #cbd5e1;scrollbar-color:#6b7280 #e5edf5;scrollbar-width:auto;}
 .report-table-scroll .data-table{min-width:1720px;}
@@ -548,7 +741,7 @@ function exportCurrentReport() {
     .data-table{font-size:10px;}
     .data-table th,.data-table td{padding:6px 7px;}
 }
-@media (max-width:1180px){.report-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media (max-width:768px){.report-summary-grid{grid-template-columns:1fr;}.filter-bar .filter-group,.report-search-control{max-width:none;width:100%;}.filter-bar .filter-form{align-items:stretch;}}
+@media (max-width:1180px){.report-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.filter-bar .filter-form{grid-template-columns:repeat(6,minmax(0,1fr));}.filter-bar .filter-group:not(.flex-fill),.filter-bar .filter-group.flex-fill{grid-column:span 2;}.filter-actions{grid-column:span 4;}}
+@media (max-width:768px){.report-summary-grid{grid-template-columns:1fr;}.filter-bar .filter-form{grid-template-columns:1fr;align-items:stretch;}.filter-bar .filter-group:not(.flex-fill),.filter-bar .filter-group.flex-fill,.filter-actions{grid-column:1;}.filter-actions{flex-direction:column;align-items:stretch;}.filter-actions .btn{width:100%;}.report-search-control{max-width:none;width:100%;}}
 </style>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
