@@ -548,6 +548,7 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: .8rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
 .form-group input[type="text"],
+.form-group input[type="tel"],
 .form-group input[type="email"],
 .form-group input[type="password"],
 .form-group input[type="number"],

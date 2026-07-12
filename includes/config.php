@@ -135,8 +135,19 @@ function verifyCsrf(): void {
     }
 
     if (!$valid) {
+        if (isLoggedIn()) {
+            setFlash('error', 'Your form session expired. Please try again.');
+            $fallback = BASE_URL . 'pages/dashboard.php';
+            $target = $_SERVER['HTTP_REFERER'] ?? $fallback;
+            if (strpos($target, BASE_URL) !== 0) {
+                $target = $fallback;
+            }
+            header('Location: ' . $target);
+            exit;
+        }
+
         http_response_code(403);
-        die('Invalid CSRF token.');
+        die('Your form session expired. Please refresh and try again.');
     }
 }
 
