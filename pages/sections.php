@@ -5,6 +5,12 @@ requireRole('Administrator', 'Campus Manager', 'Store Manager', 'Section Manager
 $pageTitle = 'Departments';
 $activePage = 'sections';
 $pdo = db();
+$user = currentUser();
+$isAdmin = hasRole('Administrator');
+$currentBranchId = (int)$user['branch_id'];
+$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name")->fetchAll();
+$branchNamesById = array_column($branches, 'name', 'id');
+$currentBranchName = $branchNamesById[$currentBranchId] ?? ($user['branch_name'] ?? 'Current Campus');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -44,7 +50,25 @@ $pagination = getPagination($totalSections, 10);
 $sections = $pdo->query(
         "SELECT s.*, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}"
 )->fetchAll();
-$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name")->fetchAll();
+$printSectionsStmt = $isAdmin
+    ? $pdo->query("SELECT s.id, s.name, s.code, s.description, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name")
+    : null;
+if ($isAdmin) {
+    $printSections = $printSectionsStmt->fetchAll();
+} else {
+    $printSectionsStmt = $pdo->prepare("SELECT s.id, s.name, s.code, s.description, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 AND s.branch_id = ? ORDER BY s.name");
+    $printSectionsStmt->execute([$currentBranchId]);
+    $printSections = $printSectionsStmt->fetchAll();
+}
+$printDepartmentData = array_map(static function ($section) {
+    return [
+        'name' => $section['name'],
+        'code' => $section['code'] ?: '—',
+        'branch_id' => (int)$section['branch_id'],
+        'branch_name' => $section['branch_name'],
+        'description' => $section['description'] ?: '—',
+    ];
+}, $printSections);
 $editSection = null;
 if (isset($_GET['edit'])) {
     $stmt = $pdo->prepare("SELECT * FROM sections WHERE id = ?");
@@ -60,6 +84,17 @@ include __DIR__ . '/../includes/header.php';
         <p class="page-sub"><?= number_format($totalSections) ?> UIRI departments/directorates under each campus.</p>
     </div>
     <div class="page-actions">
+        <?php if ($isAdmin): ?>
+        <button type="button" class="btn btn-outline" onclick="openModal('printDepartmentsModal')">
+            <svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print Departments
+        </button>
+        <?php else: ?>
+        <button type="button" class="btn btn-outline" onclick="printDepartments('<?= $currentBranchId ?>')">
+            <svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print Departments
+        </button>
+        <?php endif; ?>
         <button class="btn btn-primary" onclick="openModal('sectionModal')">Add Department</button>
     </div>
 </div>
@@ -96,6 +131,68 @@ include __DIR__ . '/../includes/header.php';
         <?= renderPaginationBar($pagination, $totalSections, ['edit']) ?>
     </div>
 </div>
+
+<?php if ($isAdmin): ?>
+<div class="modal-overlay" id="printDepartmentsModal" role="dialog" aria-modal="true" aria-labelledby="printDepartmentsTitle">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="printDepartmentsTitle">Print Departments</h3>
+            <button class="modal-close" onclick="closeModal('printDepartmentsModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Print Scope</label>
+                <select id="printDepartmentScope">
+                    <option value="<?= $currentBranchId ?>">Active campus: <?= clean($currentBranchName) ?></option>
+                    <option value="all">All campuses</option>
+                    <?php foreach ($branches as $branch): ?>
+                    <option value="<?= $branch['id'] ?>"><?= clean($branch['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <small class="form-note">Choose whether to print the active campus, all campuses, or a specific campus.</small>
+            </div>
+            <div class="print-option-summary">
+                The report includes all matching departments, not only the current paginated rows.
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeModal('printDepartmentsModal')">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="printSelectedDepartments()">Print Report</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<section class="departments-print-area" id="departmentsPrintArea" aria-hidden="true">
+    <div class="departments-print-header">
+        <div class="departments-print-logo">
+            <img src="<?= BASE_URL ?>assets/img/uiri-logo.webp" alt="UIRI">
+        </div>
+        <div>
+            <span>Uganda Industrial Research Institute</span>
+            <h1>Department Register</h1>
+            <p id="printDepartmentScopeLabel"><?= clean($currentBranchName) ?></p>
+        </div>
+    </div>
+    <div class="departments-print-meta">
+        <div><strong>Scope</strong><span id="printDepartmentMetaScope"><?= clean($currentBranchName) ?></span></div>
+        <div><strong>Total Departments</strong><span id="printDepartmentMetaCount">0</span></div>
+        <div><strong>Generated By</strong><span><?= clean($user['full_name']) ?></span></div>
+        <div><strong>Generated On</strong><span><?= date('d M Y H:i') ?></span></div>
+    </div>
+    <table class="departments-print-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Department</th>
+                <th>Code</th>
+                <th>Campus</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody id="printDepartmentsRows"></tbody>
+    </table>
+</section>
 
 <div class="modal-overlay" id="sectionModal" <?= $editSection ? 'style="display:flex"' : '' ?>>
     <div class="modal">
@@ -139,4 +236,194 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<script>
+const departmentPrintData = <?= json_encode($printDepartmentData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+const departmentBranchNames = <?= json_encode($branchNamesById, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+const activeDepartmentBranchId = '<?= $currentBranchId ?>';
+
+function departmentPrintText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (character) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[character];
+    });
+}
+
+function printDepartments(scope) {
+    const selectedScope = scope || activeDepartmentBranchId;
+    const rows = selectedScope === 'all'
+        ? departmentPrintData
+        : departmentPrintData.filter(row => String(row.branch_id) === String(selectedScope));
+    const scopeLabel = selectedScope === 'all' ? 'All UIRI Campuses' : (departmentBranchNames[selectedScope] || 'Selected Campus');
+    const tbody = document.getElementById('printDepartmentsRows');
+    const scopeTitle = document.getElementById('printDepartmentScopeLabel');
+    const metaScope = document.getElementById('printDepartmentMetaScope');
+    const metaCount = document.getElementById('printDepartmentMetaCount');
+
+    if (!tbody || !scopeTitle || !metaScope || !metaCount) return;
+
+    tbody.innerHTML = rows.length
+        ? rows.map((row, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td><strong>${departmentPrintText(row.name)}</strong></td>
+                <td>${departmentPrintText(row.code || '—')}</td>
+                <td>${departmentPrintText(row.branch_name)}</td>
+                <td>${departmentPrintText(row.description || '—')}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" class="departments-print-empty">No departments found for this scope.</td></tr>';
+
+    scopeTitle.textContent = scopeLabel;
+    metaScope.textContent = scopeLabel;
+    metaCount.textContent = rows.length.toLocaleString();
+    document.body.classList.add('department-printing');
+    window.setTimeout(function () {
+        window.print();
+    }, 50);
+}
+
+function printSelectedDepartments() {
+    const scope = document.getElementById('printDepartmentScope')?.value || activeDepartmentBranchId;
+    closeModal('printDepartmentsModal');
+    printDepartments(scope);
+}
+
+window.addEventListener('afterprint', function () {
+    document.body.classList.remove('department-printing');
+});
+</script>
+<style>
+.print-option-summary {
+    border: 1px solid #dbeafe;
+    background: #eff6ff;
+    color: #1e3a8a;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: .84rem;
+    font-weight: 650;
+}
+.departments-print-area {
+    display: none;
+}
+.departments-print-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding-bottom: 18px;
+    margin-bottom: 16px;
+    border-bottom: 3px solid #0A1628;
+}
+.departments-print-logo {
+    width: 72px;
+    height: 72px;
+    border: 1px solid #d8e1ec;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.departments-print-logo img {
+    max-width: 58px;
+    max-height: 58px;
+}
+.departments-print-header span {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    color: #607086;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+.departments-print-header h1 {
+    margin: 3px 0;
+    color: #0A1628;
+    font-size: 24px;
+    font-weight: 900;
+}
+.departments-print-header p {
+    margin: 0;
+    color: #34445a;
+    font-size: 13px;
+    font-weight: 700;
+}
+.departments-print-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.departments-print-meta div {
+    border: 1px solid #d8e1ec;
+    border-radius: 8px;
+    padding: 9px 10px;
+    background: #f8fafc;
+}
+.departments-print-meta strong,
+.departments-print-meta span {
+    display: block;
+}
+.departments-print-meta strong {
+    color: #607086;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 4px;
+}
+.departments-print-meta span {
+    color: #0A1628;
+    font-size: 12px;
+    font-weight: 800;
+}
+.departments-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+.departments-print-table th {
+    background: #d8edf8;
+    color: #12314f;
+    text-align: left;
+    padding: 8px;
+    border: 1px solid #a8bed3;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+.departments-print-table td {
+    padding: 8px;
+    border: 1px solid #cbd7e4;
+    color: #102033;
+    vertical-align: top;
+}
+.departments-print-empty {
+    text-align: center;
+    font-weight: 800;
+    color: #607086;
+}
+@media print {
+    body.department-printing .sidebar,
+    body.department-printing .topnav,
+    body.department-printing .flash,
+    body.department-printing .page-content > :not(.departments-print-area) {
+        display: none !important;
+    }
+    body.department-printing .main-wrapper {
+        margin: 0 !important;
+    }
+    body.department-printing .page-content {
+        padding: 0 !important;
+    }
+    body.department-printing .departments-print-area {
+        display: block !important;
+        padding: 18mm 14mm;
+        background: #fff;
+    }
+    body.department-printing .departments-print-meta {
+        grid-template-columns: repeat(4, 1fr);
+        break-inside: avoid;
+    }
+    body.department-printing .departments-print-header {
+        break-inside: avoid;
+    }
+}
+</style>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
