@@ -211,6 +211,12 @@ $notifications = $notifStmt->fetchAll();
             <?php endif; ?>
 
             <li class="nav-section">Reports</li>
+            <li class="<?= ($activePage ?? '') === 'analytics' ? 'active' : '' ?>">
+                <a href="<?= BASE_URL ?>pages/analytics.php">
+                    <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-7"/><circle cx="7" cy="15" r="1"/><circle cx="10" cy="12" r="1"/><circle cx="13" cy="14" r="1"/><circle cx="18" cy="7" r="1"/></svg></span>
+                    Analytics
+                </a>
+            </li>
             <li class="<?= ($activePage ?? '') === 'reports' ? 'active' : '' ?>">
                 <a href="<?= BASE_URL ?>pages/reports.php">
                     <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
