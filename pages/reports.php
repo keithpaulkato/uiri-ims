@@ -224,6 +224,76 @@ if ($conditionFilter && !in_array($conditionFilter, array_column($conditionOptio
     $conditionFilter = '';
 }
 
+[$dateBoundsWhere, $dateBoundsParams] = $buildOptionWhere(['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'asset_type', 'condition']);
+$dateBoundsStmt = $pdo->prepare("
+    SELECT MIN(i.purchase_date) AS min_purchase_date, MAX(i.purchase_date) AS max_purchase_date
+    FROM inventory_items i
+    {$dateBoundsWhere}
+      AND i.purchase_date IS NOT NULL
+");
+$dateBoundsStmt->execute($dateBoundsParams);
+$purchaseBounds = $dateBoundsStmt->fetch() ?: [];
+$minPurchaseDate = $purchaseBounds['min_purchase_date'] ?? null;
+$maxPurchaseDate = $purchaseBounds['max_purchase_date'] ?? null;
+if ($purchaseFrom && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseFrom) || ($minPurchaseDate && $purchaseFrom < $minPurchaseDate) || ($maxPurchaseDate && $purchaseFrom > $maxPurchaseDate))) {
+    $purchaseFrom = '';
+}
+if ($purchaseTo && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseTo) || ($minPurchaseDate && $purchaseTo < $minPurchaseDate) || ($maxPurchaseDate && $purchaseTo > $maxPurchaseDate))) {
+    $purchaseTo = '';
+}
+if ($purchaseFrom && $purchaseTo && $purchaseFrom > $purchaseTo) {
+    $purchaseFrom = '';
+    $purchaseTo = '';
+}
+
+$filterRows = $pdo->query("
+    SELECT i.branch_id, i.category_id, i.section_id, i.department_id, i.supplier_id,
+           i.asset_status, i.asset_type, i.asset_condition,
+           i.purchase_date,
+           CASE
+               WHEN i.current_stock = 0 THEN 'out_of_stock'
+               WHEN i.current_stock <= i.minimum_stock THEN 'low_stock'
+               ELSE 'available'
+           END AS stock_status
+    FROM inventory_items i
+    WHERE i.is_active = 1
+")->fetchAll();
+if (!$isAdmin) {
+    $filterRows = array_values(array_filter($filterRows, static fn($row) => (int)$row['branch_id'] === (int)$branchId));
+}
+
+$allCategories = $pdo->query("SELECT id, name, branch_id FROM categories ORDER BY branch_id, name")->fetchAll();
+$allSections = $pdo->query("SELECT id, name, branch_id FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
+$allDepartments = $pdo->query("SELECT d.id, d.name, d.section_id, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
+$allSuppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
+
+$filterOptionLabels = [
+    'categories' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => $row['name'],
+        'branch_id' => (int)$row['branch_id'],
+    ], $allCategories),
+    'sections' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => $row['name'],
+        'branch_id' => (int)$row['branch_id'],
+    ], $allSections),
+    'departments' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => ($row['section_name'] ? $row['section_name'] . ' - ' : '') . $row['name'],
+        'section_id' => (int)$row['section_id'],
+    ], $allDepartments),
+    'suppliers' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => $row['company_name'],
+    ], $allSuppliers),
+    'stock_statuses' => [
+        ['id' => 'low_stock', 'label' => 'Low Stock'],
+        ['id' => 'out_of_stock', 'label' => 'Out of Stock'],
+        ['id' => 'available', 'label' => 'Available'],
+    ],
+];
+
 $searchSql = '';
 if ($searchQuery) {
     $searchLike = $pdo->quote('%' . $searchQuery . '%');
@@ -477,9 +547,9 @@ include __DIR__ . '/../includes/header.php';
         <label for="statusSelect" class="form-label">Status</label>
         <select id="statusSelect" name="status" class="form-control">
             <option value="">All Statuses</option>
-            <option value="low_stock" <?= $statusFilter==='low_stock'?'selected':'' ?>>Low Stock</option>
-            <option value="out_of_stock" <?= $statusFilter==='out_of_stock'?'selected':'' ?>>Out of Stock</option>
-            <option value="available" <?= $statusFilter==='available'?'selected':'' ?>>Available</option>
+            <?php foreach ($stockStatusOptions as $status): ?>
+            <option value="<?= clean($status['value']) ?>" <?= $statusFilter===$status['value']?'selected':'' ?>><?= clean($status['label']) ?></option>
+            <?php endforeach; ?>
         </select>
     </div>
 
@@ -488,7 +558,7 @@ include __DIR__ . '/../includes/header.php';
         <select id="assetStatusSelect" name="asset_status" class="form-control">
             <option value="">All Asset Statuses</option>
             <?php foreach ($assetStatusOptions as $status): ?>
-            <option value="<?= $status ?>" <?= $assetStatusFilter===$status?'selected':'' ?>><?= $status ?></option>
+            <option value="<?= clean($status['value']) ?>" <?= $assetStatusFilter===$status['value']?'selected':'' ?>><?= clean($status['label']) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
@@ -497,8 +567,8 @@ include __DIR__ . '/../includes/header.php';
         <label for="assetTypeSelect" class="form-label">Asset Type</label>
         <select id="assetTypeSelect" name="asset_type" class="form-control">
             <option value="">All Asset Types</option>
-            <?php foreach (['Fixed Asset','Consumable','Tool','Spare Part','Laboratory Equipment','Office Equipment'] as $type): ?>
-            <option value="<?= $type ?>" <?= $assetTypeFilter===$type?'selected':'' ?>><?= $type ?></option>
+            <?php foreach ($assetTypeOptions as $type): ?>
+            <option value="<?= clean($type['value']) ?>" <?= $assetTypeFilter===$type['value']?'selected':'' ?>><?= clean($type['label']) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
@@ -508,19 +578,19 @@ include __DIR__ . '/../includes/header.php';
         <select id="conditionSelect" name="condition" class="form-control">
             <option value="">All Conditions</option>
             <?php foreach ($conditionOptions as $condition): ?>
-            <option value="<?= $condition ?>" <?= $conditionFilter===$condition?'selected':'' ?>><?= $condition ?></option>
+            <option value="<?= clean($condition['value']) ?>" <?= $conditionFilter===$condition['value']?'selected':'' ?>><?= clean($condition['label']) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
 
     <div class="filter-group">
         <label for="purchaseFrom" class="form-label">Purchased From</label>
-        <input id="purchaseFrom" type="date" name="purchase_from" value="<?= clean($purchaseFrom) ?>" class="form-control">
+        <input id="purchaseFrom" type="date" name="purchase_from" value="<?= clean($purchaseFrom) ?>" <?= $minPurchaseDate ? 'min="'.clean($minPurchaseDate).'"' : '' ?> <?= $maxPurchaseDate ? 'max="'.clean($maxPurchaseDate).'"' : '' ?> class="form-control">
     </div>
 
     <div class="filter-group">
         <label for="purchaseTo" class="form-label">Purchased To</label>
-        <input id="purchaseTo" type="date" name="purchase_to" value="<?= clean($purchaseTo) ?>" class="form-control">
+        <input id="purchaseTo" type="date" name="purchase_to" value="<?= clean($purchaseTo) ?>" <?= $minPurchaseDate ? 'min="'.clean($minPurchaseDate).'"' : '' ?> <?= $maxPurchaseDate ? 'max="'.clean($maxPurchaseDate).'"' : '' ?> class="form-control">
     </div>
 <?php endif; ?>
         <div class="filter-group flex-fill">
@@ -633,6 +703,21 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+const reportFilterRows = <?= json_encode(array_map(static fn($row) => [
+    'branch' => (int)$row['branch_id'],
+    'category' => (int)$row['category_id'],
+    'section' => (int)$row['section_id'],
+    'department' => (int)$row['department_id'],
+    'supplier' => (int)$row['supplier_id'],
+    'status' => (string)$row['stock_status'],
+    'asset_status' => (string)$row['asset_status'],
+    'asset_type' => (string)$row['asset_type'],
+    'condition' => (string)$row['asset_condition'],
+    'purchase_date' => (string)$row['purchase_date'],
+], $filterRows), JSON_UNESCAPED_SLASHES) ?>;
+const reportFilterLabels = <?= json_encode($filterOptionLabels, JSON_UNESCAPED_SLASHES) ?>;
+const reportFilterFixedBranch = <?= $isAdmin ? 'null' : (int)$branchId ?>;
+
 function printFullReport() {
     const url = new URL(window.location.href);
     url.searchParams.set('print', '1');
@@ -681,6 +766,162 @@ function exportCurrentReport() {
         showConfirmButton: false,
     });
 }
+
+function initSmartReportFilters() {
+    const fields = {
+        branch: document.getElementById('branchSelect'),
+        category: document.getElementById('categorySelect'),
+        section: document.getElementById('sectionSelect'),
+        department: document.getElementById('departmentSelect'),
+        supplier: document.getElementById('supplierSelect'),
+        status: document.getElementById('statusSelect'),
+        asset_status: document.getElementById('assetStatusSelect'),
+        asset_type: document.getElementById('assetTypeSelect'),
+        condition: document.getElementById('conditionSelect'),
+        purchase_from: document.getElementById('purchaseFrom'),
+        purchase_to: document.getElementById('purchaseTo'),
+    };
+
+    const order = ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'asset_type', 'condition'];
+    const optionSources = {
+        category: reportFilterLabels.categories,
+        section: reportFilterLabels.sections,
+        department: reportFilterLabels.departments,
+        supplier: reportFilterLabels.suppliers,
+        status: reportFilterLabels.stock_statuses,
+    };
+    const defaultLabels = {
+        category: 'All Categories',
+        section: 'All Departments',
+        department: 'All Sections / Units',
+        supplier: 'All Suppliers',
+        status: 'All Statuses',
+        asset_status: 'All Asset Statuses',
+        asset_type: 'All Asset Types',
+        condition: 'All Conditions',
+    };
+
+    const valueOf = (key) => {
+        if (key === 'branch' && reportFilterFixedBranch !== null) {
+            return String(reportFilterFixedBranch);
+        }
+        return fields[key] ? fields[key].value : '';
+    };
+
+    const matchesBefore = (row, targetKey) => {
+        const targetIndex = order.indexOf(targetKey);
+
+        return order.slice(0, targetIndex).every((key) => {
+            const selected = valueOf(key);
+            if (!selected) {
+                return true;
+            }
+            return String(row[key]) === selected;
+        });
+    };
+
+    const uniqueValues = (key) => {
+        const values = new Set();
+        reportFilterRows.forEach((row) => {
+            if (matchesBefore(row, key) && row[key] !== null && row[key] !== '') {
+                values.add(String(row[key]));
+            }
+        });
+        return values;
+    };
+
+    const labelFor = (key, value) => {
+        if (key === 'asset_status' || key === 'asset_type' || key === 'condition') {
+            return value;
+        }
+
+        const source = optionSources[key] || [];
+        const option = source.find((item) => String(item.id) === String(value));
+        return option ? option.label : value;
+    };
+
+    const renderSelect = (key) => {
+        const select = fields[key];
+        if (!select) {
+            return;
+        }
+
+        const selected = select.value;
+        const values = Array.from(uniqueValues(key)).sort((a, b) => labelFor(key, a).localeCompare(labelFor(key, b)));
+        select.innerHTML = '';
+        select.add(new Option(defaultLabels[key], ''));
+
+        values.forEach((value) => {
+            select.add(new Option(labelFor(key, value), value));
+        });
+
+        if (selected && values.includes(String(selected))) {
+            select.value = selected;
+        } else {
+            select.value = '';
+        }
+
+        select.disabled = values.length === 0;
+    };
+
+    const refreshAfter = (changedKey = 'branch') => {
+        const start = Math.max(1, order.indexOf(changedKey) + 1);
+        order.slice(start).forEach(renderSelect);
+        updatePurchaseDateBounds();
+    };
+
+    const updatePurchaseDateBounds = () => {
+        const matchingDates = reportFilterRows
+            .filter((row) => order.every((key) => {
+                const selected = valueOf(key);
+                return !selected || String(row[key]) === selected;
+            }))
+            .map((row) => row.purchase_date)
+            .filter(Boolean)
+            .sort();
+
+        if (!fields.purchase_from || !fields.purchase_to) {
+            return;
+        }
+
+        fields.purchase_from.removeAttribute('min');
+        fields.purchase_from.removeAttribute('max');
+        fields.purchase_to.removeAttribute('min');
+        fields.purchase_to.removeAttribute('max');
+
+        if (!matchingDates.length) {
+            fields.purchase_from.value = '';
+            fields.purchase_to.value = '';
+            return;
+        }
+
+        const minDate = matchingDates[0];
+        const maxDate = matchingDates[matchingDates.length - 1];
+        fields.purchase_from.min = minDate;
+        fields.purchase_from.max = maxDate;
+        fields.purchase_to.min = minDate;
+        fields.purchase_to.max = maxDate;
+
+        if (fields.purchase_from.value && (fields.purchase_from.value < minDate || fields.purchase_from.value > maxDate)) {
+            fields.purchase_from.value = '';
+        }
+        if (fields.purchase_to.value && (fields.purchase_to.value < minDate || fields.purchase_to.value > maxDate)) {
+            fields.purchase_to.value = '';
+        }
+    };
+
+    order.forEach((key) => {
+        if (!fields[key]) {
+            return;
+        }
+        fields[key].addEventListener('change', () => refreshAfter(key));
+    });
+
+    order.slice(1).forEach(renderSelect);
+    updatePurchaseDateBounds();
+}
+
+document.addEventListener('DOMContentLoaded', initSmartReportFilters);
 </script>
 <style>
 @media print {
