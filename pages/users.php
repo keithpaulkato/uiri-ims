@@ -12,21 +12,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fullName = trim($_POST['full_name']??''); $emailInput = trim($_POST['email']??'');
         $email = $emailInput !== '' ? $emailInput : null;
         $username = trim($_POST['username']??''); $phone = trim($_POST['phone']??'');
-        $profilePhoto = null;
         $existingPhoto = null;
+        $hasProfilePhotoUpload = !empty($_FILES['profile_photo']['name']);
         if ($action === 'edit' && $id) {
             $existingUserStmt = $pdo->prepare("SELECT profile_photo FROM users WHERE id = ?");
             $existingUserStmt->execute([$id]);
             $existingPhoto = $existingUserStmt->fetchColumn();
-        }
-        if (!empty($_FILES['profile_photo']['name'])) {
-            $profilePhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $id ?: 0);
-            if (!$profilePhoto) {
-                setFlash('error','Please upload a valid image file (jpg, png, webp, gif) under 2MB.');
-                header('Location: users.php'); exit;
-            }
-        } elseif ($action==='edit') {
-            $profilePhoto = $existingPhoto;
         }
         $roleId = (int)($_POST['role_id']??0); $branchId = (int)($_POST['branch_id']??0);
         $departmentId = (int)($_POST['department_id']??0); $sectionId = (int)($_POST['section_id']??0);
@@ -50,6 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     header('Location: users.php'); exit;
                 }
             }
+            if ($hasProfilePhotoUpload) {
+                $uploadError = '';
+                if (!validateProfilePhotoUpload($_FILES['profile_photo'], $uploadError)) {
+                    setFlash('error', $uploadError);
+                    header('Location: users.php'); exit;
+                }
+            }
             if ($action==='add') {
                 // Auto-generate username/password when left blank
                 if (!$username) {
@@ -62,8 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (strlen($pass) < 8) { setFlash('error','Password must be at least 8 characters.'); }
                 else {
                     $hash = password_hash($pass, PASSWORD_BCRYPT);
-                    $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active,profile_photo) VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status,$profilePhoto]);
+                    $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active,profile_photo) VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status,null]);
                     $newId = $pdo->lastInsertId();
+                    if ($hasProfilePhotoUpload) {
+                        $profilePhoto = saveProfilePhotoUpload($_FILES['profile_photo'], (int)$newId);
+                        if ($profilePhoto) {
+                            $pdo->prepare("UPDATE users SET profile_photo = ? WHERE id = ?")->execute([$profilePhoto, $newId]);
+                        }
+                    }
                     auditLog('ADD_USER','users',$newId,"Added user: $username");
 
                     // Create password setup token and expiry
@@ -86,6 +90,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
             } else {
+                $profilePhoto = $existingPhoto;
+                if ($hasProfilePhotoUpload) {
+                    $uploadedPhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $id);
+                    if (!$uploadedPhoto) {
+                        setFlash('error','The user details are valid, but the profile photo could not be saved. Please try another image.');
+                        header('Location: users.php'); exit;
+                    }
+                    $profilePhoto = $uploadedPhoto;
+                }
                 $pdo->prepare("UPDATE users SET branch_id=?,section_id=?,department_id=?,role_id=?,full_name=?,email=?,username=?,phone=?,is_active=?,profile_photo=? WHERE id=?")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$phone,$status,$profilePhoto,$id]);
                 if ($pass && strlen($pass)>=8) {
                     $hash=password_hash($pass,PASSWORD_BCRYPT);

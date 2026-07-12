@@ -19,13 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $oldPass = $_POST['old_password']??''; $newPass = $_POST['new_password']??''; $confirmPass = $_POST['confirm_password']??'';
     $profilePhoto = $profile['profile_photo'] ?? null;
     $photoChanged = false;
-    if (!empty($_FILES['profile_photo']['name'])) {
-        $uploadedPhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $userId);
-        if ($uploadedPhoto) {
-            $profilePhoto = $uploadedPhoto;
-            $photoChanged = true;
-        } else {
-            setFlash('error','Please upload a valid image file (jpg, png, webp, gif) under 2MB.');
+    $hasProfilePhotoUpload = !empty($_FILES['profile_photo']['name']);
+    if ($hasProfilePhotoUpload) {
+        $uploadError = '';
+        if (!validateProfilePhotoUpload($_FILES['profile_photo'], $uploadError)) {
+            setFlash('error', $uploadError);
             header('Location: profile.php'); exit;
         }
     }
@@ -58,6 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($passwordOk) {
+            if ($hasProfilePhotoUpload) {
+                $uploadedPhoto = saveProfilePhotoUpload($_FILES['profile_photo'], $userId);
+                if ($uploadedPhoto) {
+                    $profilePhoto = $uploadedPhoto;
+                    $photoChanged = true;
+                } else {
+                    setFlash('error','The profile details are valid, but the photo could not be saved. Please try another image.');
+                    header('Location: profile.php'); exit;
+                }
+            }
             $pdo->prepare("UPDATE users SET full_name=?,phone=?,profile_photo=? WHERE id=?")->execute([$fullName,$phone,$profilePhoto,$userId]);
             $_SESSION['user']['full_name'] = $fullName;
             $_SESSION['user']['profile_photo'] = $profilePhoto;
