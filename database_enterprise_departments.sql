@@ -37,3 +37,21 @@ SELECT b.id, 'Civil Works & Estate Management', 'CIVIL', 'Estate management, fac
 FROM branches b
 WHERE b.name = 'UIRI Nakawa'
   AND NOT EXISTS (SELECT 1 FROM sections s WHERE s.branch_id = b.id AND s.name = 'Civil Works & Estate Management');
+
+INSERT INTO sections (branch_id, name, code, description)
+SELECT b.id, 'Engineering Stores and Warehouse (Namanve)', 'STORES-NAM', 'Namanve receiving, bulk raw materials custody, engineering stores control and workshop issue coordination.'
+FROM branches b
+WHERE b.name = 'UIRI Namanve'
+  AND NOT EXISTS (SELECT 1 FROM sections s WHERE s.branch_id = b.id AND s.name = 'Engineering Stores and Warehouse (Namanve)');
+
+INSERT INTO sections (branch_id, name, code, description)
+SELECT b.id, 'ICT Infrastructure and Technical Support (Namanve)', 'ICT-NAM', 'Local ICT infrastructure support for CAD/CAM workstations, CNC controllers, networks, software licenses and automation interfaces.'
+FROM branches b
+WHERE b.name = 'UIRI Namanve'
+  AND NOT EXISTS (SELECT 1 FROM sections s WHERE s.branch_id = b.id AND s.name = 'ICT Infrastructure and Technical Support (Namanve)');
+
+INSERT INTO sections (branch_id, name, code, description)
+SELECT b.id, 'Facilities and Admin Support Unit (Namanve)', 'ADMIN-NAM', 'Namanve facilities support, local administration, safety gear, PPE, office supplies and campus-wide maintenance coordination.'
+FROM branches b
+WHERE b.name = 'UIRI Namanve'
+  AND NOT EXISTS (SELECT 1 FROM sections s WHERE s.branch_id = b.id AND s.name = 'Facilities and Admin Support Unit (Namanve)');
