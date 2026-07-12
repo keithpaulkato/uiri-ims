@@ -105,8 +105,8 @@ include __DIR__ . '/../includes/header.php';
             <tr><td><strong>Username</strong></td><td><code><?= clean($profile['username']) ?></code></td></tr>
             <tr><td><strong>Email</strong></td><td><?= clean($profile['email']) ?></td></tr>
             <tr><td><strong>Branch</strong></td><td><?= clean($profile['branch_name']) ?></td></tr>
-            <tr><td><strong>Last Login</strong></td><td><?= $profile['last_login']?date('d M Y H:i',strtotime($profile['last_login'])):'Never' ?></td></tr>
-            <tr><td><strong>Member Since</strong></td><td><?= date('d M Y',strtotime($profile['created_at'])) ?></td></tr>
+            <tr><td><strong>Last Login</strong></td><td><?= $profile['last_login'] ? formatDateTime($profile['last_login'], true) : 'Never' ?></td></tr>
+            <tr><td><strong>Member Since</strong></td><td><?= formatDate($profile['created_at']) ?></td></tr>
         </tbody></table>
     </div>
 </div>

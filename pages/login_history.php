@@ -39,7 +39,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             $row['ip_address'] ?? '',
             $row['user_agent'] ?? '',
             $row['details'] ?? '',
-            $row['created_at'] ?? ''
+            formatDateTime($row['created_at'] ?? '', true)
         ]);
     }
     fclose($out);
@@ -97,7 +97,7 @@ include __DIR__ . '/../includes/header.php';
                     <td><?= clean($r['ip_address'] ?? '') ?></td>
                     <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= clean($r['user_agent'] ?? '') ?></td>
                     <td><?= clean($r['details'] ?? '') ?></td>
-                    <td><?= clean($r['created_at']) ?></td>
+                    <td><?= formatDateTime($r['created_at'], true) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

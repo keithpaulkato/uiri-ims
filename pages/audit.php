@@ -60,15 +60,14 @@ include __DIR__ . '/../includes/header.php';
             <thead><tr><th>#</th><th>Activity</th><th>User</th><th>Branch</th><th>Details</th><th>Date</th><th>Time</th><th>IP Address</th></tr></thead>
             <tbody>
             <?php foreach ($logs as $i=>$log): ?>
-            <?php $dt = new DateTime($log['created_at']); ?>
             <tr>
                 <td><?= $pagination['offset'] + $i + 1 ?></td>
                 <td><span class="badge badge-info" style="display:inline-block"><?= clean($activityLabels[$log['action']] ?? $log['action']) ?></span></td>
                 <td><?= clean($log['full_name'] ?? 'System') ?><span class="item-code"><?= clean($log['username'] ?? '') ?></span></td>
                 <td><?= clean($log['branch_name'] ?? '—') ?></td>
                 <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= clean($log['details'] ?: '—') ?></td>
-                <td><?= $dt->format('d M Y') ?></td>
-                <td><?= $dt->format('H:i:s') ?></td>
+                <td><?= formatDate($log['created_at']) ?></td>
+                <td><?= formatTimeWithTimezone($log['created_at'], true) ?></td>
                 <td><?= clean($log['ip_address'] ?? '—') ?></td>
             </tr>
             <?php endforeach; ?>

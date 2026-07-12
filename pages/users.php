@@ -219,7 +219,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= clean($u['section_name']?:'—') ?></td>
                 <td><?= clean($u['department_name']?:'—') ?></td>
                 <td><?= clean($u['phone']?:'—') ?></td>
-                <td><?= $u['last_login'] ? date('d M Y H:i',strtotime($u['last_login'])) : 'Never' ?></td>
+                <td><?= $u['last_login'] ? formatDateTime($u['last_login'], true) : 'Never' ?></td>
                 <td><span class="badge <?= $u['is_active']?'badge-success':'badge-danger' ?>"><?= $u['is_active']?'Active':'Inactive' ?></span></td>
                 <td>
                     <div class="action-btns">

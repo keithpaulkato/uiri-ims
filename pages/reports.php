@@ -391,7 +391,7 @@ include __DIR__ . '/../includes/header.php';
         <div>
             <h2><?= $tabs[$reportType] ?></h2>
             <p>Uganda Industrial Research Institute<?= $branchFilter ? ' — '.clean(array_column($branches,'name','id')[$branchFilter]??'') : ' — All Branches' ?></p>
-            <p>Printed: <?= date('d F Y, H:i:s') ?> by <?= clean($user['full_name']) ?> (<?= clean($user['role']) ?>)</p>
+            <p>Printed: <?= formatDateTime('now', true) ?> by <?= clean($user['full_name']) ?> (<?= clean($user['role']) ?>)</p>
         </div>
     </div>
     <div class="print-meta">

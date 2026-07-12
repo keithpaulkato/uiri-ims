@@ -15,6 +15,11 @@ define('UPLOAD_DIR', __DIR__ . '/../uploads/items/');
 define('UPLOAD_URL', BASE_URL . 'uploads/items/');
 define('PROFILE_UPLOAD_DIR', __DIR__ . '/../uploads/profiles/');
 define('PROFILE_UPLOAD_URL', BASE_URL . 'uploads/profiles/');
+define('APP_TIMEZONE', 'Africa/Kampala');
+define('APP_TIMEZONE_ABBR', 'EAT');
+define('APP_TIMEZONE_OFFSET', '+03:00');
+
+date_default_timezone_set(APP_TIMEZONE);
 
 // SMTP settings — configure these for real email delivery
 define('SMTP_HOST', ''); // e.g. smtp.mailtrap.io or smtp.yourdomain.com
@@ -39,6 +44,7 @@ function db(): PDO {
                     PDO::ATTR_EMULATE_PREPARES   => false,
                 ]
             );
+            $pdo->exec("SET time_zone = '" . APP_TIMEZONE_OFFSET . "'");
         } catch (PDOException $e) {
             die('<div style="font-family:sans-serif;padding:40px;background:#fff0f0;border-left:4px solid #e53e3e;margin:20px;">
                 <h3 style="color:#e53e3e;">Database Connection Failed</h3>

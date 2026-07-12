@@ -9,15 +9,42 @@
  */
 function formatDate($datetime): string {
     if (!$datetime) return '';
-    return date('d M Y', strtotime($datetime));
+    $dt = new DateTime((string)$datetime, appTimezone());
+    return $dt->format('d M Y');
 }
 
 /**
  * Format datetime to readable format
  */
-function formatDateTime($datetime): string {
+function formatDateTime($datetime, bool $includeSeconds = false): string {
     if (!$datetime) return '';
-    return date('d M Y H:i', strtotime($datetime));
+    $dt = new DateTime((string)$datetime, appTimezone());
+    return $dt->format($includeSeconds ? 'd M Y, h:i:s A' : 'd M Y, h:i A') . ' ' . appTimezoneStamp();
+}
+
+/**
+ * Format only the time with an evidential timezone trail.
+ */
+function formatTimeWithTimezone($datetime, bool $includeSeconds = true): string {
+    if (!$datetime) return '';
+    $dt = new DateTime((string)$datetime, appTimezone());
+    return $dt->format($includeSeconds ? 'h:i:s A' : 'h:i A') . ' ' . appTimezoneStamp();
+}
+
+/**
+ * Application timezone used for audit-grade timestamps.
+ */
+function appTimezone(): DateTimeZone {
+    return new DateTimeZone(defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Africa/Kampala');
+}
+
+/**
+ * Human-readable timezone stamp for reports and audit trails.
+ */
+function appTimezoneStamp(): string {
+    $abbr = defined('APP_TIMEZONE_ABBR') ? APP_TIMEZONE_ABBR : (new DateTime('now', appTimezone()))->format('T');
+    $offset = defined('APP_TIMEZONE_OFFSET') ? APP_TIMEZONE_OFFSET : (new DateTime('now', appTimezone()))->format('P');
+    return $abbr . ' (UTC' . $offset . ')';
 }
 
 /**

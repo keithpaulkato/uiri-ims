@@ -206,7 +206,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
                 <?php foreach ($recentAdjustments as $adj): ?>
                 <tr>
-                    <td><?= formatDateTime($adj['created_at']) ?></td>
+                    <td><?= formatDateTime($adj['created_at'], true) ?></td>
                     <td><span class="item-name"><?= clean($adj['item_name']) ?></span><span class="item-code"><?= clean($adj['item_code']) ?></span></td>
                     <td>
                         <span class="badge <?= $adj['transaction_type'] === 'stock_in' ? 'badge-success' : 'badge-danger' ?>">
