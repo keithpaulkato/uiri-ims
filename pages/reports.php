@@ -25,6 +25,7 @@ $conditionFilter   = $_GET['condition'] ?? '';
 $purchaseFrom      = $_GET['purchase_from'] ?? '';
 $purchaseTo        = $_GET['purchase_to'] ?? '';
 $searchQuery      = trim($_GET['search'] ?? '');
+$printMode        = (int)($_GET['print'] ?? 0) === 1;
 
 $validReports = ['summary', 'movement', 'valuation', 'low_stock'];
 $reportType = in_array($reportType, $validReports, true) ? $reportType : 'summary';
@@ -173,6 +174,12 @@ if ($reportType === 'summary') {
     $data = $stmt->fetchAll();
 }
 
+$totalReportRows = count($data);
+$pagination = getPagination($totalReportRows, 10);
+$displayData = $printMode ? $data : array_slice($data, (int)$pagination['offset'], (int)$pagination['per_page']);
+$rowOffset = $printMode ? 0 : (int)$pagination['offset'];
+$paginationHtml = $printMode ? '' : renderPaginationBar($pagination, $totalReportRows);
+
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header d-flex justify-content-between align-items-start animate__animated animate__fadeInDown" data-aos="fade-down">
@@ -181,7 +188,7 @@ include __DIR__ . '/../includes/header.php';
         <p class="page-sub text-muted">Generate and export inventory reports with modern dashboards and analytics.</p>
     </div>
     <div class="page-actions d-flex gap-2">
-        <button onclick="window.print()" class="btn btn-outline-secondary">
+        <button onclick="printFullReport()" class="btn btn-outline-secondary">
             <i class="fa-solid fa-print me-2"></i>
             Print / PDF
         </button>
@@ -192,57 +199,33 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<div class="row row-deck gx-3 mb-4" data-aos="fade-up">
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm shadow-sm">
-            <div class="card-body d-flex align-items-center gap-3">
-                <span class="bg-primary text-white rounded-circle p-3">
-                    <i class="fa-solid fa-boxes fa-lg"></i>
-                </span>
-                <div>
-                    <div class="text-muted">Total Items</div>
-                    <div class="h3 mb-0"><?= number_format($totalInventory) ?></div>
-                </div>
-            </div>
+<div class="report-summary-grid" data-aos="fade-up">
+    <div class="report-summary-card">
+        <span class="report-summary-icon blue"><i class="fa-solid fa-boxes"></i></span>
+        <div>
+            <span>Total Items</span>
+            <strong><?= number_format($totalInventory) ?></strong>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm shadow-sm">
-            <div class="card-body d-flex align-items-center gap-3">
-                <span class="bg-success text-white rounded-circle p-3">
-                    <i class="fa-solid fa-coins fa-lg"></i>
-                </span>
-                <div>
-                    <div class="text-muted">Inventory Value</div>
-                    <div class="h3 mb-0"><?= ugx($inventoryValue) ?></div>
-                </div>
-            </div>
+    <div class="report-summary-card">
+        <span class="report-summary-icon green"><i class="fa-solid fa-coins"></i></span>
+        <div>
+            <span>Inventory Value</span>
+            <strong><?= ugx($inventoryValue) ?></strong>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm shadow-sm">
-            <div class="card-body d-flex align-items-center gap-3">
-                <span class="bg-warning text-white rounded-circle p-3">
-                    <i class="fa-solid fa-circle-exclamation fa-lg"></i>
-                </span>
-                <div>
-                    <div class="text-muted">Low Stock</div>
-                    <div class="h3 mb-0"><?= number_format($lowStock) ?></div>
-                </div>
-            </div>
+    <div class="report-summary-card">
+        <span class="report-summary-icon amber"><i class="fa-solid fa-circle-exclamation"></i></span>
+        <div>
+            <span>Low Stock</span>
+            <strong><?= number_format($lowStock) ?></strong>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm shadow-sm">
-            <div class="card-body d-flex align-items-center gap-3">
-                <span class="bg-info text-white rounded-circle p-3">
-                    <i class="fa-solid fa-hand-holding-medical fa-lg"></i>
-                </span>
-                <div>
-                    <div class="text-muted">Pending Requests</div>
-                    <div class="h3 mb-0"><?= number_format($pendingRequests) ?></div>
-                </div>
-            </div>
+    <div class="report-summary-card">
+        <span class="report-summary-icon cyan"><i class="fa-solid fa-hand-holding-medical"></i></span>
+        <div>
+            <span>Pending Requests</span>
+            <strong><?= number_format($pendingRequests) ?></strong>
         </div>
     </div>
 </div>
@@ -366,10 +349,7 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
         <div class="filter-group flex-fill">
             <label for="searchInput" class="form-label">Search</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
-                <input id="searchInput" type="text" name="search" value="<?= clean($searchQuery) ?>" class="form-control" placeholder="Item, branch, category, supplier...">
-            </div>
+            <input id="searchInput" type="text" name="search" value="<?= clean($searchQuery) ?>" class="form-control report-search-control" placeholder="Item, branch, category, supplier...">
         </div>
         <?php if ($reportType==='movement'): ?>
         <div class="filter-group">
@@ -401,46 +381,60 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <?php if ($reportType==='summary' && $data): ?>
+    <div class="report-table-scroll">
     <table class="data-table">
         <thead><tr><th>#</th><th>Item Code</th><th>Item Name</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><?php if ($isAdmin): ?><th>Campus</th><?php endif; ?><th>Purchased</th><th>Asset Status</th><th>Unit</th><th>Unit Price</th><th>Stock</th><th>Min Stock</th><th>Total Value</th><th>Stock Status</th></tr></thead>
         <tbody>
-        <?php $grandTotal=0; foreach ($data as $i=>$row): $grandTotal+=$row['total_value']; $ss=$row['current_stock']==0?'danger':($row['current_stock']<=$row['minimum_stock']?'warn':'success'); ?>
-        <tr><td><?= $i+1 ?></td><td><?= clean($row['item_code']) ?></td><td><?= clean($row['name']) ?></td><td><?= clean($row['brand_model'] ?: '—') ?></td><td><?= clean($row['category_name']) ?></td><td><?= clean($row['supplier_name'] ?: '—') ?></td><td><?= clean($row['section_name'] ?: '—') ?></td><td><?= clean($row['department_name'] ?: '—') ?></td><?php if ($isAdmin): ?><td><?= clean($row['branch_name']) ?></td><?php endif; ?><td><?= $row['purchase_date'] ? date('d M Y', strtotime($row['purchase_date'])) : '—' ?></td><td><?= clean($row['asset_status'] ?: 'Available') ?></td><td><?= clean($row['unit']) ?></td><td><?= ugx($row['unit_price']) ?></td><td><strong><?= number_format($row['current_stock']) ?></strong></td><td><?= $row['minimum_stock'] ?></td><td><?= ugx($row['total_value']) ?></td><td><span class="badge badge-<?= $ss ?>"><?= $ss==='danger'?'Out':($ss==='warn'?'Low':'OK') ?></span></td></tr>
+        <?php $grandTotal=0; foreach ($data as $row) { $grandTotal += $row['total_value']; } ?>
+        <?php foreach ($displayData as $i=>$row): $ss=$row['current_stock']==0?'danger':($row['current_stock']<=$row['minimum_stock']?'warn':'success'); ?>
+        <tr><td><?= $rowOffset+$i+1 ?></td><td><?= clean($row['item_code']) ?></td><td><?= clean($row['name']) ?></td><td><?= clean($row['brand_model'] ?: '—') ?></td><td><?= clean($row['category_name']) ?></td><td><?= clean($row['supplier_name'] ?: '—') ?></td><td><?= clean($row['section_name'] ?: '—') ?></td><td><?= clean($row['department_name'] ?: '—') ?></td><?php if ($isAdmin): ?><td><?= clean($row['branch_name']) ?></td><?php endif; ?><td><?= $row['purchase_date'] ? date('d M Y', strtotime($row['purchase_date'])) : '—' ?></td><td><?= clean($row['asset_status'] ?: 'Available') ?></td><td><?= clean($row['unit']) ?></td><td><?= ugx($row['unit_price']) ?></td><td><strong><?= number_format($row['current_stock']) ?></strong></td><td><?= $row['minimum_stock'] ?></td><td><?= ugx($row['total_value']) ?></td><td><span class="badge badge-<?= $ss ?>"><?= $ss==='danger'?'Out':($ss==='warn'?'Low':'OK') ?></span></td></tr>
         <?php endforeach; ?>
         </tbody>
         <tfoot><tr><td colspan="<?= $isAdmin?15:14 ?>"><strong>Grand Total Stock Value</strong></td><td colspan="2"><strong><?= ugx($grandTotal) ?></strong></td></tr></tfoot>
     </table>
+    </div>
+    <?= $paginationHtml ?>
 
     <?php elseif ($reportType==='movement' && $data): ?>
+    <div class="report-table-scroll">
     <table class="data-table">
         <thead><tr><th>#</th><th>Date</th><th>Item</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><th>Campus</th><th>Purchased</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Reference</th><th>Recorded By</th></tr></thead>
         <tbody>
-        <?php foreach ($data as $i=>$tx): $tc=['stock_in'=>'badge-success','stock_out'=>'badge-blue','adjustment'=>'badge-warn']; ?>
-        <tr><td><?= $i+1 ?></td><td><?= date('d M Y',strtotime($tx['transaction_date'])) ?></td><td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td><td><?= clean($tx['brand_model'] ?: '—') ?></td><td><?= clean($tx['category_name']) ?></td><td><?= clean($tx['supplier_name'] ?: '—') ?></td><td><?= clean($tx['section_name'] ?: '—') ?></td><td><?= clean($tx['department_name'] ?: '—') ?></td><td><?= clean($tx['branch_name']) ?></td><td><?= $tx['purchase_date'] ? date('d M Y', strtotime($tx['purchase_date'])) : '—' ?></td><td><span class="badge <?= $tc[$tx['transaction_type']]??'badge-blue' ?>"><?= str_replace('_',' ',ucfirst($tx['transaction_type'])) ?></span></td><td><?= number_format($tx['quantity']) ?></td><td><?= $tx['unit_price']>0?ugx($tx['unit_price']):'—' ?></td><td><?= $tx['unit_price']>0?ugx($tx['quantity']*$tx['unit_price']):'—' ?></td><td><?= clean($tx['reference_number']?:'—') ?></td><td><?= clean($tx['user_name']) ?></td></tr>
+        <?php foreach ($displayData as $i=>$tx): $tc=['stock_in'=>'badge-success','stock_out'=>'badge-blue','adjustment'=>'badge-warn']; ?>
+        <tr><td><?= $rowOffset+$i+1 ?></td><td><?= date('d M Y',strtotime($tx['transaction_date'])) ?></td><td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td><td><?= clean($tx['brand_model'] ?: '—') ?></td><td><?= clean($tx['category_name']) ?></td><td><?= clean($tx['supplier_name'] ?: '—') ?></td><td><?= clean($tx['section_name'] ?: '—') ?></td><td><?= clean($tx['department_name'] ?: '—') ?></td><td><?= clean($tx['branch_name']) ?></td><td><?= $tx['purchase_date'] ? date('d M Y', strtotime($tx['purchase_date'])) : '—' ?></td><td><span class="badge <?= $tc[$tx['transaction_type']]??'badge-blue' ?>"><?= str_replace('_',' ',ucfirst($tx['transaction_type'])) ?></span></td><td><?= number_format($tx['quantity']) ?></td><td><?= $tx['unit_price']>0?ugx($tx['unit_price']):'—' ?></td><td><?= $tx['unit_price']>0?ugx($tx['quantity']*$tx['unit_price']):'—' ?></td><td><?= clean($tx['reference_number']?:'—') ?></td><td><?= clean($tx['user_name']) ?></td></tr>
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
+    <?= $paginationHtml ?>
 
     <?php elseif ($reportType==='valuation' && $data): ?>
+    <div class="report-table-scroll">
     <table class="data-table">
         <thead><tr><th>#</th><th>Category</th><?php if ($isAdmin): ?><th>Branch</th><?php endif; ?><th>Items</th><th>Total Units</th><th>Total Value</th></tr></thead>
         <tbody>
-        <?php $gt=0; foreach ($data as $i=>$row): $gt+=$row['total_value']; ?>
-        <tr><td><?= $i+1 ?></td><td><?= clean($row['category_name']) ?></td><?php if ($isAdmin): ?><td><?= clean($row['branch_name']) ?></td><?php endif; ?><td><?= $row['item_count'] ?></td><td><?= number_format($row['total_units']) ?></td><td><?= ugx($row['total_value']) ?></td></tr>
+        <?php $gt=0; foreach ($data as $row) { $gt += $row['total_value']; } ?>
+        <?php foreach ($displayData as $i=>$row): ?>
+        <tr><td><?= $rowOffset+$i+1 ?></td><td><?= clean($row['category_name']) ?></td><?php if ($isAdmin): ?><td><?= clean($row['branch_name']) ?></td><?php endif; ?><td><?= $row['item_count'] ?></td><td><?= number_format($row['total_units']) ?></td><td><?= ugx($row['total_value']) ?></td></tr>
         <?php endforeach; ?>
         </tbody>
         <tfoot><tr><td colspan="<?= $isAdmin?4:3 ?>"><strong>Grand Total</strong></td><td></td><td><strong><?= ugx($gt) ?></strong></td></tr></tfoot>
     </table>
+    </div>
+    <?= $paginationHtml ?>
 
     <?php elseif ($reportType==='low_stock' && $data): ?>
+    <div class="report-table-scroll">
     <table class="data-table">
         <thead><tr><th>#</th><th>Item Code</th><th>Item Name</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><?php if ($isAdmin): ?><th>Campus</th><?php endif; ?><th>Purchased</th><th>Asset Status</th><th>Current Stock</th><th>Min Stock</th><th>Deficit</th><th>Status</th></tr></thead>
         <tbody>
-        <?php foreach ($data as $i=>$row): $deficit=max(0,$row['minimum_stock']-$row['current_stock']); ?>
-        <tr><td><?= $i+1 ?></td><td><?= clean($row['item_code']) ?></td><td><?= clean($row['name']) ?></td><td><?= clean($row['brand_model'] ?: '—') ?></td><td><?= clean($row['category_name']) ?></td><td><?= clean($row['supplier_name'] ?: '—') ?></td><td><?= clean($row['section_name'] ?: '—') ?></td><td><?= clean($row['department_name'] ?: '—') ?></td><?php if ($isAdmin): ?><td><?= clean($row['branch_name']) ?></td><?php endif; ?><td><?= $row['purchase_date'] ? date('d M Y', strtotime($row['purchase_date'])) : '—' ?></td><td><?= clean($row['asset_status'] ?: 'Available') ?></td><td><span class="badge <?= $row['current_stock']==0?'badge-danger':'badge-warn' ?>"><?= $row['current_stock'] ?></span></td><td><?= $row['minimum_stock'] ?></td><td><?= $deficit ?></td><td><?= $row['current_stock']==0?'<span class="badge badge-danger">Out of Stock</span>':'<span class="badge badge-warn">Low Stock</span>' ?></td></tr>
+        <?php foreach ($displayData as $i=>$row): $deficit=max(0,$row['minimum_stock']-$row['current_stock']); ?>
+        <tr><td><?= $rowOffset+$i+1 ?></td><td><?= clean($row['item_code']) ?></td><td><?= clean($row['name']) ?></td><td><?= clean($row['brand_model'] ?: '—') ?></td><td><?= clean($row['category_name']) ?></td><td><?= clean($row['supplier_name'] ?: '—') ?></td><td><?= clean($row['section_name'] ?: '—') ?></td><td><?= clean($row['department_name'] ?: '—') ?></td><?php if ($isAdmin): ?><td><?= clean($row['branch_name']) ?></td><?php endif; ?><td><?= $row['purchase_date'] ? date('d M Y', strtotime($row['purchase_date'])) : '—' ?></td><td><?= clean($row['asset_status'] ?: 'Available') ?></td><td><span class="badge <?= $row['current_stock']==0?'badge-danger':'badge-warn' ?>"><?= $row['current_stock'] ?></span></td><td><?= $row['minimum_stock'] ?></td><td><?= $deficit ?></td><td><?= $row['current_stock']==0?'<span class="badge badge-danger">Out of Stock</span>':'<span class="badge badge-warn">Low Stock</span>' ?></td></tr>
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
+    <?= $paginationHtml ?>
 
     <?php else: ?>
     <div class="empty-state text-center animate__animated animate__fadeIn" data-aos="fade-up">
@@ -454,6 +448,19 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+function printFullReport() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('print', '1');
+    url.searchParams.delete('page');
+    window.location.href = url.toString();
+}
+
+<?php if ($printMode): ?>
+window.addEventListener('load', () => {
+    setTimeout(() => window.print(), 350);
+});
+<?php endif; ?>
+
 function exportCurrentReport() {
     const table = document.querySelector('.print-area table');
     if (!table) {
@@ -492,7 +499,7 @@ function exportCurrentReport() {
 </script>
 <style>
 @media print {
-    .sidebar,.topnav,.filter-bar,.report-tabs,.page-header,.page-actions{display:none!important;}
+    .sidebar,.topnav,.filter-bar,.report-tabs,.page-header,.page-actions,.pagination-bar,.report-summary-grid{display:none!important;}
     .main-wrapper{margin:0!important;padding:0!important;}
     .print-area{box-shadow:none!important;border:none!important;padding:0!important;}
     .print-header{display:flex!important;}
@@ -501,11 +508,33 @@ function exportCurrentReport() {
 .page-header{margin-bottom:1.5rem;}
 .page-title{font-size:2rem; display:flex; align-items:center; gap:.75rem;}
 .page-actions .btn{min-width:170px;}
-.report-tabs .nav-link{margin-right:.5rem; margin-bottom:.5rem;}
-.report-tabs .nav-link.active{background:#0d6efd; color:#fff;}
-.filter-bar .filter-group{margin-bottom:1rem; max-width:280px;}
-.filter-bar .input-group-text{background:#f8f9fa; border-right:0;}
-.filter-bar .form-control{border-left:0;}
+.report-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px;}
+.report-summary-card{min-height:86px;display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #b8c9dc;border-radius:8px;background:#fff;box-shadow:0 10px 24px rgba(15,23,42,.06);}
+.report-summary-card div{min-width:0;}
+.report-summary-card span:not(.report-summary-icon){display:block;color:#526174;font-size:.72rem;font-weight:850;text-transform:uppercase;letter-spacing:.04em;}
+.report-summary-card strong{display:block;color:#0A1628;font-size:1.15rem;line-height:1.2;font-weight:900;white-space:normal;word-break:break-word;}
+.report-summary-icon{width:42px;height:42px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 42px;border-radius:10px;color:#fff;font-size:1rem;}
+.report-summary-icon.blue{background:#2f80ed;}
+.report-summary-icon.green{background:#22c55e;}
+.report-summary-icon.amber{background:#f59e0b;}
+.report-summary-icon.cyan{background:#06b6d4;}
+.report-tabs{display:flex;gap:8px;flex-wrap:wrap;padding:8px;border:1px solid #b8c9dc;border-radius:8px;background:#f8fbff;user-select:none;}
+.report-tabs .nav-link{margin:0!important;min-height:36px;display:inline-flex;align-items:center;gap:7px;padding:8px 12px!important;border:1px solid #cbd5e1!important;border-radius:7px!important;background:#fff!important;color:#0A1628!important;font-size:.82rem;font-weight:850;text-decoration:none!important;}
+.report-tabs .nav-link.active{background:#0f2744!important;border-color:#0f2744!important;color:#fff!important;box-shadow:0 8px 16px rgba(15,39,68,.14);}
+.report-tabs .nav-link::selection,.report-tabs .nav-link *::selection{background:transparent;color:inherit;}
+.filter-bar .filter-form{display:flex;align-items:end;gap:12px;flex-wrap:wrap;}
+.filter-bar .filter-group{margin-bottom:0;max-width:280px;min-width:150px;}
+.filter-bar .form-label{font-size:.72rem;font-weight:850;color:#334155;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
+.filter-bar .form-control,.report-search-control{height:38px;border:1px solid #cbd5e1!important;border-radius:7px!important;background:#fff;color:#0A1628;padding:7px 10px;font-size:.82rem;font-weight:700;box-shadow:none!important;}
+.report-search-control{min-width:210px;}
+.print-area{overflow:hidden;}
+.report-table-scroll{width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:10px;border-bottom:1px solid #cbd5e1;scrollbar-color:#6b7280 #e5edf5;scrollbar-width:auto;}
+.report-table-scroll .data-table{min-width:1720px;}
+.report-table-scroll::-webkit-scrollbar{height:14px;}
+.report-table-scroll::-webkit-scrollbar-track{background:#e5edf5;border-radius:999px;}
+.report-table-scroll::-webkit-scrollbar-thumb{background:#6b7280;border-radius:999px;border:3px solid #e5edf5;}
+.report-table-scroll::-webkit-scrollbar-thumb:hover{background:#475569;}
+.print-area .pagination-bar{margin:12px 14px 16px;}
 .empty-state .card{border:none;}
 .print-header{display:flex;align-items:center;gap:20px;padding:20px;border-bottom:2px solid #0A1628;margin-bottom:20px;}
 .print-logo{background:#fff;padding:6px;border-radius:8px;border:1px solid #e2e8f0;}
@@ -513,9 +542,13 @@ function exportCurrentReport() {
 .print-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 16px;margin:0 0 18px;padding:12px 14px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;font-size:.82rem;}
 .print-meta strong{color:#0A1628;}
 @media print {
+    .report-table-scroll{overflow:visible!important;padding-bottom:0!important;border-bottom:none!important;}
+    .report-table-scroll .data-table{min-width:0!important;width:100%!important;}
     .print-meta{grid-template-columns:repeat(3,1fr);break-inside:avoid;}
     .data-table{font-size:10px;}
     .data-table th,.data-table td{padding:6px 7px;}
 }
+@media (max-width:1180px){.report-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:768px){.report-summary-grid{grid-template-columns:1fr;}.filter-bar .filter-group,.report-search-control{max-width:none;width:100%;}.filter-bar .filter-form{align-items:stretch;}}
 </style>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
