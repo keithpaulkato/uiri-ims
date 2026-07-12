@@ -63,8 +63,7 @@ $categoryWhere = "WHERE c.branch_id = ?";
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM categories c $categoryWhere");
 $countStmt->execute([$branchFilter]);
 $totalCategories = (int)$countStmt->fetchColumn();
-$pagination = getPagination($totalCategories, 25);
-$categoriesStmt = $pdo->prepare("SELECT c.*,(SELECT COUNT(*) FROM inventory_items WHERE category_id=c.id AND is_active=1) AS item_count FROM categories c $categoryWhere ORDER BY c.name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
+$categoriesStmt = $pdo->prepare("SELECT c.*,(SELECT COUNT(*) FROM inventory_items WHERE category_id=c.id AND is_active=1) AS item_count FROM categories c $categoryWhere ORDER BY c.name");
 $categoriesStmt->execute([$branchFilter]);
 $categories = $categoriesStmt->fetchAll();
 $editCat = null;
@@ -110,7 +109,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
             <?php foreach ($categories as $i=>$cat): ?>
             <tr>
-                <td><?= $pagination['offset'] + $i + 1 ?></td>
+                <td><?= $i + 1 ?></td>
                 <td><strong><?= clean($cat['name']) ?></strong></td>
                 <td><?= clean($cat['description']?:'—') ?></td>
                 <td><span class="badge badge-blue"><?= $cat['item_count'] ?></span></td>
@@ -133,7 +132,6 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
-        <?= renderPaginationBar($pagination, $totalCategories, ['edit']) ?>
     </div>
 </div>
 
