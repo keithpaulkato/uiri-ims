@@ -12,6 +12,9 @@ ensureInventoryDecisionColumns();
 
 $assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
 $conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
+$requestQueueFilters = ['priority' => 'Pending first', 'Pending' => 'Pending', 'Approved' => 'Approved', 'Issued' => 'Issued', 'Rejected' => 'Rejected', 'Cancelled' => 'Cancelled'];
+$requestQueueFilter = $_GET['request_status'] ?? 'priority';
+$requestQueueFilter = array_key_exists($requestQueueFilter, $requestQueueFilters) ? $requestQueueFilter : 'priority';
 $branchSql = $isAdmin ? '' : 'AND i.branch_id = ' . $branchId;
 $scopeText = $isAdmin ? 'All Campuses' : clean($user['branch_name']);
 
@@ -135,6 +138,10 @@ $recentTx = $pdo->query("
     LIMIT 6
 ")->fetchAll();
 
+$requestFilterSql = $requestQueueFilter === 'priority' ? '' : "AND r.status=" . $pdo->quote($requestQueueFilter);
+$requestOrderSql = $requestQueueFilter === 'priority'
+    ? "FIELD(r.status,'Pending','Approved','Issued','Rejected','Cancelled'), r.requested_at DESC"
+    : "r.requested_at DESC";
 $requestQueue = $pdo->query("
     SELECT r.quantity, r.status, r.requested_at, i.name AS item_name, i.item_code, u.full_name AS requester_name, b.name AS branch_name
     FROM inventory_requests r
@@ -142,7 +149,8 @@ $requestQueue = $pdo->query("
     JOIN users u ON r.user_id=u.id
     JOIN branches b ON r.branch_id=b.id
     WHERE 1=1 " . ($isAdmin ? '' : 'AND r.branch_id=' . $branchId) . "
-    ORDER BY FIELD(r.status,'Pending','Approved','Issued','Rejected','Cancelled'), r.requested_at DESC
+    $requestFilterSql
+    ORDER BY $requestOrderSql
     LIMIT 7
 ")->fetchAll();
 
@@ -325,10 +333,16 @@ include __DIR__ . '/../includes/header.php';
     <div class="orders-panel card">
         <div class="card-header">
             <h3>Request Queue</h3>
-            <select class="mini-select" aria-label="Filter request status">
-                <option>Pending first</option>
-                <option>Approved</option>
-                <option>Issued</option>
+            <select class="mini-select" aria-label="Filter request status" onchange="window.location.href=this.value">
+                <?php foreach ($requestQueueFilters as $filterValue => $filterLabel): ?>
+                <?php
+                    $filterUrl = BASE_URL . 'pages/dashboard.php';
+                    if ($filterValue !== 'priority') {
+                        $filterUrl .= '?request_status=' . urlencode($filterValue);
+                    }
+                ?>
+                <option value="<?= clean($filterUrl) ?>" <?= $requestQueueFilter === $filterValue ? 'selected' : '' ?>><?= clean($filterLabel) ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         <div class="card-body p0">
@@ -343,6 +357,9 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= date('d M', strtotime($request['requested_at'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
+                <?php if (!$requestQueue): ?>
+                    <tr><td colspan="4" class="text-center text-muted">No <?= clean(strtolower($requestQueueFilters[$requestQueueFilter])) ?> requests found.</td></tr>
+                <?php endif; ?>
                 </tbody>
             </table>
         </div>
