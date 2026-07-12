@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action==='add'||$action==='edit') {
         $id = (int)($_POST['supplier_id']??0);
         $company = trim($_POST['company_name']??''); $contact = trim($_POST['contact_person']??'');
-        $email = trim($_POST['email']??''); $phone = trim($_POST['phone']??'');
+        $email = trim($_POST['email']??''); $phone = normalizeUgandanPhone($_POST['phone']??'');
         $address = trim($_POST['address']??''); $tin = trim($_POST['tin_number']??'');
         if (!$company) { setFlash('error','Company name is required.'); }
         else {
@@ -228,7 +228,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-grid-2">
                     <div class="form-group" style="grid-column:1/-1"><label>Company Name *</label><input type="text" name="company_name" required value="<?= clean($editSupplier['company_name']??'') ?>" placeholder="e.g. CompuTech Uganda Ltd"></div>
                     <div class="form-group"><label>Contact Person</label><input type="text" name="contact_person" value="<?= clean($editSupplier['contact_person']??'') ?>" placeholder="Full name"></div>
-                    <div class="form-group"><label>Phone</label><input type="text" name="phone" value="<?= clean($editSupplier['phone']??'') ?>" placeholder="+256 ..."></div>
+                    <div class="form-group"><label>Phone</label><input type="tel" class="js-ug-phone" name="phone" value="<?= clean($editSupplier['phone']??'') ?>" placeholder="+256 700000000" inputmode="numeric" autocomplete="tel" maxlength="14"></div>
                     <div class="form-group"><label>Email</label><input type="email" name="email" value="<?= clean($editSupplier['email']??'') ?>" placeholder="supplier@example.com"></div>
                     <div class="form-group"><label>TIN Number</label><input type="text" name="tin_number" value="<?= clean($editSupplier['tin_number']??'') ?>" placeholder="URA TIN"></div>
                     <div class="form-group" style="grid-column:1/-1"><label>Address</label><textarea name="address" rows="2" placeholder="Physical address…"><?= clean($editSupplier['address']??'') ?></textarea></div>

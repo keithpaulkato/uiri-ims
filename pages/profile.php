@@ -15,7 +15,7 @@ if (!$profile) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
-    $fullName = trim($_POST['full_name']??''); $phone = trim($_POST['phone']??'');
+    $fullName = trim($_POST['full_name']??''); $phone = normalizeUgandanPhone($_POST['phone']??'');
     $oldPass = $_POST['old_password']??''; $newPass = $_POST['new_password']??''; $confirmPass = $_POST['confirm_password']??'';
     $profilePhoto = $profile['profile_photo'] ?? null;
     $photoChanged = false;
@@ -117,7 +117,7 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <div class="form-group"><label>Profile Photo</label><input type="file" name="profile_photo" accept="image/*"></div>
             <div class="form-group"><label>Full Name *</label><input type="text" name="full_name" required value="<?= clean($profile['full_name']) ?>"></div>
-            <div class="form-group"><label>Phone</label><input type="text" name="phone" value="<?= clean($profile['phone']??'') ?>"></div>
+            <div class="form-group"><label>Phone</label><input type="tel" class="js-ug-phone" name="phone" value="<?= clean($profile['phone']??'') ?>" placeholder="+256 700000000" inputmode="numeric" autocomplete="tel" maxlength="14"></div>
             <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">
             <h4 style="margin-bottom:16px;color:#64748b">Change Password</h4>
             <div class="form-group"><label>Current Password</label><input type="password" name="old_password" placeholder="Enter current password"></div>

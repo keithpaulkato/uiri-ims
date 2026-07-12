@@ -145,6 +145,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    initializeUgandanPhoneInputs();
+
     const valueTarget = document.getElementById('inventoryValueCounter');
     if (valueTarget) {
         const target = parseFloat(valueTarget.dataset.value || '0');
@@ -220,6 +222,52 @@ document.addEventListener('DOMContentLoaded', function () {
     restoreSidebarWidth();
     initializeSidebarResizer();
 });
+
+function normalizeUgandanPhoneValue(value, keepPrefix) {
+    let digits = String(value || '').replace(/\D+/g, '');
+    if (digits.startsWith('256')) {
+        digits = digits.slice(3);
+    }
+    if (digits.startsWith('0')) {
+        digits = digits.slice(1);
+    }
+    digits = digits.slice(0, 9);
+    if (!digits && !keepPrefix) return '';
+    return '+256 ' + digits;
+}
+
+function initializeUgandanPhoneInputs() {
+    document.querySelectorAll('.js-ug-phone').forEach(input => {
+        const applyValue = keepPrefix => {
+            input.value = normalizeUgandanPhoneValue(input.value, keepPrefix);
+        };
+
+        if (input.value) {
+            applyValue(false);
+        }
+
+        input.addEventListener('focus', function () {
+            applyValue(true);
+        });
+
+        input.addEventListener('input', function () {
+            applyValue(true);
+        });
+
+        input.addEventListener('blur', function () {
+            const digits = input.value.replace(/\D+/g, '').replace(/^256/, '');
+            input.value = digits.length === 9 ? '+256 ' + digits : '';
+        });
+
+        const form = input.closest('form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                const digits = input.value.replace(/\D+/g, '').replace(/^256/, '');
+                input.value = digits.length === 9 ? '+256 ' + digits : '';
+            });
+        }
+    });
+}
 
 function applySidebarWidth(width) {
     const mainWrapper = document.querySelector('.main-wrapper');

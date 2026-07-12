@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action==='add'||$action==='edit') {
         $fullName = trim($_POST['full_name']??''); $emailInput = trim($_POST['email']??'');
         $email = $emailInput !== '' ? $emailInput : null;
-        $username = trim($_POST['username']??''); $phone = trim($_POST['phone']??'');
+        $username = trim($_POST['username']??''); $phone = normalizeUgandanPhone($_POST['phone']??'');
         $existingPhoto = null;
         $hasProfilePhotoUpload = !empty($_FILES['profile_photo']['name']);
         if ($action === 'edit' && $id) {
@@ -286,7 +286,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-group"><label>Full Name *</label><input type="text" id="modal_full_name" name="full_name" required value="<?= clean($editUser['full_name']??'') ?>"></div>
                     <div class="form-group"><label>Username *</label><input type="text" id="modal_username" name="username" value="<?= clean($editUser['username']??'') ?>"><small class="form-note">Leave blank to auto-generate.</small></div>
                     <div class="form-group"><label>Email</label><input type="email" name="email" value="<?= clean($editUser['email']??'') ?>"><small class="form-note">Optional.</small></div>
-                    <div class="form-group"><label>Phone</label><input type="text" name="phone" value="<?= clean($editUser['phone']??'') ?>"></div>
+                    <div class="form-group"><label>Phone</label><input type="tel" class="js-ug-phone" name="phone" value="<?= clean($editUser['phone']??'') ?>" placeholder="+256 700000000" inputmode="numeric" autocomplete="tel" maxlength="14"></div>
                     <div class="form-group"><label>Role *</label>
                         <select name="role_id" required>
                             <?php foreach ($roles as $r): ?>

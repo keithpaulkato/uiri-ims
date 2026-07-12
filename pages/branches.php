@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $location = trim($_POST['location'] ?? '');
     $address = trim($_POST['address'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
+    $phone = normalizeUgandanPhone($_POST['phone'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $isHq = isset($_POST['is_headquarters']) ? 1 : 0;
     
@@ -161,7 +161,7 @@ $flash = getFlash();
                     </div>
                     <div class="form-group">
                         <label for="phone">Phone</label>
-                        <input type="text" id="phone" name="phone" value="<?= clean($branch['phone'] ?? $_POST['phone'] ?? '') ?>">
+                        <input type="tel" class="js-ug-phone" id="phone" name="phone" value="<?= clean($branch['phone'] ?? $_POST['phone'] ?? '') ?>" placeholder="+256 700000000" inputmode="numeric" autocomplete="tel" maxlength="14">
                     </div>
                     <div class="form-group" style="grid-column:1/-1">
                         <label for="address">Address</label>

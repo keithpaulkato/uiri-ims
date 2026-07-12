@@ -236,6 +236,20 @@ function maybeNotifyLowStock(array $item): void {
 function clean(string $val): string {
     return htmlspecialchars(trim($val), ENT_QUOTES, 'UTF-8');
 }
+
+function normalizeUgandanPhone(?string $phone): string {
+    $digits = preg_replace('/\D+/', '', (string)$phone);
+    if ($digits === '') return '';
+
+    if (strpos($digits, '256') === 0) {
+        $digits = substr($digits, 3);
+    }
+    if (strpos($digits, '0') === 0) {
+        $digits = substr($digits, 1);
+    }
+
+    return strlen($digits) === 9 ? '+256 ' . $digits : '';
+}
  
 // Format currency UGX
 function ugx(float $amount): string {
