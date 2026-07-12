@@ -63,7 +63,7 @@ $categoryWhere = "WHERE c.branch_id = ?";
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM categories c $categoryWhere");
 $countStmt->execute([$branchFilter]);
 $totalCategories = (int)$countStmt->fetchColumn();
-$pagination = getPagination($totalCategories, 10);
+$pagination = getPagination($totalCategories, 25);
 $categoriesStmt = $pdo->prepare("SELECT c.*,(SELECT COUNT(*) FROM inventory_items WHERE category_id=c.id AND is_active=1) AS item_count FROM categories c $categoryWhere ORDER BY c.name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
 $categoriesStmt->execute([$branchFilter]);
 $categories = $categoriesStmt->fetchAll();
