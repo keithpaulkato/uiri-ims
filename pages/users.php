@@ -114,17 +114,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('success','User status updated.');
     }
     if ($action==='delete') {
-        if ($id !== 1) {
+        if ($id === 1) {
+            setFlash('error','The administrator account cannot be removed.');
+        } elseif ($id === (int)($_SESSION['user_id'] ?? 0)) {
+            setFlash('error','You cannot delete the account you are currently using.');
+        } else {
             $deleteInfoStmt = $pdo->prepare("SELECT u.full_name, u.profile_photo, b.name AS branch_name FROM users u JOIN branches b ON u.branch_id = b.id WHERE u.id = ? AND u.id != 1");
             $deleteInfoStmt->execute([$id]);
             $deleteInfo = $deleteInfoStmt->fetch();
             if (!$deleteInfo) {
                 setFlash('error','Unable to find the selected user.');
             } else {
+                $replacementUserId = (int)($_SESSION['user_id'] ?? 1);
+                $runOptionalCleanup = function (string $sql, array $params = []) use ($pdo): void {
+                    try {
+                        $pdo->prepare($sql)->execute($params);
+                    } catch (Throwable $ignored) {
+                    }
+                };
                 try {
+                    $pdo->beginTransaction();
+                    $runOptionalCleanup("DELETE FROM user_permissions WHERE user_id = ?", [$id]);
+                    $runOptionalCleanup("DELETE FROM notifications WHERE user_id = ?", [$id]);
+                    $runOptionalCleanup("UPDATE departments SET section_manager_id = NULL WHERE section_manager_id = ?", [$id]);
+                    $runOptionalCleanup("UPDATE departments SET department_manager_id = NULL WHERE department_manager_id = ?", [$id]);
+                    $runOptionalCleanup("UPDATE inventory_items SET created_by = NULL WHERE created_by = ?", [$id]);
+                    $runOptionalCleanup("UPDATE login_history SET user_id = NULL WHERE user_id = ?", [$id]);
+                    $runOptionalCleanup("UPDATE audit_log SET user_id = NULL WHERE user_id = ?", [$id]);
+                    $runOptionalCleanup("UPDATE settings SET updated_by = NULL WHERE updated_by = ?", [$id]);
+                    $runOptionalCleanup("UPDATE reports SET generated_by = NULL WHERE generated_by = ?", [$id]);
+                    $runOptionalCleanup("UPDATE inventory_requests SET approved_by = NULL WHERE approved_by = ?", [$id]);
+                    $runOptionalCleanup("UPDATE inventory_requests SET processed_by = NULL WHERE processed_by = ?", [$id]);
+                    $runOptionalCleanup("UPDATE inventory_requests SET user_id = ? WHERE user_id = ?", [$replacementUserId, $id]);
+                    $runOptionalCleanup("UPDATE stock_transactions SET user_id = ? WHERE user_id = ?", [$replacementUserId, $id]);
+                    $runOptionalCleanup("UPDATE transfers SET approved_by = NULL WHERE approved_by = ?", [$id]);
+                    $runOptionalCleanup("UPDATE transfers SET requested_by = ? WHERE requested_by = ?", [$replacementUserId, $id]);
+                    $runOptionalCleanup("UPDATE equipment_maintenance SET assigned_to = NULL WHERE assigned_to = ?", [$id]);
+
                     $stmt = $pdo->prepare("DELETE FROM users WHERE id = ? AND id != 1");
                     $stmt->execute([$id]);
                     if ($stmt->rowCount()) {
+                        auditLog('DELETE_USER','users',$id,"Deleted user: {$deleteInfo['full_name']} from {$deleteInfo['branch_name']}");
+                        $pdo->commit();
                         $photo = $deleteInfo['profile_photo'] ?? '';
                         if ($photo && strpos($photo, 'uploads/profiles/') === 0) {
                             $photoPath = __DIR__ . '/../' . $photo;
@@ -132,17 +163,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 @unlink($photoPath);
                             }
                         }
-                        auditLog('DELETE_USER','users',$id,"Deleted user: {$deleteInfo['full_name']} from {$deleteInfo['branch_name']}");
                         setFlash('success', $deleteInfo['full_name'] . ' was permanently deleted from ' . $deleteInfo['branch_name'] . ' campus.');
                     } else {
+                        $pdo->rollBack();
                         setFlash('error','Unable to remove the selected user.');
                     }
                 } catch (Throwable $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
                     setFlash('error','Unable to permanently delete this user because related records still depend on the account.');
                 }
             }
-        } else {
-            setFlash('error','The administrator account cannot be removed.');
         }
     }
     header('Location: users.php'); exit;
