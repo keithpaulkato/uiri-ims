@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 requireLogin();
-requireRole('Administrator', 'Campus Manager', 'Store Manager', 'Section Manager');
+requireRole('Administrator', 'Campus Manager', 'Store Manager', 'Section Manager', 'Staff');
 $pageTitle = 'Departments';
 $activePage = 'sections';
 $pdo = db();
 $user = currentUser();
 $isAdmin = hasRole('Administrator');
+$canManage = hasRole('Administrator', 'Campus Manager', 'Store Manager', 'Section Manager');
 $currentBranchId = (int)$user['branch_id'];
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC, name")->fetchAll();
 $branchNamesById = array_column($branches, 'name', 'id');
@@ -14,6 +15,11 @@ $currentBranchName = $branchNamesById[$currentBranchId] ?? ($user['branch_name']
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
+    if (!$canManage) {
+        setFlash('error', 'You do not have permission to change department records.');
+        header('Location: sections.php');
+        exit;
+    }
     $action = $_POST['action'] ?? '';
     if ($action === 'add' || $action === 'edit') {
         $id = (int)($_POST['section_id'] ?? 0);
@@ -45,11 +51,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: sections.php');
     exit;
 }
-$totalSections = (int)$pdo->query("SELECT COUNT(*) FROM sections s WHERE s.is_active = 1")->fetchColumn();
+$sectionWhere = $isAdmin ? "WHERE s.is_active = 1" : "WHERE s.is_active = 1 AND s.branch_id = ?";
+$sectionParams = $isAdmin ? [] : [$currentBranchId];
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM sections s $sectionWhere");
+$countStmt->execute($sectionParams);
+$totalSections = (int)$countStmt->fetchColumn();
 $pagination = getPagination($totalSections, 10);
-$sections = $pdo->query(
-        "SELECT s.*, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}"
-)->fetchAll();
+$sectionsStmt = $pdo->prepare(
+    "SELECT s.*, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id $sectionWhere ORDER BY b.name, s.name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}"
+);
+$sectionsStmt->execute($sectionParams);
+$sections = $sectionsStmt->fetchAll();
 $printSectionsStmt = $isAdmin
     ? $pdo->query("SELECT s.id, s.name, s.code, s.description, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY b.name, s.name")
     : null;
@@ -81,7 +93,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <div>
         <h1 class="page-title">Department Management</h1>
-        <p class="page-sub"><?= number_format($totalSections) ?> UIRI departments/directorates under each campus.</p>
+        <p class="page-sub"><?= number_format($totalSections) ?> <?= $isAdmin ? 'UIRI departments/directorates under each campus' : 'departments/directorates for ' . clean($currentBranchName) ?>.</p>
     </div>
     <div class="page-actions">
         <?php if ($isAdmin): ?>
@@ -95,7 +107,9 @@ include __DIR__ . '/../includes/header.php';
             Print Departments
         </button>
         <?php endif; ?>
+        <?php if ($canManage): ?>
         <button class="btn btn-primary" onclick="openModal('sectionModal')">Add Department</button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -103,7 +117,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body p0">
         <table class="data-table">
             <thead>
-                <tr><th>#</th><th>Department</th><th>Code</th><th>Campus</th><th>Description</th><th>Actions</th></tr>
+                <tr><th>#</th><th>Department</th><th>Code</th><th>Campus</th><th>Description</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr>
             </thead>
             <tbody>
             <?php foreach ($sections as $i => $sec): ?>
@@ -113,6 +127,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= clean($sec['code'] ?: '—') ?></td>
                 <td><?= clean($sec['branch_name']) ?></td>
                 <td><?= clean($sec['description'] ?: '—') ?></td>
+                <?php if ($canManage): ?>
                 <td>
                     <div class="action-btns">
                         <a href="sections.php?edit=<?= $sec['id'] ?>" class="btn-icon" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
@@ -124,6 +139,7 @@ include __DIR__ . '/../includes/header.php';
                         </form>
                     </div>
                 </td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -194,6 +210,7 @@ include __DIR__ . '/../includes/header.php';
     </table>
 </section>
 
+<?php if ($canManage): ?>
 <div class="modal-overlay" id="sectionModal" <?= $editSection ? 'style="display:flex"' : '' ?>>
     <div class="modal">
         <div class="modal-header">
@@ -235,6 +252,7 @@ include __DIR__ . '/../includes/header.php';
         </form>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 const departmentPrintData = <?= json_encode($printDepartmentData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
