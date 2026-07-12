@@ -115,13 +115,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($action==='delete') {
         if ($id !== 1) {
-            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ? AND id != 1");
-            $stmt->execute([$id]);
-            if ($stmt->rowCount()) {
-                auditLog('DELETE_USER','users',$id,"Deleted user ID: $id");
-                setFlash('success','User removed.');
+            $deleteInfoStmt = $pdo->prepare("SELECT u.full_name, u.profile_photo, b.name AS branch_name FROM users u JOIN branches b ON u.branch_id = b.id WHERE u.id = ? AND u.id != 1");
+            $deleteInfoStmt->execute([$id]);
+            $deleteInfo = $deleteInfoStmt->fetch();
+            if (!$deleteInfo) {
+                setFlash('error','Unable to find the selected user.');
             } else {
-                setFlash('error','Unable to remove the selected user.');
+                try {
+                    $stmt = $pdo->prepare("DELETE FROM users WHERE id = ? AND id != 1");
+                    $stmt->execute([$id]);
+                    if ($stmt->rowCount()) {
+                        $photo = $deleteInfo['profile_photo'] ?? '';
+                        if ($photo && strpos($photo, 'uploads/profiles/') === 0) {
+                            $photoPath = __DIR__ . '/../' . $photo;
+                            if (is_file($photoPath)) {
+                                @unlink($photoPath);
+                            }
+                        }
+                        auditLog('DELETE_USER','users',$id,"Deleted user: {$deleteInfo['full_name']} from {$deleteInfo['branch_name']}");
+                        setFlash('success', $deleteInfo['full_name'] . ' was permanently deleted from ' . $deleteInfo['branch_name'] . ' campus.');
+                    } else {
+                        setFlash('error','Unable to remove the selected user.');
+                    }
+                } catch (Throwable $e) {
+                    setFlash('error','Unable to permanently delete this user because related records still depend on the account.');
+                }
             }
         } else {
             setFlash('error','The administrator account cannot be removed.');
@@ -170,17 +188,21 @@ include __DIR__ . '/../includes/header.php';
                     <div class="action-btns">
                         <a href="users.php?edit=<?= $u['id'] ?>" class="btn-icon" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
                         <?php if ($u['id']!=1): ?>
-                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this user?')">
-                            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                            <button type="submit" class="btn-icon" title="Delete"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-                        </form>
+                        <button
+                            type="button"
+                            class="btn-icon btn-icon-danger js-delete-user"
+                            title="Delete permanently"
+                            aria-label="Delete <?= clean($u['full_name']) ?> permanently"
+                            data-user-id="<?= $u['id'] ?>"
+                            data-user-name="<?= clean($u['full_name']) ?>"
+                            data-user-campus="<?= clean($u['branch_name']) ?>">
+                            <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                        </button>
                         <form method="POST" style="display:inline">
                             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                             <input type="hidden" name="action" value="toggle">
                             <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                            <button type="submit" class="btn-icon" title="Toggle"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button type="submit" class="btn-icon" title="<?= $u['is_active'] ? 'Deactivate user' : 'Activate user' ?>" aria-label="<?= $u['is_active'] ? 'Deactivate' : 'Activate' ?> <?= clean($u['full_name']) ?>"><svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg></button>
                         </form>
                         <?php endif; ?>
                     </div>
@@ -191,6 +213,32 @@ include __DIR__ . '/../includes/header.php';
         </table>
         </div>
         <?= renderPaginationBar($pagination, $totalUsers, ['edit']) ?>
+    </div>
+</div>
+
+<div class="modal-overlay" id="deleteUserModal" role="dialog" aria-modal="true" aria-labelledby="deleteUserTitle">
+    <div class="modal delete-user-modal">
+        <div class="delete-user-topline"></div>
+        <div class="delete-user-body">
+            <div class="delete-user-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </div>
+            <div class="delete-user-copy">
+                <span class="delete-user-kicker">Permanent account deletion</span>
+                <h3 id="deleteUserTitle">Confirm user deletion</h3>
+                <p><strong id="deleteUserName">This user</strong> will be permanently deleted from <strong id="deleteUserCampus">this campus</strong> campus. Do you want to continue?</p>
+            </div>
+        </div>
+        <div class="delete-user-warning">
+            This removes the account immediately. The user will no longer be able to sign in.
+        </div>
+        <form method="POST" id="deleteUserForm" class="delete-user-actions">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" id="deleteUserId" value="">
+            <button type="button" class="btn btn-outline delete-user-cancel" id="cancelDeleteUser">No, keep account</button>
+            <button type="submit" class="btn btn-danger delete-user-confirm" id="confirmDeleteUser">Yes, delete permanently</button>
+        </form>
     </div>
 </div>
 
@@ -348,6 +396,35 @@ document.addEventListener('DOMContentLoaded', function(){
     });
     if (department) department.addEventListener('change', filterUserOrgOptions);
     filterUserOrgOptions();
+
+    const deleteModal = document.getElementById('deleteUserModal');
+    const deleteUserId = document.getElementById('deleteUserId');
+    const deleteUserName = document.getElementById('deleteUserName');
+    const deleteUserCampus = document.getElementById('deleteUserCampus');
+    const cancelDeleteUser = document.getElementById('cancelDeleteUser');
+    const confirmDeleteUser = document.getElementById('confirmDeleteUser');
+    document.querySelectorAll('.js-delete-user').forEach(button => {
+        button.addEventListener('click', function () {
+            if (!deleteModal || !deleteUserId || !deleteUserName || !deleteUserCampus) return;
+            deleteUserId.value = this.dataset.userId || '';
+            deleteUserName.textContent = this.dataset.userName || 'This user';
+            deleteUserCampus.textContent = this.dataset.userCampus || 'this';
+            openModal('deleteUserModal');
+            if (cancelDeleteUser) cancelDeleteUser.focus();
+        });
+    });
+    if (cancelDeleteUser) {
+        cancelDeleteUser.addEventListener('click', function () {
+            closeModal('deleteUserModal');
+        });
+    }
+    const deleteUserForm = document.getElementById('deleteUserForm');
+    if (deleteUserForm && confirmDeleteUser) {
+        deleteUserForm.addEventListener('submit', function () {
+            confirmDeleteUser.disabled = true;
+            confirmDeleteUser.textContent = 'Deleting...';
+        });
+    }
 });
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
