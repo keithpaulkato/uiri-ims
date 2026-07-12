@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($sent) {
                         setFlash('success',"User '$fullName' added. A password setup link has been emailed to the user.");
                     } else {
-                        setFlash('success',"User '$fullName' added. Use the following link to set the password (valid for 1 hour):<br><br><code style=\"background:#f5f5f5;padding:10px;display:block;margin:10px 0;border-radius:4px;word-break:break-all;\">" . htmlspecialchars($resetLink) . "</code><br><p><strong>Note:</strong> In production this link would be emailed to the user.</p>");
+                        setFlash('success',"User '$fullName' added. Email delivery is not available, so share this password setup link with the user within 1 hour: " . $resetLink);
                     }
                 }
             } else {

@@ -335,7 +335,7 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .user-dropdown hr { border: none; border-top: 1px solid var(--border); margin: 0; }
 
 /* FLASH */
-.flash { display: flex; align-items: center; gap: 10px; padding: 12px 24px; font-size: .875rem; font-weight: 500; }
+.flash { display: flex; align-items: center; gap: 10px; padding: 12px 24px; font-size: .875rem; font-weight: 500; overflow-wrap: anywhere; }
 .flash svg { width: 18px; height: 18px; flex-shrink: 0; }
 .flash-close { margin-left: auto; background: none; border: none; cursor: pointer; font-size: 1.2rem; line-height: 1; opacity: .6; }
 .flash-success { background: #f0fdf4; color: #15803d; border-bottom: 1px solid #bbf7d0; }

@@ -257,7 +257,27 @@ function profilePhotoUrl(?array $user = null): string {
     return strpos($photo, 'uploads/') === 0 ? BASE_URL . $photo : BASE_URL . ltrim($photo, '/');
 }
 
+function validateProfilePhotoUpload(array $file, string &$error = ''): bool {
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        $error = 'Please upload a valid image file (jpg, png, webp, gif) under 2MB.';
+        return false;
+    }
+
+    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowed, true) || (int)($file['size'] ?? 0) > 2 * 1024 * 1024) {
+        $error = 'Please upload a valid image file (jpg, png, webp, gif) under 2MB.';
+        return false;
+    }
+
+    return true;
+}
+
 function saveProfilePhotoUpload(array $file, int $userId): ?string {
+    if ($userId <= 0) {
+        return null;
+    }
+
     if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
         return null;
     }
@@ -266,12 +286,12 @@ function saveProfilePhotoUpload(array $file, int $userId): ?string {
         mkdir(PROFILE_UPLOAD_DIR, 0755, true);
     }
 
-    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, $allowed, true) || (int)$file['size'] > 2 * 1024 * 1024) {
+    $error = '';
+    if (!validateProfilePhotoUpload($file, $error)) {
         return null;
     }
 
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $filename = 'user_' . $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
     $target = PROFILE_UPLOAD_DIR . $filename;
     if (!move_uploaded_file($file['tmp_name'], $target)) {
