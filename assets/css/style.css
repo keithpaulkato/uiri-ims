@@ -779,12 +779,25 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .pie-legend a { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .82rem; font-weight: 700; }
 .pie-legend span { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 .pie-legend strong { margin-left: auto; color: var(--navy); }
-.horizontal-bars { display: flex; flex-direction: column; gap: 12px; min-height: 230px; justify-content: center; }
-.hbar-row { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; align-items: center; gap: 14px; }
-.hbar-label strong { display: block; color: var(--navy); font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hbar-label span { display: block; color: var(--sub); font-size: .74rem; margin-top: 2px; }
-.hbar-track { height: 14px; border-radius: 999px; background: #edf2f7; overflow: hidden; }
-.hbar-track span { display: block; height: 100%; border-radius: 999px; box-shadow: 0 5px 12px rgba(15,23,42,.10); }
+.horizontal-bars { display: grid; gap: 0; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.hbar-row { display: grid; grid-template-columns: minmax(190px, 260px) 1fr; align-items: center; gap: 18px; min-height: 54px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: #fff; opacity: 1; filter: none; }
+.hbar-row:last-child { border-bottom: none; }
+.hbar-label strong { display: block; color: var(--navy); font-size: .82rem; font-weight: 850; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+.hbar-label span { display: block; color: #475569; font-size: .74rem; font-weight: 650; line-height: 1.25; margin-top: 3px; -webkit-font-smoothing: antialiased; }
+.hbar-track { height: 14px; border-radius: 999px; background: #eef3f8; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(148,163,184,.16); opacity: 1; filter: none; }
+.hbar-track span { display: block; height: 100%; border-radius: 999px; box-shadow: none; opacity: 1; filter: none; }
+.value-category-card,
+.value-category-card * {
+  opacity: 1;
+  filter: none;
+  text-shadow: none;
+}
+.value-category-card .card-body {
+  background: #fff;
+}
+.value-category-card .horizontal-bars {
+  min-height: 0;
+}
 .kpi-monthly-card { border-radius: 8px; }
 .sparkline { width: 124px; height: 34px; display: block; }
 .sparkline polyline { fill: none; stroke: #2f80ed; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }

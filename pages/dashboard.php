@@ -452,7 +452,7 @@ include __DIR__ . '/../includes/header.php';
 </section>
 
 <section class="enterprise-grid">
-    <div class="chart-card">
+    <div class="chart-card value-category-card">
         <div class="card-header">
             <h3>Value by Category</h3>
             <a class="card-link" href="<?= BASE_URL ?>pages/reports.php?report=valuation">Valuation</a>
