@@ -81,23 +81,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     auditLog('ADD_USER','users',$newId,"Added user: $username");
 
-                    // Create password setup token and expiry
-                    $token = bin2hex(random_bytes(32));
-                    $expiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
-                    $pdo->prepare("UPDATE users SET password_reset_token = ?, token_expiry = ? WHERE id = ?")->execute([$token, $expiry, $newId]);
-                    $resetLink = BASE_URL . 'reset-password.php?token=' . urlencode($token);
-
                     $sent = false;
                     if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                        $subject = SITE_SHORT . ' — Set your password';
-                        $body = "Hello {$fullName},\n\nAn account has been created for you on " . SITE_NAME . ".\nPlease set your password using the link below (valid for 1 hour):\n\n" . $resetLink . "\n\nIf you did not request this, contact your administrator.";
+                        $subject = SITE_SHORT . ' — Account created';
+                        $body = "Hello {$fullName},\n\nAn account has been created for you on " . SITE_NAME . ".\n\nUsername: {$username}\nPassword: {$pass}\n\nPlease sign in and change your password after your first login.";
                         $sent = sendMail($email, $subject, $body, SMTP_FROM_NAME, SMTP_FROM_EMAIL, false);
                     }
 
                     if ($sent) {
-                        setFlash('success',"User '$fullName' added. A password setup link has been emailed to the user.");
+                        setFlash('success',"User '$fullName' added successfully.");
                     } else {
-                        setFlash('success',"User '$fullName' added. Email delivery is not available, so share this password setup link with the user within 1 hour: " . $resetLink);
+                        setFlash('success',"User '$fullName' added successfully.");
                     }
                 }
             } else {
