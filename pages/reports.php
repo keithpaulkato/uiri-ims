@@ -925,11 +925,14 @@ document.addEventListener('DOMContentLoaded', initSmartReportFilters);
 </script>
 <style>
 @media print {
+    @page{size:A4 landscape;margin:6mm;}
     .sidebar,.topnav,.filter-bar,.report-tabs,.page-header,.page-actions,.pagination-bar,.report-summary-grid{display:none!important;}
-    .main-wrapper{margin:0!important;padding:0!important;}
-    .print-area{box-shadow:none!important;border:none!important;padding:0!important;}
+    html,body{width:auto!important;min-width:0!important;background:#fff!important;overflow:visible!important;}
+    .main-wrapper{margin:0!important;padding:0!important;width:auto!important;max-width:none!important;overflow:visible!important;}
+    .page-content{padding:0!important;margin:0!important;width:auto!important;max-width:none!important;overflow:visible!important;}
+    .print-area{box-shadow:none!important;border:none!important;padding:0!important;margin:0!important;width:100%!important;max-width:none!important;overflow:visible!important;}
     .print-header{display:flex!important;}
-    body{font-size:12px;}
+    body{font-size:9px!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 }
 .page-header{margin-bottom:1.5rem;}
 .page-title{font-size:2rem; display:flex; align-items:center; gap:.75rem;}
@@ -976,11 +979,21 @@ document.addEventListener('DOMContentLoaded', initSmartReportFilters);
 .print-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 16px;margin:0 0 18px;padding:12px 14px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;font-size:.82rem;}
 .print-meta strong{color:#0A1628;}
 @media print {
-    .report-table-scroll{overflow:visible!important;padding-bottom:0!important;border-bottom:none!important;}
-    .report-table-scroll .data-table{min-width:0!important;width:100%!important;}
-    .print-meta{grid-template-columns:repeat(3,1fr);break-inside:avoid;}
-    .data-table{font-size:10px;}
-    .data-table th,.data-table td{padding:6px 7px;}
+    .print-header{gap:10px!important;padding:8px 0 7px!important;margin-bottom:8px!important;border-bottom:1.5px solid #0A1628!important;break-inside:avoid;}
+    .print-logo{padding:3px!important;border-radius:4px!important;}
+    .print-logo img{height:34px!important;}
+    .print-header h2{font-size:15px!important;line-height:1.1!important;margin:0!important;}
+    .print-header p{font-size:8px!important;line-height:1.2!important;margin:1px 0!important;}
+    .print-meta{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:3px 6px!important;margin:0 0 7px!important;padding:6px!important;border-radius:4px!important;font-size:7.2px!important;line-height:1.2!important;break-inside:avoid;}
+    .report-table-scroll{display:block!important;width:100%!important;max-width:none!important;overflow:visible!important;overflow-x:visible!important;padding-bottom:0!important;border-bottom:none!important;}
+    .report-table-scroll .data-table{min-width:0!important;width:100%!important;max-width:100%!important;}
+    .data-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:6.4px!important;line-height:1.12!important;}
+    .data-table th,.data-table td{padding:2.2px 2.6px!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;hyphens:auto!important;letter-spacing:0!important;vertical-align:top!important;}
+    .data-table th{font-size:5.8px!important;line-height:1.05!important;}
+    .data-table td{font-size:6.3px!important;}
+    .data-table tfoot td{padding:3px!important;font-size:6.5px!important;}
+    .badge{padding:1px 3px!important;border-radius:4px!important;font-size:5.5px!important;letter-spacing:0!important;line-height:1.1!important;}
+    .item-name,.item-code{font-size:inherit!important;line-height:inherit!important;white-space:normal!important;overflow-wrap:anywhere!important;}
 }
 @media (max-width:1180px){.report-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.filter-bar .filter-form{grid-template-columns:repeat(6,minmax(0,1fr));}.filter-bar .filter-group:not(.flex-fill),.filter-bar .filter-group.flex-fill{grid-column:span 2;}.filter-actions{grid-column:span 4;}}
 @media (max-width:768px){.report-summary-grid{grid-template-columns:1fr;}.filter-bar .filter-form{grid-template-columns:1fr;align-items:stretch;}.filter-bar .filter-group:not(.flex-fill),.filter-bar .filter-group.flex-fill,.filter-actions{grid-column:1;}.filter-actions{flex-direction:column;align-items:stretch;}.filter-actions .btn{width:100%;}.report-search-control{max-width:none;width:100%;}}
