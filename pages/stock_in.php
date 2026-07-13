@@ -63,12 +63,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $currency = trim($_POST['currency'] ?? 'UGX');
     $taxPercent = max(0, min(100, (float)($_POST['tax'] ?? 0)));
     $discountPercent = max(0, min(100, (float)($_POST['discount'] ?? 0)));
+    $uploadedItemImage = null;
+    $uploadedItemImagePath = null;
 
     $errors = [];
     if (!$itemId) { $errors[] = 'Please select a product.'; }
     if ($qty <= 0) { $errors[] = 'Quantity must be greater than zero.'; }
     if ($unitPrice < 0) { $errors[] = 'Unit cost must be zero or greater.'; }
     if ($sellingPrice < 0) { $errors[] = 'Selling price must be zero or greater.'; }
+    if (!empty($_FILES['item_image']['name'])) {
+        if (!is_dir(UPLOAD_DIR) && !mkdir(UPLOAD_DIR, 0775, true)) {
+            $errors[] = 'Could not prepare the item image upload folder.';
+        } else {
+            $allowedImageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $imageExt = strtolower(pathinfo($_FILES['item_image']['name'], PATHINFO_EXTENSION));
+            $isRealImage = is_uploaded_file($_FILES['item_image']['tmp_name']) && @getimagesize($_FILES['item_image']['tmp_name']);
+            if (!in_array($imageExt, $allowedImageTypes, true) || !$isRealImage) {
+                $errors[] = 'Please upload a valid item image: JPG, PNG, GIF, or WEBP.';
+            } elseif (($_FILES['item_image']['size'] ?? 0) > 5 * 1024 * 1024) {
+                $errors[] = 'Item image must be 5MB or smaller.';
+            } else {
+                $uploadedItemImage = 'item_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $imageExt;
+                $uploadedItemImagePath = UPLOAD_DIR . $uploadedItemImage;
+            }
+        }
+    }
 
     if ($errors) {
         setFlash('error', implode(' ', $errors));
@@ -85,6 +104,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception('Selected product is outside your active branch.');
             }
             $txBranch = (int)$item['branch_id'];
+
+            if ($uploadedItemImage) {
+                if (!move_uploaded_file($_FILES['item_image']['tmp_name'], $uploadedItemImagePath)) {
+                    throw new Exception('Could not save the item image. Please try again.');
+                }
+                $pdo->prepare("UPDATE inventory_items SET image = ? WHERE id = ?")->execute([$uploadedItemImage, $itemId]);
+            }
 
             if ($supplierId) {
                 $pdo->prepare("UPDATE inventory_items SET supplier_id = ? WHERE id = ?")->execute([$supplierId, $itemId]);
@@ -190,6 +216,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            if ($uploadedItemImagePath && is_file($uploadedItemImagePath)) {
+                @unlink($uploadedItemImagePath);
+            }
             setFlash('error', $e->getMessage() ?: 'Transaction failed.');
         }
     }
@@ -200,6 +229,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $branchFilter = $isAdmin ? (int)($_GET['branch'] ?? 0) : $branchId;
 $bWhere = $isAdmin ? ($branchFilter ? "AND i.branch_id=$branchFilter" : '') : "AND i.branch_id=$branchId";
 $items = $pdo->query("SELECT i.id,i.name,i.item_code,i.unit,i.unit_price,i.current_stock,i.minimum_stock,i.purchase_date,i.image,i.asset_type,i.branch_id,i.supplier_id,c.name AS category_name,s.company_name AS supplier_name,s.phone AS supplier_phone,s.email AS supplier_email,s.address AS supplier_address,b.name AS branch_name,b.location AS branch_location FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id WHERE i.is_active=1 $bWhere ORDER BY i.name")->fetchAll();
+foreach ($items as &$stockInItem) {
+    if (!empty($stockInItem['image']) && !preg_match('/^https?:\/\//i', $stockInItem['image'])) {
+        $stockInItem['image'] = UPLOAD_URL . $stockInItem['image'];
+    }
+}
+unset($stockInItem);
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $tWhere = $isAdmin ? ($branchFilter ? "AND t.branch_id=$branchFilter" : '') : "AND t.branch_id=$branchId";
@@ -243,7 +278,7 @@ include __DIR__ . '/../includes/header.php';
             <span class="badge badge-primary">Live calculations</span>
         </div>
         <div class="card-body">
-            <form method="POST" id="stockInForm">
+            <form method="POST" id="stockInForm" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                 <input type="hidden" name="item_id" id="itemIdInput" value="">
                 <input type="hidden" name="transaction_id" id="transactionIdInput" value="">
@@ -317,6 +352,11 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-grid-2" style="gap:16px;">
                         <div class="form-group"><label>Brand</label><input type="text" id="productBrand" class="form-control" readonly></div>
                         <div class="form-group"><label>Unit of Measure</label><input type="text" id="productUnit" class="form-control" readonly></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Product Image</label>
+                        <input type="file" name="item_image" id="stockInItemImage" class="form-control" accept="image/*" onchange="previewStockInUpload(this)">
+                        <small class="form-note">Optional. Updates this product image while recording stock in.</small>
                     </div>
                 </div>
                         </div>
@@ -585,6 +625,22 @@ function setProductPreview(item) {
 
     renderPurchaseHistory(item.id);
     calculateTotals();
+}
+
+function previewStockInUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        Swal.fire({ icon: 'warning', title: 'Invalid image', text: 'Please choose a valid image file.', toast: true, position: 'top-end', timer: 2600, showConfirmButton: false });
+        input.value = '';
+        return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        Swal.fire({ icon: 'warning', title: 'Image too large', text: 'Please choose an image smaller than 5MB.', toast: true, position: 'top-end', timer: 2600, showConfirmButton: false });
+        input.value = '';
+        return;
+    }
+    document.getElementById('previewImage').src = URL.createObjectURL(file);
 }
 
 function findItemByInput(value) {

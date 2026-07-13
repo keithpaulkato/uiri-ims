@@ -44,11 +44,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $imageName = $_POST['existing_image'] ?? null;
             if (!empty($_FILES['image']['name'])) {
+                if (!is_dir(UPLOAD_DIR) && !mkdir(UPLOAD_DIR, 0775, true)) {
+                    setFlash('error', 'Could not prepare the item image upload folder.');
+                    header('Location: items.php'); exit;
+                }
                 $allowed = ['jpg','jpeg','png','gif','webp'];
                 $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-                if (in_array($ext, $allowed)) {
-                    $imageName = 'item_' . time() . '_' . rand(100,999) . '.' . $ext;
-                    move_uploaded_file($_FILES['image']['tmp_name'], UPLOAD_DIR . $imageName);
+                $isImage = is_uploaded_file($_FILES['image']['tmp_name']) && @getimagesize($_FILES['image']['tmp_name']);
+                if (!in_array($ext, $allowed, true) || !$isImage) {
+                    setFlash('error', 'Please upload a valid item image: JPG, PNG, GIF, or WEBP.');
+                    header('Location: items.php'); exit;
+                }
+                if (($_FILES['image']['size'] ?? 0) > 5 * 1024 * 1024) {
+                    setFlash('error', 'Item image must be 5MB or smaller.');
+                    header('Location: items.php'); exit;
+                }
+                $imageName = 'item_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                if (!move_uploaded_file($_FILES['image']['tmp_name'], UPLOAD_DIR . $imageName)) {
+                    setFlash('error', 'Could not save the item image. Please try again.');
+                    header('Location: items.php'); exit;
                 }
             }
             $sectionId = (int)($_POST['section_id'] ?? 0) ?: null;
