@@ -415,6 +415,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="card-header d-flex align-items-center justify-content-between">
                 <h3>Recent Stock In</h3>
                 <div class="d-flex gap-2">
+                    <a href="transactions.php?type=stock_in" class="btn btn-outline-secondary btn-sm">View all</a>
                     <button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportRecentStock()"><i class="fa-solid fa-file-csv"></i></button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" onclick="printRecentStock()"><i class="fa-solid fa-print"></i></button>
                 </div>
