@@ -13,7 +13,9 @@ $reportType       = $_GET['report'] ?? 'summary';
 $branchFilter     = $isAdmin ? (int)($_GET['branch'] ?? 0) : $branchId;
 $dateFrom         = $_GET['date_from'] ?? date('Y-m-01');
 $dateTo           = $_GET['date_to'] ?? date('Y-m-d');
-$catFilter        = (int)($_GET['category'] ?? 0);
+$categoryParam    = trim($_GET['category'] ?? '');
+$catFilter        = ctype_digit($categoryParam) ? (int)$categoryParam : 0;
+$catNameFilter    = $catFilter ? '' : $categoryParam;
 $sectionFilter    = (int)($_GET['section'] ?? 0);
 $departmentFilter = (int)($_GET['department'] ?? 0);
 $supplierFilter   = (int)($_GET['supplier'] ?? 0);
@@ -37,6 +39,7 @@ $conditionMaster = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obs
 $buildOptionWhere = function (array $keys) use (
     &$branchFilter,
     &$catFilter,
+    &$catNameFilter,
     &$sectionFilter,
     &$departmentFilter,
     &$supplierFilter,
@@ -61,6 +64,9 @@ $buildOptionWhere = function (array $keys) use (
     if (in_array('category', $keys, true) && $catFilter) {
         $where[] = 'i.category_id = ?';
         $params[] = $catFilter;
+    } elseif (in_array('category', $keys, true) && $catNameFilter !== '') {
+        $where[] = 'i.category_id IN (SELECT id FROM categories WHERE name = ?)';
+        $params[] = $catNameFilter;
     }
     if (in_array('section', $keys, true) && $sectionFilter) {
         $where[] = 'i.section_id = ?';
@@ -111,15 +117,19 @@ $hasSelectedId = static function (array $rows, int $selected): bool {
 };
 
 $categories = $fetchOptionRows("
-    SELECT c.id, c.name, c.branch_id, COUNT(i.id) AS item_count
+    SELECT MIN(c.id) AS id, c.name, " . ($branchFilter ? "MIN(c.branch_id)" : "0") . " AS branch_id, COUNT(i.id) AS item_count
     FROM inventory_items i
     JOIN categories c ON c.id = i.category_id
     {WHERE}
-    GROUP BY c.id, c.name, c.branch_id
-    ORDER BY c.branch_id, c.name
+    GROUP BY c.name
+    ORDER BY c.name
 ", ['branch']);
-if (!$hasSelectedId($categories, $catFilter)) {
+if ($catFilter && !$hasSelectedId($categories, $catFilter)) {
     $catFilter = 0;
+    $catNameFilter = '';
+}
+if ($catNameFilter !== '' && !in_array($catNameFilter, array_column($categories, 'name'), true)) {
+    $catNameFilter = '';
 }
 
 $sections = $fetchOptionRows("
@@ -247,7 +257,7 @@ if ($purchaseFrom && $purchaseTo && $purchaseFrom > $purchaseTo) {
 }
 
 $filterRows = $pdo->query("
-    SELECT i.branch_id, i.category_id, i.section_id, i.department_id, i.supplier_id,
+    SELECT i.branch_id, c.name AS category_name, i.section_id, i.department_id, i.supplier_id,
            i.asset_status, i.asset_type, i.asset_condition,
            i.purchase_date,
            CASE
@@ -256,20 +266,21 @@ $filterRows = $pdo->query("
                ELSE 'available'
            END AS stock_status
     FROM inventory_items i
+    JOIN categories c ON c.id = i.category_id
     WHERE i.is_active = 1
 ")->fetchAll();
 if (!$isAdmin) {
     $filterRows = array_values(array_filter($filterRows, static fn($row) => (int)$row['branch_id'] === (int)$branchId));
 }
 
-$allCategories = $pdo->query("SELECT id, name, branch_id FROM categories ORDER BY branch_id, name")->fetchAll();
+$allCategories = $pdo->query("SELECT MIN(id) AS id, name, 0 AS branch_id FROM categories GROUP BY name ORDER BY name")->fetchAll();
 $allSections = $pdo->query("SELECT id, name, branch_id FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
 $allDepartments = $pdo->query("SELECT d.id, d.name, d.section_id, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
 $allSuppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 
 $filterOptionLabels = [
     'categories' => array_map(static fn($row) => [
-        'id' => (int)$row['id'],
+        'id' => $row['name'],
         'label' => $row['name'],
         'branch_id' => (int)$row['branch_id'],
     ], $allCategories),
@@ -301,7 +312,7 @@ if ($searchQuery) {
 }
 
 $branchSql = !$isAdmin ? "AND i.branch_id=$branchId" : ($branchFilter ? "AND i.branch_id=$branchFilter" : '');
-$catSql = $catFilter ? "AND i.category_id=$catFilter" : '';
+$catSql = $catFilter ? "AND i.category_id=$catFilter" : ($catNameFilter !== '' ? "AND c.name=" . $pdo->quote($catNameFilter) : '');
 $departmentSql = $departmentFilter ? "AND i.department_id=$departmentFilter" : '';
 $supplierSql = $supplierFilter ? "AND i.supplier_id=$supplierFilter" : '';
 $sectionSql = $sectionFilter ? "AND i.section_id=$sectionFilter" : '';
@@ -336,7 +347,7 @@ $reportTabs = [
 ];
 
 $branchNames = array_column($branches, 'name', 'id');
-$categoryNames = array_column($categories, 'name', 'id');
+$categoryNames = array_column($categories, 'name', 'name');
 $sectionNames = array_column($sections, 'name', 'id');
 $departmentNames = array_column($departments, 'name', 'id');
 $supplierNames = array_column($suppliers, 'company_name', 'id');
@@ -345,7 +356,7 @@ $printFilters = [
     'Campus' => $branchFilter ? ($branchNames[$branchFilter] ?? 'Selected campus') : ($isAdmin ? 'All Campuses' : ($branchNames[$branchId] ?? 'Current campus')),
     'Transaction Date' => $reportType === 'movement' ? "$dateFrom to $dateTo" : 'Not applied',
     'Purchase Date' => ($purchaseFrom || $purchaseTo) ? (($purchaseFrom ?: 'Any') . ' to ' . ($purchaseTo ?: 'Any')) : 'All purchase dates',
-    'Category' => $catFilter ? ($categoryNames[$catFilter] ?? 'Selected category') : 'All Categories',
+    'Category' => ($catNameFilter !== '' || $catFilter) ? ($catNameFilter ?: ($categoryNames[$catFilter] ?? 'Selected category')) : 'All Categories',
     'Department' => $sectionFilter ? ($sectionNames[$sectionFilter] ?? 'Selected department') : 'All Departments',
     'Section / Unit' => $departmentFilter ? ($departmentNames[$departmentFilter] ?? 'Selected section/unit') : 'All Sections / Units',
     'Supplier' => $supplierFilter ? ($supplierNames[$supplierFilter] ?? 'Selected supplier') : 'All Suppliers',
@@ -385,6 +396,7 @@ if ($reportType === 'summary') {
         $params[] = $branchFilter;
     }
     if ($catFilter) { $sql .= " AND i.category_id = ?"; $params[] = $catFilter; }
+    elseif ($catNameFilter !== '') { $sql .= " AND c.name = ?"; $params[] = $catNameFilter; }
     if ($departmentFilter) { $sql .= " AND i.department_id = ?"; $params[] = $departmentFilter; }
     if ($supplierFilter) { $sql .= " AND i.supplier_id = ?"; $params[] = $supplierFilter; }
     if ($sectionFilter) { $sql .= " AND d.section_id = ?"; $params[] = $sectionFilter; }
@@ -493,9 +505,9 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($txTypeFilter): ?><input type="hidden" name="tx_type" value="<?= clean($txTypeFilter) ?>"><?php endif; ?>
         <?php if ($isAdmin): ?>
         <div class="filter-group">
-            <label for="branchSelect" class="form-label">Branch</label>
+            <label for="branchSelect" class="form-label">Campus</label>
             <select id="branchSelect" name="branch" class="form-control">
-                <option value="">All Branches</option>
+                <option value="">All Campuses</option>
                 <?php foreach ($branches as $b): ?><option value="<?= $b['id'] ?>" <?= $b['id']==$branchFilter?'selected':'' ?>><?= clean($b['name']) ?></option><?php endforeach; ?>
             </select>
         </div>
@@ -506,8 +518,8 @@ include __DIR__ . '/../includes/header.php';
         <select id="categorySelect" name="category" class="form-control">
             <option value="">All Categories</option>
             <?php foreach ($categories as $c): ?>
-                <option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>>
-                    <?= clean($c['name']) ?><?= $isAdmin && !$branchFilter ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?>
+                <option value="<?= clean($c['name']) ?>" <?= ($catNameFilter === $c['name'] || ($catFilter && $c['id']==$catFilter)) ? 'selected' : '' ?>>
+                    <?= clean($c['name']) ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -705,7 +717,7 @@ include __DIR__ . '/../includes/header.php';
 <script>
 const reportFilterRows = <?= json_encode(array_map(static fn($row) => [
     'branch' => (int)$row['branch_id'],
-    'category' => (int)$row['category_id'],
+    'category' => (string)$row['category_name'],
     'section' => (int)$row['section_id'],
     'department' => (int)$row['department_id'],
     'supplier' => (int)$row['supplier_id'],

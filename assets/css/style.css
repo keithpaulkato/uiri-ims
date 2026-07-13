@@ -479,6 +479,30 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .table tbody tr:last-child td { border-bottom: none; }
 .table-responsive { width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; }
 .table-responsive .data-table { min-width: max-content; }
+.inventory-table-card { overflow: hidden; }
+.inventory-table-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; padding-bottom: 12px; scrollbar-color: #6b7280 #e5edf5; scrollbar-width: auto; -webkit-overflow-scrolling: touch; }
+.inventory-table-scroll::-webkit-scrollbar { height: 14px; }
+.inventory-table-scroll::-webkit-scrollbar-track { background: #e5edf5; border-radius: 999px; }
+.inventory-table-scroll::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 999px; border: 3px solid #e5edf5; }
+.inventory-table-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
+.inventory-table-canvas { min-width: 1540px; }
+.inventory-items-table { min-width: 1540px; table-layout: fixed; }
+.inventory-items-table th:nth-child(1), .inventory-items-table td:nth-child(1) { width: 42px; }
+.inventory-items-table th:nth-child(2), .inventory-items-table td:nth-child(2) { width: 190px; }
+.inventory-items-table th:nth-child(3), .inventory-items-table td:nth-child(3) { width: 140px; }
+.inventory-items-table th:nth-child(4), .inventory-items-table td:nth-child(4) { width: 170px; }
+.inventory-items-table th:nth-child(5), .inventory-items-table td:nth-child(5) { width: 160px; }
+.inventory-items-table th:nth-child(6), .inventory-items-table td:nth-child(6) { width: 110px; }
+.inventory-items-table th:nth-child(7), .inventory-items-table td:nth-child(7) { width: 120px; }
+.inventory-items-table th:nth-child(8), .inventory-items-table td:nth-child(8) { width: 100px; }
+.inventory-items-table th:nth-child(9), .inventory-items-table td:nth-child(9) { width: 105px; }
+.inventory-items-table th:nth-child(10), .inventory-items-table td:nth-child(10) { width: 90px; }
+.inventory-items-table th:nth-child(11), .inventory-items-table td:nth-child(11) { width: 58px; }
+.inventory-items-table th:nth-child(12), .inventory-items-table td:nth-child(12) { width: 120px; }
+.inventory-items-table th:nth-child(13), .inventory-items-table td:nth-child(13) { width: 98px; }
+.inventory-items-table th, .inventory-items-table td { white-space: normal; overflow-wrap: anywhere; }
+.inventory-items-table .badge { white-space: normal; line-height: 1.15; text-align: center; }
+.inventory-print-header, .inventory-print-meta { display: none; }
 .users-table-card { overflow: hidden; }
 .users-table-wrap { --users-scale: var(--sidebar-scale, 1); }
 .users-table { min-width: 1040px; font-size: calc(.82rem * var(--users-scale)); }
@@ -1175,6 +1199,149 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
   .analytics-age-bars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } .page-content { padding: 16px; } }
+
+@media print {
+  @page { size: A4 landscape; margin: 6mm; }
+  .sidebar,
+  .topnav,
+  .filter-bar,
+  .page-header,
+  .page-actions,
+  .pagination-bar,
+  .modal-overlay,
+  .inventory-actions-col {
+    display: none !important;
+  }
+  html,
+  body {
+    width: auto !important;
+    min-width: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+  body {
+    font-size: 9px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .main-wrapper,
+  .page-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+  .inventory-print-area {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+  .inventory-print-area .card-body {
+    padding: 0 !important;
+  }
+  .inventory-print-header {
+    display: flex !important;
+    align-items: center;
+    gap: 10px !important;
+    padding: 8px 0 7px !important;
+    margin-bottom: 8px !important;
+    border-bottom: 1.5px solid #0A1628 !important;
+    break-inside: avoid;
+  }
+  .print-logo {
+    background: #fff;
+    padding: 3px !important;
+    border-radius: 4px !important;
+    border: 1px solid #e2e8f0;
+  }
+  .print-logo img {
+    height: 34px !important;
+    display: block;
+  }
+  .inventory-print-header h2 {
+    font-size: 15px !important;
+    line-height: 1.1 !important;
+    margin: 0 !important;
+  }
+  .inventory-print-header p {
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    margin: 1px 0 !important;
+  }
+  .inventory-print-meta {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 3px 6px !important;
+    margin: 0 0 7px !important;
+    padding: 6px !important;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 4px !important;
+    font-size: 7.2px !important;
+    line-height: 1.2 !important;
+    break-inside: avoid;
+  }
+  .inventory-print-meta strong {
+    color: #0A1628;
+  }
+  .inventory-table-scroll {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+  }
+  .inventory-table-canvas,
+  .inventory-items-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .inventory-items-table {
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 6.4px !important;
+    line-height: 1.12 !important;
+  }
+  .inventory-items-table th,
+  .inventory-items-table td {
+    padding: 2.2px 2.6px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    hyphens: auto !important;
+    letter-spacing: 0 !important;
+    vertical-align: top !important;
+  }
+  .inventory-items-table th {
+    font-size: 5.8px !important;
+    line-height: 1.05 !important;
+  }
+  .inventory-items-table td {
+    font-size: 6.3px !important;
+  }
+  .inventory-items-table .badge {
+    padding: 1px 3px !important;
+    border-radius: 4px !important;
+    font-size: 5.5px !important;
+    letter-spacing: 0 !important;
+    line-height: 1.1 !important;
+  }
+  .inventory-items-table .item-name,
+  .inventory-items-table .item-code {
+    font-size: inherit !important;
+    line-height: inherit !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+}
 
 /* Theme transition support - smooth color transitions when switching themes */
 body {

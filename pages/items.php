@@ -120,7 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $search         = trim($_GET['search'] ?? '');
-$catFilter      = (int)($_GET['category'] ?? 0);
+$categoryParam  = trim($_GET['category'] ?? '');
+$catFilter      = ctype_digit($categoryParam) ? (int)$categoryParam : 0;
+$catNameFilter  = $catFilter ? '' : $categoryParam;
 $supplierFilter = (int)($_GET['supplier'] ?? 0);
 $branchFilter   = $isAdmin ? (int)($_GET['branch'] ?? 0) : (int)$branchId;
 $deptFilter     = (int)($_GET['department'] ?? 0);
@@ -135,6 +137,7 @@ $missingPurchase = ($_GET['missing_purchase'] ?? '') === '1';
 $buildItemOptionWhere = function (array $keys) use (
     &$branchFilter,
     &$catFilter,
+    &$catNameFilter,
     &$sectionFilter,
     &$deptFilter,
     &$supplierFilter,
@@ -157,6 +160,9 @@ $buildItemOptionWhere = function (array $keys) use (
     if (in_array('category', $keys, true) && $catFilter) {
         $where[] = 'i.category_id = ?';
         $params[] = $catFilter;
+    } elseif (in_array('category', $keys, true) && $catNameFilter !== '') {
+        $where[] = 'i.category_id IN (SELECT id FROM categories WHERE name = ?)';
+        $params[] = $catNameFilter;
     }
     if (in_array('section', $keys, true) && $sectionFilter) {
         $where[] = 'i.section_id = ?';
@@ -204,15 +210,19 @@ $hasSelectedId = static function (array $rows, int $selected): bool {
 
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $filterCategories = $fetchItemOptionRows("
-    SELECT c.id, c.name, c.branch_id, COUNT(i.id) AS item_count
+    SELECT MIN(c.id) AS id, c.name, " . ($branchFilter ? "MIN(c.branch_id)" : "0") . " AS branch_id, COUNT(i.id) AS item_count
     FROM inventory_items i
     JOIN categories c ON c.id = i.category_id
     {WHERE}
-    GROUP BY c.id, c.name, c.branch_id
-    ORDER BY c.branch_id, c.name
+    GROUP BY c.name
+    ORDER BY c.name
 ", ['branch']);
-if (!$hasSelectedId($filterCategories, $catFilter)) {
+if ($catFilter && !$hasSelectedId($filterCategories, $catFilter)) {
     $catFilter = 0;
+    $catNameFilter = '';
+}
+if ($catNameFilter !== '' && !in_array($catNameFilter, array_column($filterCategories, 'name'), true)) {
+    $catNameFilter = '';
 }
 
 $sections = $fetchItemOptionRows("
@@ -307,7 +317,7 @@ if ($conditionFilter && !in_array($conditionFilter, array_column($conditionOptio
 }
 
 $filterRows = $pdo->query("
-    SELECT i.branch_id, i.category_id, i.section_id, i.department_id, i.supplier_id,
+    SELECT i.branch_id, c.name AS category_name, i.section_id, i.department_id, i.supplier_id,
            i.asset_status, i.asset_condition,
            CASE
                WHEN i.current_stock = 0 THEN 'out_of_stock'
@@ -315,19 +325,20 @@ $filterRows = $pdo->query("
                ELSE 'available'
            END AS stock_status
     FROM inventory_items i
+    JOIN categories c ON c.id = i.category_id
     WHERE i.is_active = 1
 ")->fetchAll();
 if (!$isAdmin) {
     $filterRows = array_values(array_filter($filterRows, static fn($row) => (int)$row['branch_id'] === (int)$branchId));
 }
 
-$allCategories = $pdo->query("SELECT id, name, branch_id FROM categories ORDER BY branch_id, name")->fetchAll();
+$allCategories = $pdo->query("SELECT MIN(id) AS id, name, 0 AS branch_id FROM categories GROUP BY name ORDER BY name")->fetchAll();
 $allSections = $pdo->query("SELECT id, name, branch_id FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
 $allDepartments = $pdo->query("SELECT d.id, d.name, d.section_id, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
 $allSuppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $filterOptionLabels = [
     'categories' => array_map(static fn($row) => [
-        'id' => (int)$row['id'],
+        'id' => $row['name'],
         'label' => $row['name'],
         'branch_id' => (int)$row['branch_id'],
     ], $allCategories),
@@ -361,6 +372,7 @@ if ($search) {
     $params = array_merge($params, ["%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%"]);
 }
 if ($catFilter) { $where[] = "i.category_id = ?"; $params[] = $catFilter; }
+elseif ($catNameFilter !== '') { $where[] = "c.name = ?"; $params[] = $catNameFilter; }
 if ($supplierFilter) { $where[] = "i.supplier_id = ?"; $params[] = $supplierFilter; }
 if ($sectionFilter) { $where[] = "i.section_id = ?"; $params[] = $sectionFilter; }
 if ($deptFilter) { $where[] = "i.department_id = ?"; $params[] = $deptFilter; }
@@ -417,6 +429,26 @@ if (isset($_GET['edit'])) {
 }
 $showAddModal = $canManage && (($_GET['action'] ?? '') === 'add' || $editItem);
 
+$branchNames = array_column($branches, 'name', 'id');
+$categoryNames = array_column($filterCategories, 'name', 'name');
+$sectionNames = array_column($sections, 'name', 'id');
+$departmentNames = array_column($departments, 'name', 'id');
+$supplierNames = array_column($suppliers, 'company_name', 'id');
+$stockStatusNames = array_column($stockStatusOptions, 'label', 'value');
+$assetStatusNames = array_column($assetStatusOptions, 'label', 'value');
+$conditionNames = array_column($conditionOptions, 'label', 'value');
+$printFilters = [
+    'Campus' => $branchFilter ? ($branchNames[$branchFilter] ?? 'Selected campus') : ($isAdmin ? 'All Campuses' : ($branchNames[$branchId] ?? 'Current campus')),
+    'Category' => ($catNameFilter !== '' || $catFilter) ? ($catNameFilter ?: ($categoryNames[$catFilter] ?? 'Selected category')) : 'All Categories',
+    'Department' => $sectionFilter ? ($sectionNames[$sectionFilter] ?? 'Selected department') : 'All Departments',
+    'Section / Unit' => $deptFilter ? ($departmentNames[$deptFilter] ?? 'Selected section/unit') : 'All Sections / Units',
+    'Supplier' => $supplierFilter ? ($supplierNames[$supplierFilter] ?? 'Selected supplier') : 'All Suppliers',
+    'Stock Level' => $stockFilter ? ($stockStatusNames[$stockFilter] ?? $stockFilter) : 'All Stock Levels',
+    'Asset Status' => $assetStatusFilter ? ($assetStatusNames[$assetStatusFilter] ?? $assetStatusFilter) : 'All Asset Statuses',
+    'Condition' => $conditionFilter ? ($conditionNames[$conditionFilter] ?? $conditionFilter) : 'All Conditions',
+    'Search' => $search ?: 'None',
+];
+
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
@@ -447,11 +479,21 @@ include __DIR__ . '/../includes/header.php';
                 <input type="text" name="search" placeholder="Search asset code, QR code, name…" value="<?= clean($search) ?>">
             </div>
         </div>
+        <?php if ($isAdmin): ?>
+        <div class="filter-group">
+            <select id="branchSelect" name="branch">
+                <option value="">All Campuses</option>
+                <?php foreach ($branches as $b): ?>
+                <option value="<?= $b['id'] ?>" <?= $b['id']==$branchFilter?'selected':'' ?>><?= clean($b['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
         <div class="filter-group">
             <select id="categorySelect" name="category">
                 <option value="">All Categories</option>
                 <?php foreach ($filterCategories as $c): ?>
-                <option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
+                <option value="<?= clean($c['name']) ?>" <?= ($catNameFilter === $c['name'] || ($catFilter && $c['id']==$catFilter)) ? 'selected' : '' ?>><?= clean($c['name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -463,16 +505,6 @@ include __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             </select>
         </div>
-        <?php if ($isAdmin): ?>
-        <div class="filter-group">
-            <select id="branchSelect" name="branch">
-                <option value="">All Campuses</option>
-                <?php foreach ($branches as $b): ?>
-                <option value="<?= $b['id'] ?>" <?= $b['id']==$branchFilter?'selected':'' ?>><?= clean($b['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <?php endif; ?>
         <div class="filter-group">
             <select id="sectionSelect" name="section">
                 <option value="">All Departments</option>
@@ -521,15 +553,30 @@ include __DIR__ . '/../includes/header.php';
     </form>
 </div>
 
-<div class="card">
+<div class="card inventory-print-area inventory-table-card">
     <div class="card-body p0">
         <?php if ($items): ?>
-        <table class="data-table">
+        <div class="print-header inventory-print-header">
+            <div class="print-logo"><img src="<?= BASE_URL ?>assets/img/uiri-logo.webp" alt="UIRI"></div>
+            <div>
+                <h2>Inventory Items</h2>
+                <p>Uganda Industrial Research Institute<?= $branchFilter ? ' — ' . clean($branchNames[$branchFilter] ?? '') : ' — All Campuses' ?></p>
+                <p>Printed: <?= formatDateTime('now', true) ?> by <?= clean($user['full_name']) ?> (<?= clean($user['role']) ?>)</p>
+            </div>
+        </div>
+        <div class="print-meta inventory-print-meta">
+            <?php foreach ($printFilters as $label => $value): ?>
+            <div><strong><?= clean($label) ?>:</strong> <?= clean((string)$value) ?></div>
+            <?php endforeach; ?>
+        </div>
+        <div class="inventory-table-scroll">
+        <div class="inventory-table-canvas">
+        <table class="data-table inventory-items-table">
             <thead><tr>
                 <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
                 <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
                 <th>Model / Specs</th><th>Purchased</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
-                <?php if ($canManage): ?><th>Actions</th><?php endif; ?>
+                <?php if ($canManage): ?><th class="inventory-actions-col">Actions</th><?php endif; ?>
             </tr></thead>
             <tbody>
             <?php foreach ($items as $i => $item):
@@ -554,7 +601,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= $item['minimum_stock'] ?></td>
                 <td><span class="badge badge-<?= $ss==='good'?'success':($ss==='low'?'warn':'danger') ?>"><?= $sl ?></span></td>
                 <?php if ($canManage): ?>
-                <td>
+                <td class="inventory-actions-col">
                     <div class="action-btns">
                         <a href="items.php?edit=<?= $item['id'] ?>" class="btn-icon" title="Edit">
                             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -606,6 +653,8 @@ include __DIR__ . '/../includes/header.php';
             </nav>
         </div>
         <?php endif; ?>
+        </div>
+        </div>
         <?php else: ?>
         <div class="empty-state">
             <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
@@ -907,7 +956,7 @@ include __DIR__ . '/../includes/header.php';
 <script>
 const itemFilterRows = <?= json_encode(array_map(static fn($row) => [
     'branch' => (int)$row['branch_id'],
-    'category' => (int)$row['category_id'],
+    'category' => (string)$row['category_name'],
     'section' => $row['section_id'] !== null ? (int)$row['section_id'] : null,
     'department' => $row['department_id'] !== null ? (int)$row['department_id'] : null,
     'supplier' => $row['supplier_id'] !== null ? (int)$row['supplier_id'] : null,
