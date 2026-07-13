@@ -313,7 +313,7 @@ include __DIR__ . '/../includes/header.php';
     </form>
 
     <section class="analytics-kpi-grid">
-        <div class="analytics-kpi"><span>Inventory Value</span><strong><?= ugx($inventoryValue) ?></strong><small><?= number_format($totalUnits) ?> units under control</small></div>
+        <div class="analytics-kpi analytics-kpi-inventory-value"><span>Inventory Value</span><strong><?= ugx($inventoryValue) ?></strong><small><?= number_format($totalUnits) ?> units under control</small></div>
         <div class="analytics-kpi"><span>Stock Turnover Signal</span><strong><?= $issueReceiptRatio ?>%</strong><small><?= number_format($stockOutQty) ?> issued vs <?= number_format($stockInQty) ?> received</small></div>
         <div class="analytics-kpi risk"><span>Risk Exposure</span><strong><?= $riskRate ?>%</strong><small><?= $lowStock ?> low, <?= $outStock ?> out, <?= $maintenanceItems + $notWorkingItems ?> technical risk</small></div>
         <div class="analytics-kpi"><span>Request Fulfillment</span><strong><?= $fulfillmentRate ?>%</strong><small><?= number_format($requestIssued) ?> issued from <?= number_format($requestTotal) ?> requests</small></div>

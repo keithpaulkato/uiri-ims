@@ -820,6 +820,7 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .analytics-kpi.warn { border-color: #fde68a; background: #fffbeb; }
 .analytics-kpi span { color: #334155; font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
 .analytics-kpi strong { color: var(--navy); font-size: 1.45rem; line-height: 1.08; font-weight: 950; }
+.analytics-kpi-inventory-value strong { font-size: .95rem; line-height: 1.15; overflow-wrap: normal; word-break: normal; }
 .analytics-kpi small { color: #526174; font-size: .76rem; line-height: 1.35; font-weight: 650; }
 .analytics-grid { display: grid; gap: 16px; }
 .analytics-grid-main { grid-template-columns: minmax(0, 1.45fr) minmax(340px, .55fr); }
