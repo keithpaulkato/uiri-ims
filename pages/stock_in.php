@@ -709,14 +709,14 @@ function buildRecentTable() {
         tbody.innerHTML = visible.map(tx => `
             <tr>
                 <td>${new Date(tx.transaction_date).toLocaleDateString('en-GB')}</td>
-                <td><strong>${tx.item_code}</strong><br><small>${tx.item_name}</small></td>
+                <td><strong>${tx.item_code}</strong> <small>${tx.item_name}</small></td>
                 <td>${tx.supplier_name || '—'}</td>
                 <td>${tx.quantity}</td>
                 <td>${formatCurrency(tx.unit_price * tx.quantity)}</td>
                 <td class="table-actions">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="viewRecent(${tx.id})"><i class="fa-solid fa-eye"></i></button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="editRecent(${tx.id})"><i class="fa-solid fa-pen"></i></button>
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRecent(${tx.id})"><i class="fa-solid fa-trash"></i></button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm action-icon-btn" title="View stock-in" aria-label="View stock-in" onclick="viewRecent(${tx.id})"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm action-icon-btn" title="Edit stock-in" aria-label="Edit stock-in" onclick="editRecent(${tx.id})"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button>
+                    <button type="button" class="btn btn-outline-danger btn-sm action-icon-btn" title="Delete stock-in" aria-label="Delete stock-in" onclick="deleteRecent(${tx.id})"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>
                 </td>
             </tr>
         `).join('');
