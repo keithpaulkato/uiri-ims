@@ -347,7 +347,8 @@ include __DIR__ . '/../includes/header.php';
 
                 <div class="form-section-card">
                     <h4>Purchase Details</h4>
-                            <div class="form-group"><label>Purchase Order Number</label><input type="text" name="purchase_order_number" id="purchaseOrderNumber" class="form-control"></div>
+                    <div class="form-grid-2">
+                        <div class="form-group"><label>Purchase Order Number</label><input type="text" name="purchase_order_number" id="purchaseOrderNumber" class="form-control"></div>
                         <div class="form-group"><label>Invoice Number</label><input type="text" name="invoice_number" id="invoiceNumber" class="form-control"></div>
                     </div>
                     <div class="form-grid-2">
@@ -371,7 +372,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block mt-3">
+                <button type="submit" class="btn btn-primary btn-block mt-3" id="stockInSubmitButton">
                     <i class="fa-solid fa-check me-2"></i> Record Stock In
                 </button>
             </form>
