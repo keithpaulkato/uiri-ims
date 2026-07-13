@@ -11,12 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($_POST['delete_transaction_id'])) {
         $deleteId = (int)$_POST['delete_transaction_id'];
-        $stmt = $pdo->prepare("SELECT item_id, quantity FROM stock_transactions WHERE id = ? AND transaction_type = 'stock_in'");
+        $stmt = $pdo->prepare("SELECT item_id, quantity, branch_id FROM stock_transactions WHERE id = ? AND transaction_type = 'stock_in'");
         $stmt->execute([$deleteId]);
         $tx = $stmt->fetch();
 
         if (!$tx) {
             setFlash('error', 'Stock-in transaction not found.');
+        } elseif (!$isAdmin && (int)$tx['branch_id'] !== (int)$branchId) {
+            setFlash('error', 'You cannot delete stock-in records outside your branch.');
         } else {
             $stockStmt = $pdo->prepare("SELECT current_stock FROM inventory_items WHERE id = ?");
             $stockStmt->execute([$tx['item_id']]);
@@ -185,8 +187,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 setFlash('success', "Stock in recorded — $qty unit(s) added.");
             }
         } catch (Exception $e) {
-            $pdo->rollBack();
-            setFlash('error', 'Transaction failed.');
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            setFlash('error', $e->getMessage() ?: 'Transaction failed.');
         }
     }
     header('Location: stock_in.php');
@@ -199,7 +203,7 @@ $items = $pdo->query("SELECT i.id,i.name,i.item_code,i.unit,i.unit_price,i.curre
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $tWhere = $isAdmin ? ($branchFilter ? "AND t.branch_id=$branchFilter" : '') : "AND t.branch_id=$branchId";
-$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 100")->fetchAll();
+$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.supplier_id, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 100")->fetchAll();
 $itemStatsRaw = $pdo->query("SELECT item_id, MAX(transaction_date) AS last_stock_in_date, AVG(unit_price) AS avg_purchase_cost FROM stock_transactions WHERE transaction_type='stock_in' GROUP BY item_id")->fetchAll(PDO::FETCH_ASSOC);
 $itemStats = [];
 foreach ($itemStatsRaw as $stat) {
@@ -232,8 +236,8 @@ include __DIR__ . '/../includes/header.php';
         </button>
     </div>
 </div>
-<div class="section-grid-2" style="align-items:flex-start; gap:24px;">
-    <div class="card" data-aos="fade-right">
+<div class="stock-workspace">
+    <section class="card stock-form-card" data-aos="fade-right">
         <div class="card-header d-flex align-items-center justify-content-between">
             <h3>Stock In Form</h3>
             <span class="badge badge-primary">Live calculations</span>
@@ -246,8 +250,8 @@ include __DIR__ . '/../includes/header.php';
 
                 <?php if ($isAdmin): ?>
                 <div class="form-group">
-                    <label>Branch</label>
-                    <select name="branch_id" id="branchSelect" onchange="window.location='stock_in.php?branch='+this.value">
+                    <label>Branch Filter</label>
+                    <select id="branchSelect" onchange="window.location='stock_in.php?branch='+this.value">
                         <option value="">All Branches</option>
                         <?php foreach ($branches as $b): ?>
                         <option value="<?= $b['id'] ?>" <?= $b['id'] == $branchFilter ? 'selected' : '' ?>><?= clean($b['name']) ?></option>
@@ -381,9 +385,9 @@ include __DIR__ . '/../includes/header.php';
                 <input type="hidden" name="delete_transaction_id" id="deleteTransactionIdInput" value="">
             </form>
         </div>
-    </div>
+    </section>
 
-    <div>
+    <aside class="stock-side-panel">
         <div class="card mb-4" data-aos="fade-left">
             <div class="card-header"><h3>Product Preview</h3></div>
             <div class="card-body preview-card" id="productPreview">
@@ -465,7 +469,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
         </div>
-    </div>
+    </aside>
 </div>
 
 <script>
