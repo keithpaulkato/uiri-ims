@@ -696,6 +696,45 @@ select.form-control { cursor: pointer; color: var(--gold); }
 .stock-workspace .form-section-card > .d-flex .form-control { min-height: 42px; }
 .stock-workspace .form-section-card > .d-flex { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .stock-workspace .table-filters .filter-row { align-items: center; }
+.stock-in-wizard { display: block; padding: 0; border: 0; box-shadow: none; background: transparent; }
+.stock-in-wizard .wizard-intro { margin-bottom: 14px; }
+.stock-in-wizard .wizard-step-nav { margin: 0 0 14px; }
+.stock-wizard-panels { min-height: 430px; }
+.stock-wizard-panels .form-section-card { margin-bottom: 0; }
+.stock-wizard-footer { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.stock-wizard-footer .btn { min-height: 42px; }
+.stock-wizard-footer #stockWizardBack { margin-right: auto; }
+.stock-review-list { display: grid; gap: 10px; margin-top: 12px; }
+.stock-review-list .review-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; background: #f8fbff; border: 1px solid #e2e8f0; border-radius: 12px; }
+.stock-review-list .review-item span { color: var(--sub); font-size: .78rem; text-transform: uppercase; font-weight: 800; letter-spacing: .02em; }
+.stock-review-list .review-item strong { color: var(--navy); text-align: right; }
+.preview-grid span { display: block; margin-top: 4px; color: var(--navy); font-weight: 800; }
+.recent-stock-card .table-responsive { overflow-x: hidden; }
+.recent-stock-card .data-table { table-layout: fixed; min-width: 0; }
+.recent-stock-card .data-table th,
+.recent-stock-card .data-table td { padding: 10px 9px; white-space: normal; overflow-wrap: anywhere; }
+.recent-stock-card .data-table th:nth-child(1),
+.recent-stock-card .data-table td:nth-child(1) { width: 14%; }
+.recent-stock-card .data-table th:nth-child(2),
+.recent-stock-card .data-table td:nth-child(2) { width: 27%; }
+.recent-stock-card .data-table th:nth-child(3),
+.recent-stock-card .data-table td:nth-child(3) { width: 21%; }
+.recent-stock-card .data-table th:nth-child(4),
+.recent-stock-card .data-table td:nth-child(4) { width: 8%; text-align: center; }
+.recent-stock-card .data-table th:nth-child(5),
+.recent-stock-card .data-table td:nth-child(5) { width: 14%; }
+.recent-stock-card .data-table th:nth-child(6),
+.recent-stock-card .data-table td:nth-child(6) { width: 16%; text-align: right; }
+.recent-stock-card .table-actions { white-space: nowrap; text-align: right; }
+.recent-stock-card .table-actions .btn { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin-right: 2px; border-radius: 8px; color: var(--navy); background: #fff; border: 1px solid var(--border); }
+.recent-stock-card .table-actions .btn i { font-size: .78rem; color: inherit; }
+.recent-stock-card .table-actions .btn-outline-danger { color: #b42318; border-color: rgba(180,35,24,.28); }
+.recent-pagination-bar { display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
+.recent-pagination-bar .pagination-nav-left,
+.recent-pagination-bar .recent-page-links { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.recent-pagination-bar .pagination-nav-right { display: flex; justify-content: flex-end; }
+.recent-pagination-bar .pagination-link { border: 1px solid var(--border); cursor: pointer; }
+.recent-pagination-bar .pagination-direction { min-width: 96px; }
 
 /* DASHBOARD CHARTS */
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }

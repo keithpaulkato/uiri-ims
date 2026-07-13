@@ -203,7 +203,7 @@ $items = $pdo->query("SELECT i.id,i.name,i.item_code,i.unit,i.unit_price,i.curre
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $tWhere = $isAdmin ? ($branchFilter ? "AND t.branch_id=$branchFilter" : '') : "AND t.branch_id=$branchId";
-$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.supplier_id, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 100")->fetchAll();
+$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.supplier_id, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 8")->fetchAll();
 $itemStatsRaw = $pdo->query("SELECT item_id, MAX(transaction_date) AS last_stock_in_date, AVG(unit_price) AS avg_purchase_cost FROM stock_transactions WHERE transaction_type='stock_in' GROUP BY item_id")->fetchAll(PDO::FETCH_ASSOC);
 $itemStats = [];
 foreach ($itemStatsRaw as $stat) {
@@ -248,10 +248,35 @@ include __DIR__ . '/../includes/header.php';
                 <input type="hidden" name="item_id" id="itemIdInput" value="">
                 <input type="hidden" name="transaction_id" id="transactionIdInput" value="">
 
+                <div class="inventory-wizard stock-in-wizard">
+                    <div class="wizard-intro">
+                        <div>
+                            <div class="wizard-breadcrumb">Stock / Stock In / Receive Inventory</div>
+                            <div class="wizard-title-row">
+                                <h3>Record Stock In</h3>
+                                <div class="wizard-badges">
+                                    <span>Live preview</span>
+                                    <span>Branch aware</span>
+                                </div>
+                            </div>
+                            <p>Receive inventory in focused steps, then review the stock impact before saving.</p>
+                        </div>
+                    </div>
+
+                    <div class="wizard-step-nav" aria-label="Stock in steps">
+                        <button type="button" class="wizard-step-btn active" data-step-target="product">1. Product</button>
+                        <button type="button" class="wizard-step-btn" data-step-target="supplier">2. Supplier</button>
+                        <button type="button" class="wizard-step-btn" data-step-target="reference">3. Reference</button>
+                        <button type="button" class="wizard-step-btn" data-step-target="stock">4. Stock</button>
+                        <button type="button" class="wizard-step-btn" data-step-target="review">5. Review</button>
+                    </div>
+
+                    <div class="stock-wizard-panels">
+                        <div class="wizard-step-panel active" data-step="product">
                 <?php if ($isAdmin): ?>
                 <div class="form-group">
                     <label>Branch Filter</label>
-                    <select id="branchSelect" onchange="window.location='stock_in.php?branch='+this.value">
+                    <select id="branchSelect" class="form-control" onchange="window.location='stock_in.php?branch='+this.value">
                         <option value="">All Branches</option>
                         <?php foreach ($branches as $b): ?>
                         <option value="<?= $b['id'] ?>" <?= $b['id'] == $branchFilter ? 'selected' : '' ?>><?= clean($b['name']) ?></option>
@@ -294,7 +319,9 @@ include __DIR__ . '/../includes/header.php';
                         <div class="form-group"><label>Unit of Measure</label><input type="text" id="productUnit" class="form-control" readonly></div>
                     </div>
                 </div>
+                        </div>
 
+                        <div class="wizard-step-panel" data-step="supplier">
                 <div class="form-section-card">
                     <h4>Supplier Information</h4>
                     <div class="d-flex gap-2 align-items-center mb-3">
@@ -318,7 +345,9 @@ include __DIR__ . '/../includes/header.php';
                         <div class="history-list" id="historyList">Select a product to view its last purchases.</div>
                     </div>
                 </div>
+                        </div>
 
+                        <div class="wizard-step-panel" data-step="reference">
                 <div class="form-section-card">
                     <h4>Purchase Reference</h4>
                     <div class="form-grid-2">
@@ -327,7 +356,9 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="form-group"><label>Remarks / Internal Notes</label><textarea id="remarks" name="remarks" rows="3" class="form-control" placeholder="Enter additional notes or order details"></textarea></div>
                 </div>
+                        </div>
 
+                        <div class="wizard-step-panel" data-step="stock">
                 <div class="form-section-card">
                     <h4>Stock Details</h4>
                     <div class="form-grid-2">
@@ -375,10 +406,39 @@ include __DIR__ . '/../includes/header.php';
                         <div class="form-group"><label>Profit Margin</label><div class="computed-field" id="calcProfitMargin">0%</div></div>
                     </div>
                 </div>
+                        </div>
 
-                <button type="submit" class="btn btn-primary btn-block mt-3" id="stockInSubmitButton">
-                    <i class="fa-solid fa-check me-2"></i> Record Stock In
-                </button>
+                        <div class="wizard-step-panel" data-step="review">
+                            <div class="form-section-card">
+                                <h4>Review Stock In</h4>
+                                <p>Confirm the received item, quantity and projected stock before recording.</p>
+                                <div class="review-checklist stock-review-list">
+                                    <div class="review-item"><span>Product</span><strong id="reviewProduct">Select product</strong></div>
+                                    <div class="review-item"><span>Supplier</span><strong id="reviewSupplier">Select supplier</strong></div>
+                                    <div class="review-item"><span>Quantity received</span><strong id="reviewQty">0</strong></div>
+                                    <div class="review-item"><span>Projected stock</span><strong id="reviewProjectedStock">-</strong></div>
+                                    <div class="review-item"><span>Transaction date</span><strong id="reviewDate"><?= date('Y-m-d') ?></strong></div>
+                                    <div class="review-item"><span>Grand total</span><strong id="reviewGrandTotal">UGX 0</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stock-wizard-footer">
+                        <button type="button" class="btn btn-outline-secondary" id="stockWizardBack">
+                            <i class="fa-solid fa-arrow-left me-1"></i> Back
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="stockWizardSaveDraft">
+                            <i class="fa-regular fa-floppy-disk me-1"></i> Save Draft
+                        </button>
+                        <button type="button" class="btn btn-primary" id="stockWizardNext">
+                            Save & Continue <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="stockInSubmitButton">
+                            <i class="fa-solid fa-check me-2"></i> Record Stock In
+                        </button>
+                    </div>
+                </div>
             </form>
             <form id="deleteForm" method="POST" style="display:none">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -401,17 +461,19 @@ include __DIR__ . '/../includes/header.php';
                 <div class="preview-grid">
                     <div><strong>Current stock</strong><span id="previewCurrentStock">—</span></div>
                     <div><strong>Min stock</strong><span id="previewMinStock">—</span></div>
-                    <div><strong>Max stock</strong><span id="previewMaxStock">N/A</span></div>
+                    <div><strong>Quantity in</strong><span id="previewQtyIn">0</span></div>
+                    <div><strong>Projected stock</strong><span id="previewProjectedStock">—</span></div>
                     <div><strong>Last purchase</strong><span id="previewLastPurchase">—</span></div>
                     <div><strong>Last supplier</strong><span id="previewLastSupplier">—</span></div>
                     <div><strong>Last stock-in</strong><span id="previewLastStockIn">—</span></div>
                     <div><strong>Avg cost</strong><span id="previewAvgCost">—</span></div>
                     <div><strong>Warehouse</strong><span id="previewWarehouse">—</span></div>
+                    <div><strong>Grand total</strong><span id="previewGrandTotal">UGX 0</span></div>
                 </div>
             </div>
         </div>
 
-        <div class="card" data-aos="fade-left">
+        <div class="card recent-stock-card" data-aos="fade-left">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <h3>Recent Stock In</h3>
                 <div class="d-flex gap-2">
@@ -452,21 +514,22 @@ include __DIR__ . '/../includes/header.php';
                                 <th>Product</th>
                                 <th>Supplier</th>
                                 <th>Qty</th>
-                                <th>Unit Cost</th>
-                                <th>Total Cost</th>
-                                <th>Warehouse</th>
-                                <th>Received By</th>
-                                <th>Status</th>
+                                <th>Total</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="recentTableBody"></tbody>
                     </table>
                 </div>
-                <div class="pagination-bar">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
-                    <span id="paginationInfo">Page 1</span>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="changePage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                <div class="pagination-bar recent-pagination-bar">
+                    <nav class="pagination-nav pagination-nav-left" aria-label="Recent stock in pages">
+                        <button type="button" class="pagination-link pagination-direction" id="recentPrevPage" onclick="changePage(-1)">&lt;&lt;Previous</button>
+                        <span id="recentPageLinks" class="recent-page-links"></span>
+                    </nav>
+                    <div class="pagination-summary" id="paginationInfo">Page 1 of 1</div>
+                    <nav class="pagination-nav pagination-nav-right" aria-label="Next recent stock in page">
+                        <button type="button" class="pagination-link pagination-direction" id="recentNextPage" onclick="changePage(1)">Next&gt;&gt;</button>
+                    </nav>
                 </div>
             </div>
         </div>
@@ -480,7 +543,10 @@ const itemStats = <?= json_encode($itemStats) ?>;
 const latestPurchase = <?= json_encode($latestPurchase) ?>;
 let filteredRecent = [...recentData];
 let recentPage = 1;
-const pageSize = 10;
+const pageSize = 1;
+const stockSteps = ['product', 'supplier', 'reference', 'stock', 'review'];
+let currentStockStep = 'product';
+let selectedStockInItem = null;
 
 function formatCurrency(value, symbol = 'UGX') {
     if (value === null || value === undefined || isNaN(value)) return '—';
@@ -489,6 +555,7 @@ function formatCurrency(value, symbol = 'UGX') {
 
 function setProductPreview(item) {
     if (!item) return;
+    selectedStockInItem = item;
     document.getElementById('productSku').value = item.item_code || '';
     document.getElementById('productCategory').value = item.category_name || '';
     document.getElementById('productBrand').value = item.asset_type || 'N/A';
@@ -559,6 +626,8 @@ function calculateTotals() {
     const grandTotal = totalCost + taxAmount - discountAmount;
     const expectedRevenue = qty * sell;
     const margin = cost > 0 ? ((sell - cost) / cost) * 100 : 0;
+    const currentStock = selectedStockInItem ? (parseInt(selectedStockInItem.current_stock, 10) || 0) : null;
+    const projectedStock = currentStock === null ? null : currentStock + qty;
 
     document.getElementById('calcTotalCost').textContent = formatCurrency(totalCost);
     document.getElementById('calcTaxAmount').textContent = formatCurrency(taxAmount);
@@ -566,6 +635,50 @@ function calculateTotals() {
     document.getElementById('calcGrandTotal').textContent = formatCurrency(grandTotal);
     document.getElementById('calcExpectedRevenue').textContent = formatCurrency(expectedRevenue);
     document.getElementById('calcProfitMargin').textContent = `${margin.toFixed(2)}%`;
+    document.getElementById('previewQtyIn').textContent = qty ? qty : '0';
+    document.getElementById('previewProjectedStock').textContent = projectedStock === null ? '—' : projectedStock;
+    document.getElementById('previewGrandTotal').textContent = formatCurrency(grandTotal);
+    updateStockReview(grandTotal, projectedStock);
+}
+
+function updateStockReview(grandTotal = null, projectedStock = null) {
+    const qty = parseFloat(document.getElementById('qty').value) || 0;
+    const supplierSelect = document.getElementById('supplierSelect');
+    const selectedSupplier = supplierSelect.options[supplierSelect.selectedIndex];
+    const dateValue = document.getElementById('transactionDate').value || new Date().toISOString().slice(0, 10);
+    if (projectedStock === null && selectedStockInItem) {
+        projectedStock = (parseInt(selectedStockInItem.current_stock, 10) || 0) + qty;
+    }
+    const totalText = grandTotal === null ? document.getElementById('calcGrandTotal').textContent : formatCurrency(grandTotal);
+
+    document.getElementById('reviewProduct').textContent = selectedStockInItem ? `${selectedStockInItem.item_code} - ${selectedStockInItem.name}` : 'Select product';
+    document.getElementById('reviewSupplier').textContent = selectedSupplier && selectedSupplier.value ? selectedSupplier.textContent : 'Select supplier';
+    document.getElementById('reviewQty').textContent = qty ? qty : '0';
+    document.getElementById('reviewProjectedStock').textContent = projectedStock === null ? '—' : projectedStock;
+    document.getElementById('reviewDate').textContent = dateValue;
+    document.getElementById('reviewGrandTotal').textContent = totalText;
+}
+
+function showStockInStep(step) {
+    if (!stockSteps.includes(step)) return;
+    currentStockStep = step;
+    document.querySelectorAll('#stockInForm .wizard-step-panel').forEach(panel => {
+        panel.classList.toggle('active', panel.dataset.step === step);
+    });
+    document.querySelectorAll('#stockInForm .wizard-step-btn').forEach(button => {
+        button.classList.toggle('active', button.dataset.stepTarget === step);
+    });
+    const stepIndex = stockSteps.indexOf(step);
+    document.getElementById('stockWizardBack').disabled = stepIndex === 0;
+    document.getElementById('stockWizardNext').style.display = step === 'review' ? 'none' : 'inline-flex';
+    document.getElementById('stockInSubmitButton').style.display = step === 'review' ? 'inline-flex' : 'none';
+    updateStockReview();
+}
+
+function moveStockStep(direction) {
+    const currentIndex = stockSteps.indexOf(currentStockStep);
+    const nextIndex = Math.min(stockSteps.length - 1, Math.max(0, currentIndex + direction));
+    showStockInStep(stockSteps[nextIndex]);
 }
 
 function renderPurchaseHistory(itemId) {
@@ -591,7 +704,7 @@ function buildRecentTable() {
     const visible = filteredRecent.slice(start, start + pageSize);
 
     if (!visible.length) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center">No recent stock-in records match your filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No recent stock-in records match your filters.</td></tr>';
     } else {
         tbody.innerHTML = visible.map(tx => `
             <tr>
@@ -599,11 +712,7 @@ function buildRecentTable() {
                 <td><strong>${tx.item_code}</strong><br><small>${tx.item_name}</small></td>
                 <td>${tx.supplier_name || '—'}</td>
                 <td>${tx.quantity}</td>
-                <td>${formatCurrency(tx.unit_price)}</td>
                 <td>${formatCurrency(tx.unit_price * tx.quantity)}</td>
-                <td>${tx.branch_name || '—'}</td>
-                <td>${tx.received_by || '—'}</td>
-                <td><span class="badge badge-success">Received</span></td>
                 <td class="table-actions">
                     <button type="button" class="btn btn-outline-secondary btn-sm" onclick="viewRecent(${tx.id})"><i class="fa-solid fa-eye"></i></button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" onclick="editRecent(${tx.id})"><i class="fa-solid fa-pen"></i></button>
@@ -612,7 +721,22 @@ function buildRecentTable() {
             </tr>
         `).join('');
     }
-    document.getElementById('paginationInfo').textContent = `Page ${recentPage} of ${Math.max(1, Math.ceil(filteredRecent.length / pageSize))}`;
+    renderRecentPagination();
+}
+
+function renderRecentPagination() {
+    const maxPage = Math.max(1, Math.ceil(filteredRecent.length / pageSize));
+    recentPage = Math.min(maxPage, Math.max(1, recentPage));
+    const links = document.getElementById('recentPageLinks');
+    links.innerHTML = Array.from({ length: maxPage }, (_, index) => {
+        const page = index + 1;
+        return `<button type="button" class="pagination-link ${page === recentPage ? 'active' : ''}" onclick="goRecentPage(${page})">${page}</button>`;
+    }).join('');
+    document.getElementById('paginationInfo').textContent = `Page ${recentPage} of ${maxPage}`;
+    document.getElementById('recentPrevPage').classList.toggle('disabled', recentPage <= 1);
+    document.getElementById('recentPrevPage').disabled = recentPage <= 1;
+    document.getElementById('recentNextPage').classList.toggle('disabled', recentPage >= maxPage);
+    document.getElementById('recentNextPage').disabled = recentPage >= maxPage;
 }
 
 function updateRecentFilters() {
@@ -638,6 +762,12 @@ function updateRecentFilters() {
 function changePage(direction) {
     const maxPage = Math.max(1, Math.ceil(filteredRecent.length / pageSize));
     recentPage = Math.min(maxPage, Math.max(1, recentPage + direction));
+    buildRecentTable();
+}
+
+function goRecentPage(page) {
+    const maxPage = Math.max(1, Math.ceil(filteredRecent.length / pageSize));
+    recentPage = Math.min(maxPage, Math.max(1, page));
     buildRecentTable();
 }
 
@@ -682,6 +812,7 @@ function editRecent(id) {
     document.getElementById('stockInSubmitButton').innerHTML = '<i class="fa-solid fa-pen me-2"></i> Update Stock In';
     document.getElementById('stockInForm').scrollIntoView({behavior: 'smooth'});
     calculateTotals();
+    showStockInStep('review');
 }
 
 function deleteRecent(id) {
@@ -727,11 +858,22 @@ function printRecentStock() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('#stockInForm .wizard-step-btn').forEach(button => {
+        button.addEventListener('click', () => showStockInStep(button.dataset.stepTarget));
+    });
+    document.getElementById('stockWizardBack').addEventListener('click', () => moveStockStep(-1));
+    document.getElementById('stockWizardNext').addEventListener('click', () => moveStockStep(1));
+    document.getElementById('stockWizardSaveDraft').addEventListener('click', () => {
+        Swal.fire({ icon: 'info', title: 'Draft kept on screen', text: 'Finish the review step when you are ready to record stock.', toast: true, position: 'top-end', timer: 2600, showConfirmButton: false });
+    });
     document.getElementById('qty').addEventListener('input', calculateTotals);
     document.getElementById('unitPrice').addEventListener('input', calculateTotals);
     document.getElementById('sellingPrice').addEventListener('input', calculateTotals);
     document.getElementById('taxPercent').addEventListener('input', calculateTotals);
     document.getElementById('discountPercent').addEventListener('input', calculateTotals);
+    document.getElementById('transactionDate').addEventListener('input', updateStockReview);
+    document.getElementById('referenceNumber').addEventListener('input', updateStockReview);
+    document.getElementById('remarks').addEventListener('input', updateStockReview);
     document.getElementById('supplierSelect').addEventListener('change', () => {
         const supplierId = parseInt(document.getElementById('supplierSelect').value, 10);
         const selectedSupplier = <?= json_encode(array_column($suppliers, null, 'id')) ?>;
@@ -739,7 +881,10 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('supplierContact').textContent = supplier.phone || '—';
         document.getElementById('supplierEmail').textContent = supplier.email || '—';
         document.getElementById('supplierAddress').textContent = supplier.address || '—';
+        updateStockReview();
     });
+    showStockInStep('product');
+    calculateTotals();
     buildRecentTable();
 });
 </script>
@@ -756,7 +901,7 @@ window.addEventListener('DOMContentLoaded', () => {
 .filter-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .date-range{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .table-actions button{margin-right:4px;}
-.pagination-bar{display:flex;justify-content:center;align-items:center;gap:12px;padding-top:12px;}
+.recent-pagination-bar{margin-top:12px;}
 @media (max-width: 1024px){.section-grid-2{grid-template-columns:1fr;}.filter-row,.date-range{grid-template-columns:1fr;}}
 @media print {body *{visibility:hidden;}#recentTable, #recentTable *,.page-header, .card-header, .card-body, .table-actions, .btn, .table-filters, .pagination-bar{visibility:visible;}#stockInForm, .preview-card, .supplier-details, .history-list{visibility:visible;} .page-header{position:relative;} .card{border:none;box-shadow:none;}} 
 </style>
