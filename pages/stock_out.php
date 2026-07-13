@@ -288,105 +288,284 @@ include __DIR__ . '/../includes/header.php';
     <aside class="stock-side-panel">
         <div class="card">
             <div class="card-header"><h3>Issue Preview</h3></div>
-            <div class="card-body">
-                <div class="stock-preview-title">
-                    <strong id="outPreviewName">Select an item</strong>
-                    <span id="outPreviewCode">SKU: -</span>
+            <div class="card-body preview-card">
+                <div class="preview-header">
+                    <div>
+                        <h4 id="outPreviewName">Select an item</h4>
+                        <p id="outPreviewCode" class="text-muted">SKU: -</p>
+                    </div>
                 </div>
-                <div class="stock-metric-grid">
-                    <div><span>Available</span><strong id="outAvailable">-</strong></div>
-                    <div><span>After Issue</span><strong id="outAfter">-</strong></div>
-                    <div><span>Minimum</span><strong id="outMinimum">-</strong></div>
-                    <div><span>Unit Value</span><strong id="outUnitValue">-</strong></div>
-                    <div><span>Total Value</span><strong id="outTotalValue">-</strong></div>
-                    <div><span>Branch</span><strong id="outBranch">-</strong></div>
+                <div class="preview-grid">
+                    <div><strong>Available</strong><span id="outAvailable">-</span></div>
+                    <div><strong>After issue</strong><span id="outAfter">-</span></div>
+                    <div><strong>Minimum</strong><span id="outMinimum">-</span></div>
+                    <div><strong>Quantity out</strong><span id="outQtyPreview">0</span></div>
+                    <div><strong>Unit value</strong><span id="outUnitValue">-</span></div>
+                    <div><strong>Total value</strong><span id="outTotalValue">-</span></div>
+                    <div><strong>Branch</strong><span id="outBranch">-</span></div>
+                    <div><strong>Status</strong><span id="outStatus">-</span></div>
                 </div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
+        <div class="card recent-stock-card">
+            <div class="card-header d-flex align-items-center justify-content-between">
                 <h3>Recent Stock Out</h3>
                 <a href="transactions.php?type=stock_out" class="card-link">View all</a>
             </div>
-            <div class="card-body p0">
-                <?php if ($recent): ?>
+            <div class="card-body">
                 <div class="table-responsive">
-                    <table class="data-table">
-                        <thead><tr><th>Item</th><th>Qty</th><th>Ref</th><th>Issued By</th><th>Date</th></tr></thead>
-                        <tbody>
-                        <?php foreach ($recent as $tx): ?>
-                        <tr>
-                            <td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?> - <?= clean($tx['branch_name']) ?></span></td>
-                            <td><span class="badge badge-blue"><?= number_format((int)$tx['quantity']) ?> <?= clean($tx['unit']) ?></span></td>
-                            <td><?= clean($tx['reference_number'] ?: '-') ?></td>
-                            <td><?= clean($tx['issued_by']) ?></td>
-                            <td><?= date('d M Y', strtotime($tx['transaction_date'])) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                        </tbody>
+                    <table class="data-table" id="recentOutTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Product</th>
+                                <th>Issued By</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentOutTableBody"></tbody>
                     </table>
                 </div>
-                <?= renderPaginationBar($pagination, $recentCount) ?>
-                <?php else: ?>
-                <div class="empty-state"><p>No stock-out transactions yet.</p></div>
-                <?php endif; ?>
+                <div class="pagination-bar recent-pagination-bar">
+                    <nav class="pagination-nav pagination-nav-left" aria-label="Recent stock out pages">
+                        <button type="button" class="pagination-link pagination-direction" id="recentOutPrevPage" onclick="changeOutPage(-1)">Prev</button>
+                        <span id="recentOutPageLinks" class="recent-page-links"></span>
+                    </nav>
+                    <div class="pagination-summary" id="recentOutPaginationInfo">Page 1 of 1</div>
+                    <nav class="pagination-nav pagination-nav-right" aria-label="Next recent stock out page">
+                        <button type="button" class="pagination-link pagination-direction" id="recentOutNextPage" onclick="changeOutPage(1)">Next</button>
+                    </nav>
+                </div>
             </div>
         </div>
     </aside>
 </div>
 
 <script>
+const stockOutItems = <?= json_encode(array_values($items)) ?>;
+const recentOutData = <?= json_encode(array_values($recent)) ?>;
+let selectedStockOutItem = null;
+let filteredRecentOut = [...recentOutData];
+let recentOutPage = 1;
+const recentOutPageSize = 1;
+const stockOutSteps = ['product', 'issue', 'reference', 'review'];
+let currentStockOutStep = 'product';
+
 function formatOutCurrency(value) {
     if (value === null || value === undefined || isNaN(value)) return '-';
     return 'UGX ' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-function selectedStockOutOption() {
-    const select = document.getElementById('stockOutItem');
-    return select && select.selectedIndex > 0 ? select.options[select.selectedIndex] : null;
+function findStockOutItem(value) {
+    if (!value) return null;
+    const normalized = value.trim().toLowerCase();
+    let item = stockOutItems.find(row => `${row.item_code} - ${row.name}`.toLowerCase() === normalized);
+    if (!item) item = stockOutItems.find(row => row.item_code.toLowerCase() === normalized || row.name.toLowerCase() === normalized);
+    if (!item) {
+        const code = normalized.split(' - ')[0];
+        item = stockOutItems.find(row => row.item_code.toLowerCase() === code);
+    }
+    return item || null;
 }
 
-function setStockOutItem(select) {
-    const option = select.options[select.selectedIndex];
+function setStockOutItem(item) {
     const qty = document.getElementById('stockOutQty');
-    if (!option || !option.value) {
+    if (!item) {
+        selectedStockOutItem = null;
+        document.getElementById('stockOutItemId').value = '';
         qty.removeAttribute('max');
         document.getElementById('stockOutLimit').textContent = 'Select an item to see available stock.';
         updateStockOutPreview();
         return;
     }
-    qty.max = option.dataset.stock || '';
-    document.getElementById('stockOutLimit').textContent = `${option.dataset.stock || 0} ${option.dataset.unit || 'unit(s)'} available`;
+    selectedStockOutItem = item;
+    document.getElementById('stockOutItemId').value = item.id;
+    document.getElementById('stockOutProductSearch').value = `${item.item_code} - ${item.name}`;
+    document.getElementById('stockOutBarcode').value = item.item_code || '';
+    document.getElementById('stockOutSku').value = item.item_code || '';
+    document.getElementById('stockOutCategory').value = item.category_name || '';
+    document.getElementById('stockOutAvailableField').value = `${item.current_stock || 0} ${item.unit || ''}`;
+    document.getElementById('stockOutUnitField').value = item.unit || '';
+    qty.max = item.current_stock || '';
+    document.getElementById('stockOutLimit').textContent = `${item.current_stock || 0} ${item.unit || 'unit(s)'} available`;
     updateStockOutPreview();
 }
 
+function onStockOutProductSearch(value) {
+    const item = findStockOutItem(value);
+    if (item) setStockOutItem(item);
+}
+
+function onStockOutBarcode(value) {
+    const item = findStockOutItem(value);
+    if (item) {
+        setStockOutItem(item);
+    } else if (value.trim()) {
+        Swal.fire({ icon: 'warning', title: 'Product not found', text: 'No available item matches that SKU.', toast: true, position: 'top-end', timer: 2600, showConfirmButton: false });
+    }
+}
+
 function updateStockOutPreview() {
-    const option = selectedStockOutOption();
+    const item = selectedStockOutItem;
     const qty = parseInt(document.getElementById('stockOutQty').value, 10) || 0;
-    if (!option) {
-        ['outPreviewName','outPreviewCode','outAvailable','outAfter','outMinimum','outUnitValue','outTotalValue','outBranch'].forEach(id => {
+    if (!item) {
+        ['outPreviewName','outPreviewCode','outAvailable','outAfter','outMinimum','outUnitValue','outTotalValue','outBranch','outStatus'].forEach(id => {
             document.getElementById(id).textContent = id === 'outPreviewName' ? 'Select an item' : '-';
         });
+        document.getElementById('outQtyPreview').textContent = '0';
+        updateStockOutReview();
         return;
     }
 
-    const stock = parseInt(option.dataset.stock, 10) || 0;
-    const min = parseInt(option.dataset.min, 10) || 0;
-    const price = parseFloat(option.dataset.price) || 0;
+    const stock = parseInt(item.current_stock, 10) || 0;
+    const min = parseInt(item.minimum_stock, 10) || 0;
+    const price = parseFloat(item.unit_price) || 0;
     const after = stock - qty;
-    document.getElementById('outPreviewName').textContent = option.dataset.name || 'Selected item';
-    document.getElementById('outPreviewCode').textContent = `SKU: ${option.dataset.code || '-'}`;
-    document.getElementById('outAvailable').textContent = `${stock} ${option.dataset.unit || ''}`;
-    document.getElementById('outAfter').textContent = qty ? `${after} ${option.dataset.unit || ''}` : '-';
-    document.getElementById('outMinimum').textContent = `${min} ${option.dataset.unit || ''}`;
+    document.getElementById('outPreviewName').textContent = item.name || 'Selected item';
+    document.getElementById('outPreviewCode').textContent = `SKU: ${item.item_code || '-'}`;
+    document.getElementById('outAvailable').textContent = `${stock} ${item.unit || ''}`;
+    document.getElementById('outAfter').textContent = qty ? `${after} ${item.unit || ''}` : '-';
+    document.getElementById('outMinimum').textContent = `${min} ${item.unit || ''}`;
+    document.getElementById('outQtyPreview').textContent = qty ? qty : '0';
     document.getElementById('outUnitValue').textContent = formatOutCurrency(price);
     document.getElementById('outTotalValue').textContent = qty ? formatOutCurrency(price * qty) : '-';
-    document.getElementById('outBranch').textContent = option.dataset.branch || '-';
+    document.getElementById('outBranch').textContent = item.branch_name || '-';
+    document.getElementById('outStatus').textContent = qty > stock ? 'Insufficient' : (qty ? 'Ready' : '-');
     document.getElementById('stockOutSubmit').disabled = qty > stock;
     document.getElementById('stockOutLimit').textContent = qty > stock
-        ? `Only ${stock} ${option.dataset.unit || 'unit(s)'} available`
-        : `${stock} ${option.dataset.unit || 'unit(s)'} available`;
+        ? `Only ${stock} ${item.unit || 'unit(s)'} available`
+        : `${stock} ${item.unit || 'unit(s)'} available`;
+    updateStockOutReview();
 }
+
+function updateStockOutReview() {
+    const qty = parseInt(document.getElementById('stockOutQty').value, 10) || 0;
+    const stock = selectedStockOutItem ? (parseInt(selectedStockOutItem.current_stock, 10) || 0) : null;
+    const price = selectedStockOutItem ? (parseFloat(selectedStockOutItem.unit_price) || 0) : 0;
+    document.getElementById('outReviewProduct').textContent = selectedStockOutItem ? `${selectedStockOutItem.item_code} - ${selectedStockOutItem.name}` : 'Select product';
+    document.getElementById('outReviewQty').textContent = qty ? qty : '0';
+    document.getElementById('outReviewAfter').textContent = stock === null || !qty ? '-' : `${stock - qty} ${selectedStockOutItem.unit || ''}`;
+    document.getElementById('outReviewIssuedTo').textContent = document.getElementById('stockOutIssuedTo').value || '-';
+    document.getElementById('outReviewDate').textContent = document.getElementById('stockOutDate').value || new Date().toISOString().slice(0, 10);
+    document.getElementById('outReviewTotal').textContent = qty ? formatOutCurrency(price * qty) : '-';
+}
+
+function showStockOutStep(step) {
+    if (!stockOutSteps.includes(step)) return;
+    currentStockOutStep = step;
+    document.querySelectorAll('#stockOutForm .wizard-step-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.step === step));
+    document.querySelectorAll('#stockOutForm .wizard-step-btn').forEach(button => button.classList.toggle('active', button.dataset.stepTarget === step));
+    const stepIndex = stockOutSteps.indexOf(step);
+    document.getElementById('stockOutWizardBack').disabled = stepIndex === 0;
+    document.getElementById('stockOutWizardNext').style.display = step === 'review' ? 'none' : 'inline-flex';
+    document.getElementById('stockOutSubmit').style.display = step === 'review' ? 'inline-flex' : 'none';
+    updateStockOutReview();
+}
+
+function moveStockOutStep(direction) {
+    const currentIndex = stockOutSteps.indexOf(currentStockOutStep);
+    const nextIndex = Math.min(stockOutSteps.length - 1, Math.max(0, currentIndex + direction));
+    showStockOutStep(stockOutSteps[nextIndex]);
+}
+
+function buildRecentOutTable() {
+    const tbody = document.getElementById('recentOutTableBody');
+    const start = (recentOutPage - 1) * recentOutPageSize;
+    const visible = filteredRecentOut.slice(start, start + recentOutPageSize);
+    if (!visible.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No recent stock-out records yet.</td></tr>';
+    } else {
+        tbody.innerHTML = visible.map(tx => `
+            <tr>
+                <td>${new Date(tx.transaction_date).toLocaleDateString('en-GB')}</td>
+                <td><strong>${tx.item_code}</strong> <small>${tx.item_name}</small></td>
+                <td>${tx.issued_by || '-'}</td>
+                <td>${tx.quantity}</td>
+                <td>${formatOutCurrency(tx.unit_price * tx.quantity)}</td>
+                <td class="table-actions">
+                    <button type="button" class="btn btn-outline-secondary btn-sm action-icon-btn action-view" title="View stock-out" aria-label="View stock-out" onclick="viewRecentOut(${tx.id})">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    renderRecentOutPagination();
+}
+
+function renderRecentOutPagination() {
+    const maxPage = Math.max(1, Math.ceil(filteredRecentOut.length / recentOutPageSize));
+    recentOutPage = Math.min(maxPage, Math.max(1, recentOutPage));
+    const links = document.getElementById('recentOutPageLinks');
+    let pageItems;
+    if (maxPage <= 5) {
+        pageItems = Array.from({ length: maxPage }, (_, index) => index + 1);
+    } else if (recentOutPage <= 3) {
+        pageItems = [1, 2, 3, 'ellipsis-end', maxPage];
+    } else if (recentOutPage >= maxPage - 2) {
+        pageItems = [1, 'ellipsis-start', maxPage - 2, maxPage - 1, maxPage];
+    } else {
+        pageItems = [1, 'ellipsis-start', recentOutPage, 'ellipsis-end', maxPage];
+    }
+    links.innerHTML = pageItems.map(page => {
+        if (String(page).startsWith('ellipsis')) return '<span class="pagination-ellipsis">...</span>';
+        return `<button type="button" class="pagination-link ${page === recentOutPage ? 'active' : ''}" onclick="goRecentOutPage(${page})">${page}</button>`;
+    }).join('');
+    document.getElementById('recentOutPaginationInfo').textContent = `Page ${recentOutPage} of ${maxPage}`;
+    document.getElementById('recentOutPrevPage').classList.toggle('disabled', recentOutPage <= 1);
+    document.getElementById('recentOutPrevPage').disabled = recentOutPage <= 1;
+    document.getElementById('recentOutNextPage').classList.toggle('disabled', recentOutPage >= maxPage);
+    document.getElementById('recentOutNextPage').disabled = recentOutPage >= maxPage;
+}
+
+function changeOutPage(direction) {
+    const maxPage = Math.max(1, Math.ceil(filteredRecentOut.length / recentOutPageSize));
+    recentOutPage = Math.min(maxPage, Math.max(1, recentOutPage + direction));
+    buildRecentOutTable();
+}
+
+function goRecentOutPage(page) {
+    const maxPage = Math.max(1, Math.ceil(filteredRecentOut.length / recentOutPageSize));
+    recentOutPage = Math.min(maxPage, Math.max(1, page));
+    buildRecentOutTable();
+}
+
+function viewRecentOut(id) {
+    const tx = recentOutData.find(row => row.id === id);
+    if (!tx) return;
+    Swal.fire({
+        title: 'Stock-Out Details',
+        html: `
+            <strong>Product:</strong> ${tx.item_code} - ${tx.item_name}<br>
+            <strong>Quantity:</strong> ${tx.quantity} ${tx.unit || ''}<br>
+            <strong>Total Value:</strong> ${formatOutCurrency(tx.unit_price * tx.quantity)}<br>
+            <strong>Issued By:</strong> ${tx.issued_by || '-'}<br>
+            <strong>Branch:</strong> ${tx.branch_name || '-'}<br>
+            <strong>Date:</strong> ${new Date(tx.transaction_date).toLocaleDateString('en-GB')}<br>
+            <strong>Reference:</strong> ${tx.reference_number || '-'}
+        `,
+        width: 650,
+        confirmButtonText: 'Close'
+    });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('#stockOutForm .wizard-step-btn').forEach(button => {
+        button.addEventListener('click', () => showStockOutStep(button.dataset.stepTarget));
+    });
+    document.getElementById('stockOutWizardBack').addEventListener('click', () => moveStockOutStep(-1));
+    document.getElementById('stockOutWizardNext').addEventListener('click', () => moveStockOutStep(1));
+    document.getElementById('stockOutWizardSaveDraft').addEventListener('click', () => {
+        Swal.fire({ icon: 'info', title: 'Draft kept on screen', text: 'Finish the review step when ready to issue stock.', toast: true, position: 'top-end', timer: 2600, showConfirmButton: false });
+    });
+    ['stockOutQty','stockOutIssuedTo','stockOutPurpose','stockOutReference','stockOutDate'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateStockOutPreview);
+    });
+    showStockOutStep('product');
+    buildRecentOutTable();
+});
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
