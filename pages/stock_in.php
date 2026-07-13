@@ -523,12 +523,12 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="pagination-bar recent-pagination-bar">
                     <nav class="pagination-nav pagination-nav-left" aria-label="Recent stock in pages">
-                        <button type="button" class="pagination-link pagination-direction" id="recentPrevPage" onclick="changePage(-1)">&lt;&lt;Previous</button>
+                        <button type="button" class="pagination-link pagination-direction" id="recentPrevPage" onclick="changePage(-1)">Prev</button>
                         <span id="recentPageLinks" class="recent-page-links"></span>
                     </nav>
                     <div class="pagination-summary" id="paginationInfo">Page 1 of 1</div>
                     <nav class="pagination-nav pagination-nav-right" aria-label="Next recent stock in page">
-                        <button type="button" class="pagination-link pagination-direction" id="recentNextPage" onclick="changePage(1)">Next&gt;&gt;</button>
+                        <button type="button" class="pagination-link pagination-direction" id="recentNextPage" onclick="changePage(1)">Next</button>
                     </nav>
                 </div>
             </div>
@@ -728,8 +728,20 @@ function renderRecentPagination() {
     const maxPage = Math.max(1, Math.ceil(filteredRecent.length / pageSize));
     recentPage = Math.min(maxPage, Math.max(1, recentPage));
     const links = document.getElementById('recentPageLinks');
-    links.innerHTML = Array.from({ length: maxPage }, (_, index) => {
-        const page = index + 1;
+    let pageItems;
+    if (maxPage <= 5) {
+        pageItems = Array.from({ length: maxPage }, (_, index) => index + 1);
+    } else if (recentPage <= 3) {
+        pageItems = [1, 2, 3, 'ellipsis-end', maxPage];
+    } else if (recentPage >= maxPage - 2) {
+        pageItems = [1, 'ellipsis-start', maxPage - 2, maxPage - 1, maxPage];
+    } else {
+        pageItems = [1, 'ellipsis-start', recentPage, 'ellipsis-end', maxPage];
+    }
+    links.innerHTML = pageItems.map(page => {
+        if (String(page).startsWith('ellipsis')) {
+            return '<span class="pagination-ellipsis">...</span>';
+        }
         return `<button type="button" class="pagination-link ${page === recentPage ? 'active' : ''}" onclick="goRecentPage(${page})">${page}</button>`;
     }).join('');
     document.getElementById('paginationInfo').textContent = `Page ${recentPage} of ${maxPage}`;
@@ -889,10 +901,10 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <style>
-.product-preview-card .preview-header{display:flex;gap:16px;align-items:center;margin-bottom:18px;}
-.preview-card img{width:140px;height:140px;object-fit:cover;border-radius:18px;border:1px solid #e2e8f0;}
-.preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
-.preview-grid div{background:#f8fbff;padding:12px 14px;border-radius:12px;border:1px solid #e2e8f0;}
+.product-preview-card .preview-header,.preview-card .preview-header{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+.preview-card img{width:74px;height:74px;object-fit:cover;border-radius:12px;border:1px solid #e2e8f0;}
+.preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.preview-grid div{background:#f8fbff;padding:8px 10px;border-radius:10px;border:1px solid #e2e8f0;min-height:48px;}
 .supplier-details div, .history-item{display:flex;justify-content:space-between;gap:10px;padding:.5rem 0;border-bottom:1px solid #eef2f7;}
 .history-title{font-weight:700;color:#344054;margin-bottom:10px;}
 .history-list{display:grid;gap:8px;}
