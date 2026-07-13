@@ -30,29 +30,61 @@ define('SMTP_FROM_EMAIL', 'no-reply@localhost');
 define('SMTP_FROM_NAME', SITE_SHORT);
 
 // Connect
-function db(): PDO {
+function createDbConnection(): PDO {
+    try {
+        $pdo = new PDO(
+            "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+            DB_USER,
+            DB_PASS,
+            [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => false,
+                PDO::ATTR_PERSISTENT         => false,
+                PDO::ATTR_TIMEOUT            => 5,
+            ]
+        );
+        $pdo->exec("SET time_zone = '" . APP_TIMEZONE_OFFSET . "'");
+        return $pdo;
+    } catch (PDOException $e) {
+        die('<div style="font-family:sans-serif;padding:40px;background:#fff0f0;border-left:4px solid #e53e3e;margin:20px;">
+            <h3 style="color:#e53e3e;">Database Connection Failed</h3>
+            <p>Please ensure XAMPP MySQL is running and the database <strong>uiri_ims</strong> has been imported.</p>
+            <small style="color:#666;">Error: ' . htmlspecialchars($e->getMessage()) . '</small>
+        </div>');
+    }
+}
+
+function isLostDatabaseConnection(PDOException $e): bool {
+    $code = (int)($e->errorInfo[1] ?? 0);
+    $message = $e->getMessage();
+
+    return $code === 2006
+        || $code === 2013
+        || str_contains($message, '2006')
+        || str_contains($message, '2013')
+        || stripos($message, 'server has gone away') !== false
+        || stripos($message, 'Lost connection') !== false;
+}
+
+function db(bool $forceReconnect = false): PDO {
     static $pdo = null;
-    if ($pdo === null) {
-        try {
-            $pdo = new PDO(
-                "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
-                DB_USER,
-                DB_PASS,
-                [
-                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES   => false,
-                ]
-            );
-            $pdo->exec("SET time_zone = '" . APP_TIMEZONE_OFFSET . "'");
-        } catch (PDOException $e) {
-            die('<div style="font-family:sans-serif;padding:40px;background:#fff0f0;border-left:4px solid #e53e3e;margin:20px;">
-                <h3 style="color:#e53e3e;">Database Connection Failed</h3>
-                <p>Please ensure XAMPP MySQL is running and the database <strong>uiri_ims</strong> has been imported.</p>
-                <small style="color:#666;">Error: ' . htmlspecialchars($e->getMessage()) . '</small>
-            </div>');
+
+    if ($forceReconnect || $pdo === null) {
+        $pdo = createDbConnection();
+        return $pdo;
+    }
+
+    try {
+        $pdo->query('SELECT 1');
+    } catch (PDOException $e) {
+        if (isLostDatabaseConnection($e)) {
+            $pdo = createDbConnection();
+        } else {
+            throw $e;
         }
     }
+
     return $pdo;
 }
 
@@ -274,10 +306,21 @@ function ugx(float $amount): string {
 }
 
 function ensureUsersProfilePhotoColumn(): void {
-    $pdo = db();
-    $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'profile_photo'");
-    if ($check->fetch()) return;
-    $pdo->exec("ALTER TABLE users ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL");
+    try {
+        $pdo = db();
+        $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'profile_photo'");
+        if ($check->fetch()) return;
+        $pdo->exec("ALTER TABLE users ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL");
+    } catch (PDOException $e) {
+        if (isLostDatabaseConnection($e)) {
+            $pdo = db(true);
+            $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'profile_photo'");
+            if ($check->fetch()) return;
+            $pdo->exec("ALTER TABLE users ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL");
+            return;
+        }
+        throw $e;
+    }
 }
 
 function profilePhotoUrl(?array $user = null): string {

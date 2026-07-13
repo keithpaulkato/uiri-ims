@@ -67,13 +67,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $remember = isset($_POST['remember_me']);
 
         if ($username && $password) {
-            $stmt = db()->prepare("
+            $loginSql = "
                 SELECT u.*, r.name AS role, b.name AS branch_name
                 FROM users u
                 JOIN roles r ON u.role_id = r.id
                 JOIN branches b ON u.branch_id = b.id
                 WHERE (u.username = ? OR u.email = ?) AND u.is_active = 1
-            ");
+            ";
+            try {
+                $stmt = db()->prepare($loginSql);
+            } catch (PDOException $e) {
+                if (!isLostDatabaseConnection($e)) {
+                    throw $e;
+                }
+                $stmt = db(true)->prepare($loginSql);
+            }
             $stmt->execute([$username, $username]);
             $user = $stmt->fetch();
 
