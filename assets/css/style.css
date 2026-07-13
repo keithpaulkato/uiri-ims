@@ -727,11 +727,13 @@ select.form-control { cursor: pointer; color: var(--gold); }
 .recent-stock-card .data-table th:nth-child(6),
 .recent-stock-card .data-table td:nth-child(6) { width: 15%; text-align: right; }
 .recent-stock-card .table-actions { white-space: nowrap; text-align: right; }
-.recent-stock-card .table-actions .action-icon-btn { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin-right: 3px; border-radius: 8px; color: #12314f; background: #fff; border: 1px solid #b8c7d8; box-shadow: none; opacity: 1; }
-.recent-stock-card .table-actions .action-icon-btn i { display: inline-block; font-size: .86rem; line-height: 1; color: currentColor; opacity: 1; }
-.recent-stock-card .table-actions .action-icon-btn:hover { background: #f0f7fd; border-color: var(--sky); }
-.recent-stock-card .table-actions .btn-outline-danger { color: #b42318; border-color: rgba(180,35,24,.36); }
-.recent-stock-card .table-actions .btn-outline-danger:hover { background: #fff3f2; border-color: #f04438; }
+.recent-stock-card .table-actions .action-icon-btn { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin-right: 3px; border-radius: 8px; color: #12314f; background: #fff; border: 1px solid #b8c7d8; box-shadow: none; opacity: 1; vertical-align: middle; }
+.recent-stock-card .table-actions .action-icon-btn svg { width: 15px; height: 15px; display: block; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.recent-stock-card .table-actions .action-icon-btn:hover { background: #f0f7fd; border-color: var(--sky); color: #0f5f8f; }
+.recent-stock-card .table-actions .action-edit { color: #175cd3; border-color: rgba(23,92,211,.28); }
+.recent-stock-card .table-actions .action-edit:hover { background: #eff6ff; border-color: #84caff; color: #1849a9; }
+.recent-stock-card .table-actions .action-delete { color: #b42318; border-color: rgba(180,35,24,.36); }
+.recent-stock-card .table-actions .action-delete:hover { background: #fff3f2; border-color: #f04438; color: #912018; }
 .recent-pagination-bar { position: relative; display: flex !important; align-items: center; min-height: 42px; gap: 8px; overflow: hidden; padding-right: 0; }
 .recent-pagination-bar .pagination-nav-left,
 .recent-pagination-bar .recent-page-links { display: inline-flex; align-items: center; gap: 5px; flex-wrap: nowrap; }

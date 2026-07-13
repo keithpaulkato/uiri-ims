@@ -102,8 +102,6 @@ $items = $pdo->query("
 ")->fetchAll();
 
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
-$recentCount = (int)$pdo->query("SELECT COUNT(*) FROM stock_transactions t WHERE t.transaction_type = 'stock_out' $txClause")->fetchColumn();
-$pagination = getPagination($recentCount, 10);
 $recent = $pdo->query("
     SELECT t.*, i.name AS item_name, i.item_code, i.unit, b.name AS branch_name, u.full_name AS issued_by
     FROM stock_transactions t
@@ -112,7 +110,7 @@ $recent = $pdo->query("
     JOIN users u ON t.user_id = u.id
     WHERE t.transaction_type = 'stock_out' $txClause
     ORDER BY t.transaction_date DESC, t.created_at DESC
-    LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}
+    LIMIT 8
 ")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
@@ -137,11 +135,36 @@ include __DIR__ . '/../includes/header.php';
         <div class="card-body">
             <form method="POST" id="stockOutForm">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                <input type="hidden" name="item_id" id="stockOutItemId" value="">
 
+                <div class="inventory-wizard stock-in-wizard">
+                    <div class="wizard-intro">
+                        <div>
+                            <div class="wizard-breadcrumb">Stock / Stock Out / Issue Inventory</div>
+                            <div class="wizard-title-row">
+                                <h3>Record Stock Out</h3>
+                                <div class="wizard-badges">
+                                    <span>Live preview</span>
+                                    <span>Stock guarded</span>
+                                </div>
+                            </div>
+                            <p>Issue inventory in focused steps, then review the stock impact before saving.</p>
+                        </div>
+                    </div>
+
+                    <div class="wizard-step-nav" aria-label="Stock out steps">
+                        <button type="button" class="wizard-step-btn active" data-step-target="product">1. Product</button>
+                        <button type="button" class="wizard-step-btn" data-step-target="issue">2. Issue</button>
+                        <button type="button" class="wizard-step-btn" data-step-target="reference">3. Reference</button>
+                        <button type="button" class="wizard-step-btn" data-step-target="review">4. Review</button>
+                    </div>
+
+                    <div class="stock-wizard-panels">
+                        <div class="wizard-step-panel active" data-step="product">
                 <?php if ($isAdmin): ?>
                 <div class="form-group">
                     <label>Branch Filter</label>
-                    <select onchange="window.location='stock_out.php?branch='+this.value">
+                    <select class="form-control" onchange="window.location='stock_out.php?branch='+this.value">
                         <option value="">All Branches</option>
                         <?php foreach ($branches as $b): ?>
                         <option value="<?= (int)$b['id'] ?>" <?= (int)$b['id'] === $branchFilter ? 'selected' : '' ?>><?= clean($b['name']) ?></option>
@@ -152,32 +175,41 @@ include __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
 
                 <div class="form-section-card">
-                    <h4>Item Selection</h4>
-                    <p>Choose an available item. The system prevents issuing more than the current stock.</p>
-                    <div class="form-group">
-                        <label>Item *</label>
-                        <select name="item_id" id="stockOutItem" required onchange="setStockOutItem(this)">
-                            <option value="">Select item</option>
+                    <h4>Product Information</h4>
+                    <p>Search by SKU, name or scan a barcode. The system prevents issuing more than current stock.</p>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label>Product Search</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                <input list="stockOutProductList" id="stockOutProductSearch" class="form-control" placeholder="Search product..." autocomplete="off" oninput="onStockOutProductSearch(this.value)">
+                            </div>
+                            <datalist id="stockOutProductList">
                             <?php foreach ($items as $item): ?>
-                            <option
-                                value="<?= (int)$item['id'] ?>"
-                                data-stock="<?= (int)$item['current_stock'] ?>"
-                                data-min="<?= (int)$item['minimum_stock'] ?>"
-                                data-code="<?= clean($item['item_code']) ?>"
-                                data-name="<?= clean($item['name']) ?>"
-                                data-unit="<?= clean($item['unit']) ?>"
-                                data-price="<?= (float)$item['unit_price'] ?>"
-                                data-category="<?= clean($item['category_name']) ?>"
-                                data-branch="<?= clean($item['branch_name']) ?>"
-                                data-location="<?= clean($item['branch_location'] ?? '') ?>"
-                            >
-                                <?= clean($item['item_code']) ?> - <?= clean($item['name']) ?> (<?= clean($item['branch_name']) ?>, <?= number_format((int)$item['current_stock']) ?> available)
-                            </option>
+                                <option value="<?= clean($item['item_code'] . ' - ' . $item['name']) ?>"></option>
                             <?php endforeach; ?>
-                        </select>
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label>Barcode Scanner</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa-solid fa-barcode"></i></span>
+                                <input type="text" id="stockOutBarcode" class="form-control" placeholder="Scan or type SKU" onblur="onStockOutBarcode(this.value)">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group"><label>SKU</label><input type="text" id="stockOutSku" class="form-control" readonly></div>
+                        <div class="form-group"><label>Category</label><input type="text" id="stockOutCategory" class="form-control" readonly></div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group"><label>Available Stock</label><input type="text" id="stockOutAvailableField" class="form-control" readonly></div>
+                        <div class="form-group"><label>Unit of Measure</label><input type="text" id="stockOutUnitField" class="form-control" readonly></div>
                     </div>
                 </div>
+                        </div>
 
+                        <div class="wizard-step-panel" data-step="issue">
                 <div class="form-section-card">
                     <h4>Issue Details</h4>
                     <div class="form-grid-2">
@@ -187,33 +219,68 @@ include __DIR__ . '/../includes/header.php';
                             <small class="form-note" id="stockOutLimit">Select an item to see available stock.</small>
                         </div>
                         <div class="form-group">
-                            <label>Issue Reference</label>
-                            <input type="text" name="reference_number" placeholder="e.g. ISS-2026-010">
-                        </div>
-                    </div>
-                    <div class="form-grid-2">
-                        <div class="form-group">
                             <label>Issued To</label>
-                            <input type="text" name="issued_to" placeholder="Person, department, or unit">
-                        </div>
-                        <div class="form-group">
-                            <label>Transaction Date</label>
-                            <input type="date" name="transaction_date" value="<?= date('Y-m-d') ?>" required>
+                            <input type="text" name="issued_to" id="stockOutIssuedTo" class="form-control" placeholder="Person, department, or unit" oninput="updateStockOutPreview()">
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Purpose</label>
-                        <input type="text" name="purpose" placeholder="e.g. Production use, field work, maintenance">
+                        <input type="text" name="purpose" id="stockOutPurpose" class="form-control" placeholder="e.g. Production use, field work, maintenance" oninput="updateStockOutPreview()">
+                    </div>
+                </div>
+                        </div>
+
+                        <div class="wizard-step-panel" data-step="reference">
+                <div class="form-section-card">
+                    <h4>Reference</h4>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label>Issue Reference</label>
+                            <input type="text" name="reference_number" id="stockOutReference" class="form-control" placeholder="e.g. ISS-2026-010" oninput="updateStockOutPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label>Transaction Date</label>
+                            <input type="date" name="transaction_date" id="stockOutDate" class="form-control" value="<?= date('Y-m-d') ?>" required oninput="updateStockOutPreview()">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Remarks</label>
-                        <textarea name="remarks" rows="3" placeholder="Additional issue notes"></textarea>
+                        <textarea name="remarks" id="stockOutRemarks" rows="3" class="form-control" placeholder="Additional issue notes"></textarea>
                     </div>
                 </div>
+                        </div>
 
-                <button type="submit" class="btn btn-primary btn-block" id="stockOutSubmit">
-                    Record Stock Out
-                </button>
+                        <div class="wizard-step-panel" data-step="review">
+                            <div class="form-section-card">
+                                <h4>Review Stock Out</h4>
+                                <p>Confirm the item, issue quantity and remaining stock before recording.</p>
+                                <div class="review-checklist stock-review-list">
+                                    <div class="review-item"><span>Product</span><strong id="outReviewProduct">Select product</strong></div>
+                                    <div class="review-item"><span>Quantity issued</span><strong id="outReviewQty">0</strong></div>
+                                    <div class="review-item"><span>Stock after issue</span><strong id="outReviewAfter">-</strong></div>
+                                    <div class="review-item"><span>Issued to</span><strong id="outReviewIssuedTo">-</strong></div>
+                                    <div class="review-item"><span>Transaction date</span><strong id="outReviewDate"><?= date('Y-m-d') ?></strong></div>
+                                    <div class="review-item"><span>Total value</span><strong id="outReviewTotal">-</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stock-wizard-footer">
+                        <button type="button" class="btn btn-outline-secondary" id="stockOutWizardBack">
+                            <i class="fa-solid fa-arrow-left me-1"></i> Back
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="stockOutWizardSaveDraft">
+                            <i class="fa-regular fa-floppy-disk me-1"></i> Save Draft
+                        </button>
+                        <button type="button" class="btn btn-primary" id="stockOutWizardNext">
+                            Save & Continue <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="stockOutSubmit">
+                            <i class="fa-solid fa-check me-2"></i> Record Stock Out
+                        </button>
+                    </div>
+                </div>
             </form>
         </div>
     </section>
