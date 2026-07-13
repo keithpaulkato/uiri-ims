@@ -122,15 +122,235 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $search         = trim($_GET['search'] ?? '');
 $catFilter      = (int)($_GET['category'] ?? 0);
 $supplierFilter = (int)($_GET['supplier'] ?? 0);
-$branchParam    = $_GET['branch'] ?? '';
-$showAllBranches = $isAdmin && $branchParam === 'all';
-$branchFilter   = $isAdmin ? ($showAllBranches ? 0 : ($branchParam !== '' ? (int)$branchParam : (int)$branchId)) : (int)$branchId;
+$branchFilter   = $isAdmin ? (int)($_GET['branch'] ?? 0) : (int)$branchId;
 $deptFilter     = (int)($_GET['department'] ?? 0);
 $sectionFilter  = (int)($_GET['section'] ?? 0);
 $stockFilter    = $_GET['filter'] ?? '';
+$legacyStockFilters = ['good' => 'available', 'low' => 'low_stock', 'out' => 'out_of_stock'];
+$stockFilter = $legacyStockFilters[$stockFilter] ?? $stockFilter;
 $assetStatusFilter = $_GET['asset_status'] ?? '';
 $conditionFilter = $_GET['condition'] ?? '';
 $missingPurchase = ($_GET['missing_purchase'] ?? '') === '1';
+
+$buildItemOptionWhere = function (array $keys) use (
+    &$branchFilter,
+    &$catFilter,
+    &$sectionFilter,
+    &$deptFilter,
+    &$supplierFilter,
+    &$stockFilter,
+    &$assetStatusFilter,
+    &$conditionFilter,
+    $isAdmin,
+    $branchId
+) {
+    $where = ['i.is_active = 1'];
+    $params = [];
+
+    if (!$isAdmin) {
+        $where[] = 'i.branch_id = ?';
+        $params[] = $branchId;
+    } elseif (in_array('branch', $keys, true) && $branchFilter) {
+        $where[] = 'i.branch_id = ?';
+        $params[] = $branchFilter;
+    }
+    if (in_array('category', $keys, true) && $catFilter) {
+        $where[] = 'i.category_id = ?';
+        $params[] = $catFilter;
+    }
+    if (in_array('section', $keys, true) && $sectionFilter) {
+        $where[] = 'i.section_id = ?';
+        $params[] = $sectionFilter;
+    }
+    if (in_array('department', $keys, true) && $deptFilter) {
+        $where[] = 'i.department_id = ?';
+        $params[] = $deptFilter;
+    }
+    if (in_array('supplier', $keys, true) && $supplierFilter) {
+        $where[] = 'i.supplier_id = ?';
+        $params[] = $supplierFilter;
+    }
+    if (in_array('stock', $keys, true) && $stockFilter) {
+        if ($stockFilter === 'low_stock') {
+            $where[] = 'i.current_stock <= i.minimum_stock AND i.current_stock > 0';
+        } elseif ($stockFilter === 'out_of_stock') {
+            $where[] = 'i.current_stock = 0';
+        } elseif ($stockFilter === 'available') {
+            $where[] = 'i.current_stock > i.minimum_stock';
+        }
+    }
+    if (in_array('asset_status', $keys, true) && $assetStatusFilter !== '') {
+        $where[] = 'i.asset_status = ?';
+        $params[] = $assetStatusFilter;
+    }
+    if (in_array('condition', $keys, true) && $conditionFilter !== '') {
+        $where[] = 'i.asset_condition = ?';
+        $params[] = $conditionFilter;
+    }
+
+    return ['WHERE ' . implode(' AND ', $where), $params];
+};
+
+$fetchItemOptionRows = function (string $sql, array $keys) use ($pdo, $buildItemOptionWhere) {
+    [$where, $params] = $buildItemOptionWhere($keys);
+    $stmt = $pdo->prepare(str_replace('{WHERE}', $where, $sql));
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+};
+
+$hasSelectedId = static function (array $rows, int $selected): bool {
+    return $selected === 0 || in_array($selected, array_map('intval', array_column($rows, 'id')), true);
+};
+
+$branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
+$filterCategories = $fetchItemOptionRows("
+    SELECT c.id, c.name, c.branch_id, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN categories c ON c.id = i.category_id
+    {WHERE}
+    GROUP BY c.id, c.name, c.branch_id
+    ORDER BY c.branch_id, c.name
+", ['branch']);
+if (!$hasSelectedId($filterCategories, $catFilter)) {
+    $catFilter = 0;
+}
+
+$sections = $fetchItemOptionRows("
+    SELECT sec.id, sec.name, sec.branch_id, b.name AS branch_name, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN sections sec ON sec.id = i.section_id
+    JOIN branches b ON b.id = sec.branch_id
+    {WHERE}
+    GROUP BY sec.id, sec.name, sec.branch_id, b.name
+    ORDER BY b.name, sec.name
+", ['branch', 'category']);
+if (!$hasSelectedId($sections, $sectionFilter)) {
+    $sectionFilter = 0;
+    $deptFilter = 0;
+}
+
+$departments = $fetchItemOptionRows("
+    SELECT d.id, d.name, d.section_id, sec.name AS section_name, sec.branch_id, b.name AS branch_name, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN departments d ON d.id = i.department_id
+    JOIN sections sec ON sec.id = d.section_id
+    JOIN branches b ON b.id = sec.branch_id
+    {WHERE}
+    GROUP BY d.id, d.name, d.section_id, sec.name, sec.branch_id, b.name
+    ORDER BY b.name, sec.name, d.name
+", ['branch', 'category', 'section']);
+if (!$hasSelectedId($departments, $deptFilter)) {
+    $deptFilter = 0;
+}
+
+$suppliers = $fetchItemOptionRows("
+    SELECT s.id, s.company_name, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    JOIN suppliers s ON s.id = i.supplier_id
+    {WHERE}
+    GROUP BY s.id, s.company_name
+    ORDER BY s.company_name
+", ['branch', 'category', 'section', 'department']);
+if (!$hasSelectedId($suppliers, $supplierFilter)) {
+    $supplierFilter = 0;
+}
+
+$stockStatusOptions = [];
+[$stockWhere, $stockParams] = $buildItemOptionWhere(['branch', 'category', 'section', 'department', 'supplier']);
+$stockStmt = $pdo->prepare("
+    SELECT
+        SUM(CASE WHEN i.current_stock <= i.minimum_stock AND i.current_stock > 0 THEN 1 ELSE 0 END) AS low_stock,
+        SUM(CASE WHEN i.current_stock = 0 THEN 1 ELSE 0 END) AS out_of_stock,
+        SUM(CASE WHEN i.current_stock > i.minimum_stock THEN 1 ELSE 0 END) AS available
+    FROM inventory_items i
+    {$stockWhere}
+");
+$stockStmt->execute($stockParams);
+$stockCounts = $stockStmt->fetch() ?: [];
+foreach ([
+    'available' => 'Available',
+    'low_stock' => 'Low Stock',
+    'out_of_stock' => 'Out of Stock',
+] as $value => $label) {
+    if ((int)($stockCounts[$value] ?? 0) > 0) {
+        $stockStatusOptions[] = ['value' => $value, 'label' => $label, 'item_count' => (int)$stockCounts[$value]];
+    }
+}
+if ($stockFilter && !in_array($stockFilter, array_column($stockStatusOptions, 'value'), true)) {
+    $stockFilter = '';
+}
+
+$assetStatusOptions = $fetchItemOptionRows("
+    SELECT i.asset_status AS value, i.asset_status AS label, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    {WHERE}
+      AND i.asset_status IS NOT NULL
+      AND i.asset_status <> ''
+    GROUP BY i.asset_status
+    ORDER BY i.asset_status
+", ['branch', 'category', 'section', 'department', 'supplier', 'stock']);
+if ($assetStatusFilter && !in_array($assetStatusFilter, array_column($assetStatusOptions, 'value'), true)) {
+    $assetStatusFilter = '';
+}
+
+$conditionOptions = $fetchItemOptionRows("
+    SELECT i.asset_condition AS value, i.asset_condition AS label, COUNT(i.id) AS item_count
+    FROM inventory_items i
+    {WHERE}
+      AND i.asset_condition IS NOT NULL
+      AND i.asset_condition <> ''
+    GROUP BY i.asset_condition
+    ORDER BY i.asset_condition
+", ['branch', 'category', 'section', 'department', 'supplier', 'stock', 'asset_status']);
+if ($conditionFilter && !in_array($conditionFilter, array_column($conditionOptions, 'value'), true)) {
+    $conditionFilter = '';
+}
+
+$filterRows = $pdo->query("
+    SELECT i.branch_id, i.category_id, i.section_id, i.department_id, i.supplier_id,
+           i.asset_status, i.asset_condition,
+           CASE
+               WHEN i.current_stock = 0 THEN 'out_of_stock'
+               WHEN i.current_stock <= i.minimum_stock THEN 'low_stock'
+               ELSE 'available'
+           END AS stock_status
+    FROM inventory_items i
+    WHERE i.is_active = 1
+")->fetchAll();
+if (!$isAdmin) {
+    $filterRows = array_values(array_filter($filterRows, static fn($row) => (int)$row['branch_id'] === (int)$branchId));
+}
+
+$allCategories = $pdo->query("SELECT id, name, branch_id FROM categories ORDER BY branch_id, name")->fetchAll();
+$allSections = $pdo->query("SELECT id, name, branch_id FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
+$allDepartments = $pdo->query("SELECT d.id, d.name, d.section_id, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
+$allSuppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
+$filterOptionLabels = [
+    'categories' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => $row['name'],
+        'branch_id' => (int)$row['branch_id'],
+    ], $allCategories),
+    'sections' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => $row['name'],
+        'branch_id' => (int)$row['branch_id'],
+    ], $allSections),
+    'departments' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => ($row['section_name'] ? $row['section_name'] . ' - ' : '') . $row['name'],
+        'section_id' => (int)$row['section_id'],
+    ], $allDepartments),
+    'suppliers' => array_map(static fn($row) => [
+        'id' => (int)$row['id'],
+        'label' => $row['company_name'],
+    ], $allSuppliers),
+    'stock_statuses' => [
+        ['id' => 'available', 'label' => 'Available'],
+        ['id' => 'low_stock', 'label' => 'Low Stock'],
+        ['id' => 'out_of_stock', 'label' => 'Out of Stock'],
+    ],
+];
 
 $where  = ["i.is_active = 1"];
 $params = [];
@@ -144,10 +364,9 @@ if ($catFilter) { $where[] = "i.category_id = ?"; $params[] = $catFilter; }
 if ($supplierFilter) { $where[] = "i.supplier_id = ?"; $params[] = $supplierFilter; }
 if ($sectionFilter) { $where[] = "i.section_id = ?"; $params[] = $sectionFilter; }
 if ($deptFilter) { $where[] = "i.department_id = ?"; $params[] = $deptFilter; }
-if ($stockFilter === 'low') $where[] = "i.current_stock <= i.minimum_stock AND i.current_stock > 0";
-if ($stockFilter === 'out') $where[] = "i.current_stock = 0";
-if ($stockFilter === 'good') $where[] = "i.current_stock > i.minimum_stock";
-if ($stockFilter === 'risk') $where[] = "(i.current_stock <= i.minimum_stock OR i.asset_status IN ('Maintenance','In Maintenance','Not Working'))";
+if ($stockFilter === 'low_stock') $where[] = "i.current_stock <= i.minimum_stock AND i.current_stock > 0";
+if ($stockFilter === 'out_of_stock') $where[] = "i.current_stock = 0";
+if ($stockFilter === 'available') $where[] = "i.current_stock > i.minimum_stock";
 if ($assetStatusFilter !== '') { $where[] = "i.asset_status = ?"; $params[] = $assetStatusFilter; }
 if ($conditionFilter !== '') { $where[] = "i.asset_condition = ?"; $params[] = $conditionFilter; }
 if ($missingPurchase) $where[] = "i.purchase_date IS NULL";
@@ -175,15 +394,7 @@ $pageUrl = function (int $targetPage) use ($paginationParams): string {
     return 'items.php' . ($query ? '?' . $query : '');
 };
 
-$suppliers  = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
-$branches   = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
-$filterCategoriesStmt = $pdo->prepare("SELECT * FROM categories" . ($isAdmin && $branchFilter ? " WHERE branch_id = ?" : "") . " ORDER BY name");
-if ($isAdmin && $branchFilter) {
-    $filterCategoriesStmt->execute([$branchFilter]);
-} else {
-    $filterCategoriesStmt->execute();
-}
-$filterCategories = $filterCategoriesStmt->fetchAll();
+$formSuppliers  = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 if ($isAdmin) {
     $categories = $pdo->query("SELECT * FROM categories ORDER BY branch_id, name")->fetchAll();
 } else {
@@ -191,12 +402,12 @@ if ($isAdmin) {
     $categories->execute([$branchId]);
     $categories = $categories->fetchAll();
 }
-$sections = $pdo->prepare("SELECT s.id, s.name, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id=b.id WHERE s.is_active=1" . ($branchFilter ? " AND s.branch_id = ?" : "") . " ORDER BY b.name, s.name");
-$sections->execute($branchFilter ? [$branchFilter] : []);
-$sections = $sections->fetchAll();
-$departments = $pdo->prepare("SELECT d.id, d.name, d.section_id, s.branch_id, b.name AS branch_name, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id JOIN branches b ON s.branch_id=b.id WHERE d.is_active=1" . ($branchFilter ? " AND b.id = ?" : "") . " ORDER BY b.name, s.name, d.name");
-$departments->execute($branchFilter ? [$branchFilter] : []);
-$departments = $departments->fetchAll();
+$formSections = $pdo->prepare("SELECT s.id, s.name, s.branch_id, b.name AS branch_name FROM sections s JOIN branches b ON s.branch_id=b.id WHERE s.is_active=1" . (!$isAdmin ? " AND s.branch_id = ?" : "") . " ORDER BY b.name, s.name");
+$formSections->execute(!$isAdmin ? [$branchId] : []);
+$formSections = $formSections->fetchAll();
+$formDepartments = $pdo->prepare("SELECT d.id, d.name, d.section_id, s.branch_id, b.name AS branch_name, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id JOIN branches b ON s.branch_id=b.id WHERE d.is_active=1" . (!$isAdmin ? " AND b.id = ?" : "") . " ORDER BY b.name, s.name, d.name");
+$formDepartments->execute(!$isAdmin ? [$branchId] : []);
+$formDepartments = $formDepartments->fetchAll();
 
 $editItem = null;
 if (isset($_GET['edit'])) {
@@ -237,7 +448,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div class="filter-group">
-            <select name="category">
+            <select id="categorySelect" name="category">
                 <option value="">All Categories</option>
                 <?php foreach ($filterCategories as $c): ?>
                 <option value="<?= $c['id'] ?>" <?= $c['id']==$catFilter?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
@@ -245,7 +456,7 @@ include __DIR__ . '/../includes/header.php';
             </select>
         </div>
         <div class="filter-group">
-            <select name="supplier">
+            <select id="supplierSelect" name="supplier">
                 <option value="">All Suppliers</option>
                 <?php foreach ($suppliers as $s): ?>
                 <option value="<?= $s['id'] ?>" <?= $s['id']==$supplierFilter?'selected':'' ?>><?= clean($s['company_name']) ?></option>
@@ -254,8 +465,8 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <?php if ($isAdmin): ?>
         <div class="filter-group">
-            <select name="branch">
-                <option value="all" <?= $showAllBranches ? 'selected' : '' ?>>All Campuses</option>
+            <select id="branchSelect" name="branch">
+                <option value="">All Campuses</option>
                 <?php foreach ($branches as $b): ?>
                 <option value="<?= $b['id'] ?>" <?= $b['id']==$branchFilter?'selected':'' ?>><?= clean($b['name']) ?></option>
                 <?php endforeach; ?>
@@ -263,7 +474,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <?php endif; ?>
         <div class="filter-group">
-            <select name="section">
+            <select id="sectionSelect" name="section">
                 <option value="">All Departments</option>
                 <?php foreach ($sections as $s): ?>
                 <option value="<?= $s['id'] ?>" <?= $s['id']==$sectionFilter?'selected':'' ?>><?= clean($s['branch_name']) ?> — <?= clean($s['name']) ?></option>
@@ -271,7 +482,7 @@ include __DIR__ . '/../includes/header.php';
             </select>
         </div>
         <div class="filter-group">
-            <select name="department">
+            <select id="departmentSelect" name="department">
                 <option value="">All Sections / Units</option>
                 <?php foreach ($departments as $d): ?>
                 <option value="<?= $d['id'] ?>" <?= $d['id']==$deptFilter?'selected':'' ?>><?= clean($d['branch_name']) ?> — <?= clean($d['section_name']) ?> — <?= clean($d['name']) ?></option>
@@ -279,12 +490,27 @@ include __DIR__ . '/../includes/header.php';
             </select>
         </div>
         <div class="filter-group">
-            <select name="filter">
+            <select id="statusSelect" name="filter">
                 <option value="">All Stock Levels</option>
-                <option value="good" <?= $stockFilter==='good'?'selected':'' ?>>Good Stock</option>
-                <option value="risk" <?= $stockFilter==='risk'?'selected':'' ?>>All Stock Risks</option>
-                <option value="low"  <?= $stockFilter==='low'?'selected':'' ?>>Low Stock</option>
-                <option value="out"  <?= $stockFilter==='out'?'selected':'' ?>>Out of Stock</option>
+                <?php foreach ($stockStatusOptions as $status): ?>
+                <option value="<?= clean($status['value']) ?>" <?= $stockFilter===$status['value']?'selected':'' ?>><?= clean($status['label']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="assetStatusSelect" name="asset_status">
+                <option value="">All Asset Statuses</option>
+                <?php foreach ($assetStatusOptions as $status): ?>
+                <option value="<?= clean($status['value']) ?>" <?= $assetStatusFilter===$status['value']?'selected':'' ?>><?= clean($status['label']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="conditionSelect" name="condition">
+                <option value="">All Conditions</option>
+                <?php foreach ($conditionOptions as $condition): ?>
+                <option value="<?= clean($condition['value']) ?>" <?= $conditionFilter===$condition['value']?'selected':'' ?>><?= clean($condition['label']) ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         <?php if ($missingPurchase): ?>
@@ -314,7 +540,6 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= $offset + $i + 1 ?></td>
                 <td>
                     <div class="item-cell">
-                        <div class="item-thumb-placeholder"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div>
                         <div><span class="item-name"><?= clean($item['name']) ?></span><span class="item-code"><?= clean($item['item_code']) ?></span></div>
                     </div>
                 </td>
@@ -526,7 +751,7 @@ include __DIR__ . '/../includes/header.php';
                                             <label>Department</label>
                                             <select name="section_id" id="previewSectionInput" <?= $isAdmin ? '' : 'required' ?>>
                                                 <option value="">Select department</option>
-                                                <?php foreach ($sections as $s): ?>
+                                                <?php foreach ($formSections as $s): ?>
                                                 <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?>" <?= ($editItem['section_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['branch_name']) ?> — <?= clean($s['name']) ?></option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -535,7 +760,7 @@ include __DIR__ . '/../includes/header.php';
                                             <label>Section / Unit</label>
                                             <select name="department_id" id="previewDeptInput">
                                                 <option value="">Select section/unit</option>
-                                                <?php foreach ($departments as $d): ?>
+                                                <?php foreach ($formDepartments as $d): ?>
                                                 <option value="<?= $d['id'] ?>" data-section="<?= $d['section_id'] ?>" <?= ($editItem['department_id']??0)==$d['id']?'selected':'' ?>><?= clean($d['branch_name']) ?> — <?= clean($d['section_name']) ?> — <?= clean($d['name']) ?></option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -590,7 +815,7 @@ include __DIR__ . '/../includes/header.php';
                                             <label>Supplier</label>
                                             <select name="supplier_id" id="previewSupplierInput">
                                                 <option value="">Select supplier</option>
-                                                <?php foreach ($suppliers as $s): ?>
+                                                <?php foreach ($formSuppliers as $s): ?>
                                                 <option value="<?= $s['id'] ?>" <?= ($editItem['supplier_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['company_name']) ?></option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -680,7 +905,105 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <script>
+const itemFilterRows = <?= json_encode(array_map(static fn($row) => [
+    'branch' => (int)$row['branch_id'],
+    'category' => (int)$row['category_id'],
+    'section' => $row['section_id'] !== null ? (int)$row['section_id'] : null,
+    'department' => $row['department_id'] !== null ? (int)$row['department_id'] : null,
+    'supplier' => $row['supplier_id'] !== null ? (int)$row['supplier_id'] : null,
+    'status' => (string)$row['stock_status'],
+    'asset_status' => (string)$row['asset_status'],
+    'condition' => (string)$row['asset_condition'],
+], $filterRows), JSON_UNESCAPED_SLASHES) ?>;
+const itemFilterLabels = <?= json_encode($filterOptionLabels, JSON_UNESCAPED_SLASHES) ?>;
+const itemFilterFixedBranch = <?= $isAdmin ? 'null' : (int)$branchId ?>;
+
+function initSmartItemFilters() {
+    const fields = {
+        branch: document.getElementById('branchSelect'),
+        category: document.getElementById('categorySelect'),
+        section: document.getElementById('sectionSelect'),
+        department: document.getElementById('departmentSelect'),
+        supplier: document.getElementById('supplierSelect'),
+        status: document.getElementById('statusSelect'),
+        asset_status: document.getElementById('assetStatusSelect'),
+        condition: document.getElementById('conditionSelect'),
+    };
+    const order = ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'condition'];
+    const optionSources = {
+        category: itemFilterLabels.categories,
+        section: itemFilterLabels.sections,
+        department: itemFilterLabels.departments,
+        supplier: itemFilterLabels.suppliers,
+        status: itemFilterLabels.stock_statuses,
+    };
+    const defaultLabels = {
+        category: 'All Categories',
+        section: 'All Departments',
+        department: 'All Sections / Units',
+        supplier: 'All Suppliers',
+        status: 'All Stock Levels',
+        asset_status: 'All Asset Statuses',
+        condition: 'All Conditions',
+    };
+    const valueOf = (key) => {
+        if (key === 'branch' && itemFilterFixedBranch !== null) {
+            return String(itemFilterFixedBranch);
+        }
+        return fields[key] ? fields[key].value : '';
+    };
+    const matchesBefore = (row, targetKey) => {
+        const targetIndex = order.indexOf(targetKey);
+        return order.slice(0, targetIndex).every((key) => {
+            const selected = valueOf(key);
+            return !selected || String(row[key]) === selected;
+        });
+    };
+    const uniqueValues = (key) => {
+        const values = new Set();
+        itemFilterRows.forEach((row) => {
+            if (matchesBefore(row, key) && row[key] !== null && row[key] !== '') {
+                values.add(String(row[key]));
+            }
+        });
+        return values;
+    };
+    const labelFor = (key, value) => {
+        if (key === 'asset_status' || key === 'condition') {
+            return value;
+        }
+        const source = optionSources[key] || [];
+        const option = source.find((item) => String(item.id) === String(value));
+        return option ? option.label : value;
+    };
+    const renderSelect = (key) => {
+        const select = fields[key];
+        if (!select) {
+            return;
+        }
+        const selected = select.value;
+        const values = Array.from(uniqueValues(key)).sort((a, b) => labelFor(key, a).localeCompare(labelFor(key, b)));
+        select.innerHTML = '';
+        select.add(new Option(defaultLabels[key], ''));
+        values.forEach((value) => select.add(new Option(labelFor(key, value), value)));
+        select.value = selected && values.includes(String(selected)) ? selected : '';
+        select.disabled = values.length === 0;
+    };
+    const refreshAfter = (changedKey = 'branch') => {
+        const start = Math.max(1, order.indexOf(changedKey) + 1);
+        order.slice(start).forEach(renderSelect);
+    };
+    order.forEach((key) => {
+        if (fields[key]) {
+            fields[key].addEventListener('change', () => refreshAfter(key));
+        }
+    });
+    order.slice(1).forEach(renderSelect);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+    initSmartItemFilters();
+
     const stepButtons = Array.from(document.querySelectorAll('.wizard-step-btn'));
     const stepPanels = Array.from(document.querySelectorAll('.wizard-step-panel'));
 
