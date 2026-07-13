@@ -122,30 +122,40 @@ $notifications = $notifStmt->fetchAll();
                 </a>
             </li>
 
+            <?php $stockPages = ['stock_in', 'stock_out', 'stock_adjustment', 'transactions']; $stockOpen = in_array($activePage ?? '', $stockPages, true); ?>
             <li class="nav-section">Stock</li>
-            <li class="<?= ($activePage ?? '') === 'stock_in' ? 'active' : '' ?>">
-                <a href="<?= BASE_URL ?>pages/stock_in.php">
-                    <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
-                    Stock In
-                </a>
-            </li>
-            <li class="<?= ($activePage ?? '') === 'stock_out' ? 'active' : '' ?>">
-                <a href="<?= BASE_URL ?>pages/stock_out.php">
-                    <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></span>
-                    Stock Out
-                </a>
-            </li>
-            <li class="<?= ($activePage ?? '') === 'stock_adjustment' ? 'active' : '' ?>">
-                <a href="<?= BASE_URL ?>pages/stock_adjustment.php">
-                    <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 6v12m-6-6h12"/></svg></span>
-                    Stock Adjustment
-                </a>
-            </li>
-            <li class="<?= ($activePage ?? '') === 'transactions' ? 'active' : '' ?>">
-                <a href="<?= BASE_URL ?>pages/transactions.php">
-                    <span class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></span>
-                    Transactions
-                </a>
+            <li class="nav-dropdown <?= $stockOpen ? 'open' : '' ?>">
+                <button type="button" class="nav-dropdown-toggle" onclick="this.closest('.nav-dropdown').classList.toggle('open')" aria-expanded="<?= $stockOpen ? 'true' : 'false' ?>">
+                    <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/></svg></span>
+                    <span>Stock</span>
+                    <svg viewBox="0 0 24 24" class="dropdown-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <ul class="nav-submenu">
+                    <li class="<?= ($activePage ?? '') === 'stock_in' ? 'active' : '' ?>">
+                        <a href="<?= BASE_URL ?>pages/stock_in.php">
+                            <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
+                            Stock In
+                        </a>
+                    </li>
+                    <li class="<?= ($activePage ?? '') === 'stock_out' ? 'active' : '' ?>">
+                        <a href="<?= BASE_URL ?>pages/stock_out.php">
+                            <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></span>
+                            Stock Out
+                        </a>
+                    </li>
+                    <li class="<?= ($activePage ?? '') === 'stock_adjustment' ? 'active' : '' ?>">
+                        <a href="<?= BASE_URL ?>pages/stock_adjustment.php">
+                            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 6v12m-6-6h12"/></svg></span>
+                            Stock Adjustment
+                        </a>
+                    </li>
+                    <li class="<?= ($activePage ?? '') === 'transactions' ? 'active' : '' ?>">
+                        <a href="<?= BASE_URL ?>pages/transactions.php">
+                            <span class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></span>
+                            Transactions
+                        </a>
+                    </li>
+                </ul>
             </li>
 
             <li class="nav-section">Management</li>

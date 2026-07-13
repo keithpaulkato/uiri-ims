@@ -492,7 +492,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="card-header"><h3>Product Preview</h3></div>
             <div class="card-body preview-card" id="productPreview">
                 <div class="preview-header">
-                    <img id="previewImage" src="https://via.placeholder.com/140?text=No+Image" alt="Product image" onerror="this.onerror=null;this.src='https://via.placeholder.com/140?text=No+Image'">
+                    <img id="previewImage" src="" alt="Product image" onerror="this.onerror=null;this.src=stockImagePlaceholder">
                     <div>
                         <h4 id="previewName">Select a product</h4>
                         <p id="previewSku" class="text-muted">SKU: —</p>
@@ -587,6 +587,14 @@ const pageSize = 1;
 const stockSteps = ['product', 'supplier', 'reference', 'stock', 'review'];
 let currentStockStep = 'product';
 let selectedStockInItem = null;
+const stockImagePlaceholder = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <rect width="160" height="160" rx="18" fill="#f8fbff"/>
+  <rect x="22" y="28" width="116" height="92" rx="12" fill="#ffffff" stroke="#c7d8ea" stroke-width="3"/>
+  <circle cx="58" cy="64" r="14" fill="#d8edf8"/>
+  <path d="M34 108l30-30 20 18 14-14 28 26H34z" fill="#c9e2f2"/>
+  <text x="80" y="140" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#344054">No image</text>
+</svg>`);
 
 function formatCurrency(value, symbol = 'UGX') {
     if (value === null || value === undefined || isNaN(value)) return '—';
@@ -609,7 +617,7 @@ function setProductPreview(item) {
     document.getElementById('supplierEmail').textContent = item.supplier_email || '—';
     document.getElementById('supplierAddress').textContent = item.supplier_address || '—';
 
-    document.getElementById('previewImage').src = item.image || 'https://via.placeholder.com/140?text=No+Image';
+    document.getElementById('previewImage').src = item.image || stockImagePlaceholder;
     document.getElementById('previewName').textContent = item.name || 'Selected product';
     document.getElementById('previewSku').textContent = `SKU: ${item.item_code || '—'}`;
     document.getElementById('previewCurrentStock').textContent = item.current_stock !== null ? item.current_stock : '—';
@@ -932,6 +940,7 @@ function printRecentStock() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('previewImage').src = stockImagePlaceholder;
     document.querySelectorAll('#stockInForm .wizard-step-btn').forEach(button => {
         button.addEventListener('click', () => showStockInStep(button.dataset.stepTarget));
     });
