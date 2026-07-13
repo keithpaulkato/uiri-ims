@@ -17,8 +17,8 @@ ALTER TABLE departments ADD COLUMN IF NOT EXISTS section_manager_id INT DEFAULT 
 ALTER TABLE departments ADD COLUMN IF NOT EXISTS department_manager_id INT DEFAULT NULL AFTER section_manager_id;
 
 -- Add foreign key constraints to departments for managers
-ALTER TABLE departments ADD CONSTRAINT fk_dept_section_mgr FOREIGN KEY IF NOT EXISTS (section_manager_id) REFERENCES users(id);
-ALTER TABLE departments ADD CONSTRAINT fk_dept_dept_mgr FOREIGN KEY IF NOT EXISTS (department_manager_id) REFERENCES users(id);
+ALTER TABLE departments ADD CONSTRAINT IF NOT EXISTS fk_dept_section_mgr FOREIGN KEY (section_manager_id) REFERENCES users(id);
+ALTER TABLE departments ADD CONSTRAINT IF NOT EXISTS fk_dept_dept_mgr FOREIGN KEY (department_manager_id) REFERENCES users(id);
 
 -- Add missing columns to inventory_items table
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS asset_code VARCHAR(100) DEFAULT NULL AFTER item_code;
@@ -30,7 +30,7 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS branch_id INT DEFAULT NULL AF
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link VARCHAR(255) DEFAULT NULL AFTER message;
 
 -- Add foreign key for branch_id in notifications
-ALTER TABLE notifications ADD CONSTRAINT fk_notif_branch FOREIGN KEY IF NOT EXISTS (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
+ALTER TABLE notifications ADD CONSTRAINT IF NOT EXISTS fk_notif_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
 
 -- Procurement and maintenance tables
 CREATE TABLE IF NOT EXISTS procurement_requests (

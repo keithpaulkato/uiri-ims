@@ -97,8 +97,8 @@ function generateUsername(string $fullName, int $branchId): string {
         if ((int)$stmt->fetchColumn() === 0) {
             return $candidate;
         }
-        $counter++;
         $candidate = $base . '.' . strtolower($branchCode) . $counter;
+        $counter++;
     }
 }
 
@@ -610,7 +610,7 @@ function recordRateLimitAttempt(string $identifier, string $action = 'login'): v
 
     try {
         $stmt = $pdo->prepare("INSERT INTO rate_limits (identifier, action, ip_address) VALUES (?, ?, ?)");
-        $stmt->execute([$identifier, $action, $_SERVER['REMOTE_ADDR'] ?? '']);
+        $stmt->execute([$identifier, $action, getUserIpAddress()]);
     } catch (PDOException $e) {
         if (str_contains($e->getMessage(), '42S02') || str_contains($e->getMessage(), 'doesn\'t exist')) {
             return;
@@ -678,14 +678,52 @@ function unlockAccount(int $userId): void {
  * Get user's IP address safely.
  */
 function getUserIpAddress(): string {
-    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-        $ip = $_SERVER['HTTP_CLIENT_IP'];
-    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
-    } else {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $sources = [
+        $_SERVER['HTTP_CLIENT_IP'] ?? '',
+        $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '',
+        $_SERVER['HTTP_X_REAL_IP'] ?? '',
+        $_SERVER['REMOTE_ADDR'] ?? '',
+    ];
+
+    foreach ($sources as $source) {
+        foreach (explode(',', (string)$source) as $candidate) {
+            $ip = normalizeIpAddress($candidate);
+            if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return $ip;
+            }
+        }
     }
-    return trim($ip);
+
+    foreach ($sources as $source) {
+        foreach (explode(',', (string)$source) as $candidate) {
+            $ip = normalizeIpAddress($candidate);
+            if ($ip !== '') {
+                return $ip;
+            }
+        }
+    }
+
+    return 'unknown';
+}
+
+function normalizeIpAddress(string $ip): string {
+    $ip = trim($ip);
+    if ($ip === '') {
+        return '';
+    }
+
+    if ($ip === '::1' || strcasecmp($ip, 'localhost') === 0) {
+        return '127.0.0.1';
+    }
+
+    if (stripos($ip, '::ffff:') === 0) {
+        $mapped = substr($ip, 7);
+        if (filter_var($mapped, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $mapped;
+        }
+    }
+
+    return $ip;
 }
 
 /**

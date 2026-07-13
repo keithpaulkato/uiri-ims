@@ -201,7 +201,7 @@ function auditLog(string $action, string $table = '', int $recordId = 0, string 
         $table,
         $recordId,
         $details,
-        $_SERVER['REMOTE_ADDR'] ?? ''
+        getUserIpAddress()
     ]);
 }
 
@@ -215,7 +215,7 @@ function recordLoginAttempt(?int $userId, bool $success, ?string $details = null
         $_SESSION['user']['section_id'] ?? null,
         $_SESSION['user']['department_id'] ?? null,
         $success ? 1 : 0,
-        $_SERVER['REMOTE_ADDR'] ?? null,
+        getUserIpAddress(),
         $_SERVER['HTTP_USER_AGENT'] ?? null,
         $details
     ]);

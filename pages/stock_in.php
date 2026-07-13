@@ -41,14 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $transactionId = (int)($_POST['transaction_id'] ?? 0);
-    $originalQty = (int)($_POST['original_quantity'] ?? 0);
-    $originalItemId = (int)($_POST['original_item_id'] ?? 0);
 
     $itemId = (int)($_POST['item_id'] ?? 0);
     $qty = (int)($_POST['quantity'] ?? 0);
     $unitPrice = (float)($_POST['unit_price'] ?? 0);
     $sellingPrice = (float)($_POST['selling_price'] ?? 0);
-    $txBranch = $isAdmin ? (int)($_POST['branch_id'] ?? $branchId) : $branchId;
     $supplierId = (int)($_POST['supplier_id'] ?? 0) ?: null;
     $referenceNumber = trim($_POST['reference_number'] ?? '');
     $remarks = trim($_POST['remarks'] ?? '');
@@ -76,32 +73,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $pdo->beginTransaction();
         try {
+            $itemStmt = $pdo->prepare("SELECT id, branch_id, current_stock, name FROM inventory_items WHERE id = ? AND is_active = 1 FOR UPDATE");
+            $itemStmt->execute([$itemId]);
+            $item = $itemStmt->fetch();
+            if (!$item) {
+                throw new Exception('Selected product was not found.');
+            }
+            if (!$isAdmin && (int)$item['branch_id'] !== (int)$branchId) {
+                throw new Exception('Selected product is outside your active branch.');
+            }
+            $txBranch = (int)$item['branch_id'];
+
             if ($supplierId) {
                 $pdo->prepare("UPDATE inventory_items SET supplier_id = ? WHERE id = ?")->execute([$supplierId, $itemId]);
             }
 
             if ($transactionId) {
-                $existingStmt = $pdo->prepare("SELECT * FROM stock_transactions WHERE id = ? AND transaction_type = 'stock_in'");
+                $existingStmt = $pdo->prepare("SELECT * FROM stock_transactions WHERE id = ? AND transaction_type = 'stock_in' FOR UPDATE");
                 $existingStmt->execute([$transactionId]);
                 $existing = $existingStmt->fetch();
                 if (!$existing) {
                     throw new Exception('Stock-in record not found.');
                 }
+                if (!$isAdmin && (int)$existing['branch_id'] !== (int)$branchId) {
+                    throw new Exception('You cannot edit stock-in records outside your branch.');
+                }
 
-                $oldItemId = $existing['item_id'];
-                $oldQty = $existing['quantity'];
+                $oldItemId = (int)$existing['item_id'];
+                $oldQty = (int)$existing['quantity'];
                 $stockDelta = $qty - $oldQty;
 
                 if ($oldItemId === $itemId) {
                     if ($stockDelta < 0) {
-                        $currentStock = (int)$pdo->query("SELECT current_stock FROM inventory_items WHERE id = $itemId")->fetchColumn();
+                        $currentStock = (int)$item['current_stock'];
                         if ($currentStock + $stockDelta < 0) {
                             throw new Exception('Cannot reduce quantity: insufficient current stock.');
                         }
                     }
                     $pdo->prepare("UPDATE inventory_items SET current_stock=current_stock+? WHERE id=?")->execute([$stockDelta, $itemId]);
                 } else {
-                    $currentOldStock = (int)$pdo->query("SELECT current_stock FROM inventory_items WHERE id = $oldItemId")->fetchColumn();
+                    $oldItemStmt = $pdo->prepare("SELECT current_stock FROM inventory_items WHERE id = ? FOR UPDATE");
+                    $oldItemStmt->execute([$oldItemId]);
+                    $currentOldStock = (int)$oldItemStmt->fetchColumn();
                     if ($currentOldStock < $oldQty) {
                         throw new Exception('Cannot change item: original stock cannot be removed safely.');
                     }
@@ -136,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare("UPDATE stock_transactions SET item_id = ?, branch_id = ?, quantity = ?, unit_price = ?, reference_number = ?, remarks = ?, transaction_date = ? WHERE id = ?")
                     ->execute([$itemId, $txBranch, $qty, $unitPrice, $referenceNumber, $remarks, $transactionDate, $transactionId]);
                 $pdo->commit();
+                auditLog('EDIT_STOCK_IN', 'stock_transactions', $transactionId, "Updated stock in: $qty x {$item['name']}");
                 setFlash('success', 'Stock-in transaction updated successfully.');
             } else {
                 $computedTotal = round($qty * $unitPrice, 2);
@@ -164,8 +178,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->prepare("INSERT INTO stock_transactions (item_id,branch_id,user_id,transaction_type,quantity,unit_price,reference_number,remarks,transaction_date) VALUES (?,?,?,?,?,?,?,?,?)")
                     ->execute([$itemId, $txBranch, $user['id'], 'stock_in', $qty, $unitPrice, $referenceNumber, $remarks, $transactionDate]);
+                $newTransactionId = (int)$pdo->lastInsertId();
                 $pdo->prepare("UPDATE inventory_items SET current_stock=current_stock+? WHERE id=?")->execute([$qty, $itemId]);
                 $pdo->commit();
+                auditLog('STOCK_IN', 'stock_transactions', $newTransactionId, "Stock in: $qty x {$item['name']}");
                 setFlash('success', "Stock in recorded — $qty unit(s) added.");
             }
         } catch (Exception $e) {
