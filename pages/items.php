@@ -119,7 +119,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                     $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$user['id']]);
-                    auditLog('ADD_ITEM','inventory_items',$pdo->lastInsertId(),"Added: $name");
+                    $savedItemId = (int)$pdo->lastInsertId();
+                    auditLog('ADD_ITEM','inventory_items',$savedItemId,"Added: $name");
+                    $_SESSION['inventory_feedback'] = [
+                        'type' => 'success',
+                        'action' => 'added',
+                        'item_id' => $savedItemId,
+                        'name' => $name,
+                        'code' => $itemCode,
+                        'message' => "Item '$name' added successfully.",
+                    ];
                     setFlash('success',"Item '$name' added successfully.");
                 } catch (PDOException $e) {
                     if (($e->errorInfo[1] ?? null) === 1062) {
@@ -133,6 +142,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=? WHERE id=?");
                     $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$itemBranch,$itemId]);
                     auditLog('EDIT_ITEM','inventory_items',$itemId,"Updated: $name");
+                    $_SESSION['inventory_feedback'] = [
+                        'type' => 'success',
+                        'action' => 'updated',
+                        'item_id' => $itemId,
+                        'name' => $name,
+                        'code' => $itemCode,
+                        'message' => "Item '$name' updated successfully.",
+                    ];
                     setFlash('success',"Item '$name' updated successfully.");
                 } catch (PDOException $e) {
                     if (($e->errorInfo[1] ?? null) === 1062) {
@@ -157,6 +174,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $pdo->prepare("UPDATE inventory_items SET is_active=0 WHERE id=?")->execute([$itemId]);
             auditLog('DELETE_ITEM','inventory_items',$itemId,"Deactivated: {$itemToDelete['name']}");
+            $_SESSION['inventory_feedback'] = [
+                'type' => 'success',
+                'action' => 'removed',
+                'item_id' => null,
+                'name' => $itemToDelete['name'],
+                'code' => '',
+                'message' => "Item '{$itemToDelete['name']}' removed successfully.",
+            ];
             setFlash('success',"Item '{$itemToDelete['name']}' removed successfully.");
         }
     }
@@ -472,6 +497,8 @@ if (isset($_GET['edit'])) {
     $editItem = $es->fetch();
 }
 $showAddModal = $canManage && (($_GET['action'] ?? '') === 'add' || $editItem);
+$inventoryFeedback = $_SESSION['inventory_feedback'] ?? null;
+unset($_SESSION['inventory_feedback']);
 
 $branchNames = array_column($branches, 'name', 'id');
 $categoryNames = array_column($filterCategories, 'name', 'name');
@@ -514,6 +541,31 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <?php endif; ?>
 </div>
+
+<?php if ($inventoryFeedback): ?>
+<div class="inventory-feedback inventory-feedback-<?= clean($inventoryFeedback['type'] ?? 'success') ?>" id="inventoryFeedback" role="status" aria-live="polite">
+    <div class="inventory-feedback-icon" aria-hidden="true">
+        <?php if (($inventoryFeedback['type'] ?? 'success') === 'success'): ?>
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <?php else: ?>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <?php endif; ?>
+    </div>
+    <div class="inventory-feedback-copy">
+        <strong><?= clean($inventoryFeedback['message'] ?? 'Inventory change saved.') ?></strong>
+        <span>
+            <?= clean($inventoryFeedback['name'] ?? 'Inventory item') ?>
+            <?php if (!empty($inventoryFeedback['code'])): ?>
+                · Code <?= clean($inventoryFeedback['code']) ?>
+            <?php endif; ?>
+            <?php if (($inventoryFeedback['action'] ?? '') !== 'removed'): ?>
+                · Visible in the highlighted row below.
+            <?php endif; ?>
+        </span>
+    </div>
+    <button type="button" class="inventory-feedback-close" aria-label="Dismiss inventory confirmation" onclick="this.closest('.inventory-feedback').remove()">×</button>
+</div>
+<?php endif; ?>
 
 <div class="card filter-bar">
     <form method="GET" class="filter-form">
@@ -627,9 +679,15 @@ include __DIR__ . '/../includes/header.php';
                 $ss = $item['current_stock']==0 ? 'out' : ($item['current_stock']<=$item['minimum_stock'] ? 'low' : 'good');
                 $sl = $ss==='out' ? 'Out of Stock' : ($ss==='low' ? 'Low Stock' : 'In Stock');
                 $isLatestChange = $page === 1 && $i === 0;
+                $isFeedbackItem = !empty($inventoryFeedback['item_id']) && (int)$inventoryFeedback['item_id'] === (int)$item['id'];
                 $latestChangeDate = $item['updated_at'] ?: $item['created_at'];
+                $rowClasses = array_filter([
+                    $isLatestChange ? 'inventory-latest-row' : '',
+                    $isFeedbackItem ? 'inventory-feedback-row' : '',
+                ]);
+                $latestMarkerLabel = $isFeedbackItem ? ('Just ' . ($inventoryFeedback['action'] ?? 'saved')) : 'Latest change';
             ?>
-            <tr class="<?= $isLatestChange ? 'inventory-latest-row' : '' ?>">
+            <tr class="<?= clean(implode(' ', $rowClasses)) ?>" <?= $isFeedbackItem ? 'data-inventory-feedback-row="true"' : '' ?>>
                 <td><?= $offset + $i + 1 ?></td>
                 <td>
                     <div class="item-cell">
@@ -637,8 +695,8 @@ include __DIR__ . '/../includes/header.php';
                             <span class="item-name">
                                 <?= clean($item['name']) ?>
                             </span>
-                            <?php if ($isLatestChange): ?>
-                            <span class="latest-change-marker" title="Last changed <?= clean(date('d M Y, H:i', strtotime($latestChangeDate))) ?>">Latest change</span>
+                            <?php if ($isLatestChange || $isFeedbackItem): ?>
+                            <span class="latest-change-marker" title="Last changed <?= clean(date('d M Y, H:i', strtotime($latestChangeDate))) ?>"><?= clean($latestMarkerLabel) ?></span>
                             <?php endif; ?>
                             <span class="item-code"><?= clean($item['item_code']) ?></span>
                         </div>
@@ -648,7 +706,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= clean($item['section_name'] ?: '—') ?></td>
                 <td><?= clean($item['department_name'] ?: '—') ?></td>
                 <?php if ($isAdmin): ?><td><?= clean($item['branch_name']) ?></td><?php endif; ?>
-                <td><?= clean($item['brand_model'] ?: '—') ?></td>
+                <td><?= $item['brand_model'] ? clean($item['brand_model']) : '<span class="table-muted-value">Not specified</span>' ?></td>
                 <td><?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?></td>
                 <td><?= ugx($item['unit_price']) ?></td>
                 <td><strong><?= number_format($item['current_stock']) ?> <?= clean($item['unit']) ?></strong></td>
@@ -747,7 +805,7 @@ include __DIR__ . '/../includes/header.php';
             <h3><?= $editItem?'Edit Item':'Add New Item' ?></h3>
             <button class="modal-close" onclick="closeModal('addItemModal')">×</button>
         </div>
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" id="inventoryItemForm" novalidate>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="<?= $editItem?'edit':'add' ?>">
             <?php if ($editItem): ?>
@@ -774,8 +832,8 @@ include __DIR__ . '/../includes/header.php';
                         <div class="wizard-form-column">
                             <div class="wizard-step-nav">
                                 <button type="button" class="wizard-step-btn active" data-step="basic">1. Basic Info</button>
-                                <button type="button" class="wizard-step-btn" data-step="classification">2. Classification</button>
-                                <button type="button" class="wizard-step-btn" data-step="location">3. Location</button>
+                                <button type="button" class="wizard-step-btn" data-step="location">2. Location</button>
+                                <button type="button" class="wizard-step-btn" data-step="classification">3. Classification</button>
                                 <button type="button" class="wizard-step-btn" data-step="stock">4. Stock</button>
                                 <button type="button" class="wizard-step-btn" data-step="documents">5. Documents</button>
                                 <button type="button" class="wizard-step-btn" data-step="review">6. Review</button>
@@ -796,16 +854,7 @@ include __DIR__ . '/../includes/header.php';
                                             <small>Leave blank when adding a new item; the system will generate a unique code.</small>
                                         </div>
                                         <div class="form-group">
-                                            <label>Category *</label>
-                                            <select name="category_id" id="previewCategoryInput" required>
-                                                <option value="">Select category</option>
-                                                <?php foreach ($categories as $c): ?>
-                                                <option value="<?= $c['id'] ?>" data-branch="<?= $c['branch_id'] ?>" <?= ($editItem['category_id']??0)==$c['id']?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Brand / Model</label>
+                                            <label>Model / Specs</label>
                                             <input type="text" name="brand_model" id="previewBrandModelInput" placeholder="e.g. Dell Latitude 7420, Core i5, 8GB RAM" value="<?= clean($editItem['brand_model']??'') ?>">
                                         </div>
                                     </div>
@@ -819,8 +868,17 @@ include __DIR__ . '/../includes/header.php';
                             <div class="wizard-step-panel" data-step-panel="classification">
                                 <div class="form-section-card">
                                     <h4>Classification</h4>
-                                    <p>Define how the item should be categorized in the system.</p>
+                                    <p>Classify the item after its campus and organizational assignment are clear.</p>
                                     <div class="form-grid-2">
+                                        <div class="form-group">
+                                            <label>Category *</label>
+                                            <select name="category_id" id="previewCategoryInput" required>
+                                                <option value="">Select category</option>
+                                                <?php foreach ($categories as $c): ?>
+                                                <option value="<?= $c['id'] ?>" data-branch="<?= $c['branch_id'] ?>" <?= ($editItem['category_id']??0)==$c['id']?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
                                         <div class="form-group">
                                             <label>Inventory Type</label>
                                             <select name="inventory_type">
@@ -860,9 +918,9 @@ include __DIR__ . '/../includes/header.php';
                             <div class="wizard-step-panel" data-step-panel="location">
                                 <div class="form-section-card">
                                     <h4>Organizational Assignment</h4>
-                                    <p>Assign the item to the right campus, department, and section/unit.</p>
+                                    <p>Start with campus, then narrow the item to the right department and section/unit.</p>
                                     <div class="form-grid-2">
-                                                <?php if ($isAdmin): ?>
+                                        <?php if ($isAdmin): ?>
                                         <div class="form-group">
                                             <label>Campus *</label>
                                             <select name="branch_id" id="previewBranchInput" required>
@@ -871,10 +929,17 @@ include __DIR__ . '/../includes/header.php';
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
+                                        <?php else: ?>
+                                        <input type="hidden" name="branch_id" id="previewBranchInput" value="<?= (int)$branchId ?>" data-label="<?= clean($branchNames[$branchId] ?? 'Current campus') ?>">
+                                        <div class="form-group">
+                                            <label>Campus</label>
+                                            <div class="readonly-field"><?= clean($branchNames[$branchId] ?? 'Current campus') ?></div>
+                                            <small>This is fixed from your active branch.</small>
+                                        </div>
                                         <?php endif; ?>
                                         <div class="form-group">
-                                            <label>Department</label>
-                                            <select name="section_id" id="previewSectionInput">
+                                            <label>Department *</label>
+                                            <select name="section_id" id="previewSectionInput" required>
                                                 <option value="">Select department</option>
                                                 <?php foreach ($formSections as $s): ?>
                                                 <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?>" <?= ($editItem['section_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['branch_name']) ?> — <?= clean($s['name']) ?></option>
@@ -882,8 +947,8 @@ include __DIR__ . '/../includes/header.php';
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Section / Unit</label>
-                                            <select name="department_id" id="previewDeptInput">
+                                            <label>Section / Unit *</label>
+                                            <select name="department_id" id="previewDeptInput" required>
                                                 <option value="">Select section/unit</option>
                                                 <?php foreach ($formDepartments as $d): ?>
                                                 <option value="<?= $d['id'] ?>" data-section="<?= $d['section_id'] ?>" <?= ($editItem['department_id']??0)==$d['id']?'selected':'' ?>><?= clean($d['branch_name']) ?> — <?= clean($d['section_name']) ?> — <?= clean($d['name']) ?></option>
@@ -891,8 +956,9 @@ include __DIR__ . '/../includes/header.php';
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Storage Location</label>
+                                            <label>Physical Storage Location</label>
                                             <input type="text" name="storage_location" placeholder="e.g. Shelf B4" value="<?= clean($editItem['storage_location']??'') ?>">
+                                            <small>Use this for room, shelf, cabinet, store, or lab placement after the organizational assignment.</small>
                                         </div>
                                     </div>
                                 </div>
@@ -961,8 +1027,11 @@ include __DIR__ . '/../includes/header.php';
                                     <div class="form-grid-2">
                                         <div class="form-group">
                                             <label>Item Image</label>
-                                            <input type="file" name="image" accept="image/*">
+                                            <input type="file" name="image" id="previewImageInput" accept="image/*">
                                             <?php if (!empty($editItem['image'])): ?><small>Current: <?= clean($editItem['image']) ?></small><?php endif; ?>
+                                            <div class="inline-image-preview" id="inlineImagePreview" <?= empty($editItem['image']) ? 'hidden' : '' ?>>
+                                                <img id="inlineImagePreviewImg" src="<?= !empty($editItem['image']) ? clean(UPLOAD_URL . $editItem['image']) : '' ?>" alt="Selected item image preview">
+                                            </div>
                                         </div>
                                         <div class="form-group">
                                             <label>Invoice / Warranty File</label>
@@ -976,6 +1045,16 @@ include __DIR__ . '/../includes/header.php';
                                 <div class="form-section-card">
                                     <h4>Review & Submit</h4>
                                     <p>Confirm the inventory details before saving.</p>
+                                    <div class="review-visual-card">
+                                        <div class="review-image-frame" id="reviewImageFrame">
+                                            <img id="reviewImagePreview" src="<?= !empty($editItem['image']) ? clean(UPLOAD_URL . $editItem['image']) : '' ?>" alt="Item image review" <?= empty($editItem['image']) ? 'hidden' : '' ?>>
+                                            <span id="reviewImagePlaceholder" <?= !empty($editItem['image']) ? 'hidden' : '' ?>>No image selected</span>
+                                        </div>
+                                        <div>
+                                            <strong id="reviewItemName">Untitled Item</strong>
+                                            <span id="reviewItemContext">Choose campus, category, stock, and tracking details.</span>
+                                        </div>
+                                    </div>
                                     <div class="review-checklist">
                                         <div class="review-item"><strong>Core details</strong><span>Item name, category, and description will be saved.</span></div>
                                         <div class="review-item"><strong>Location</strong><span>Campus, department, and section/unit assignments are included in the record.</span></div>
@@ -989,6 +1068,10 @@ include __DIR__ . '/../includes/header.php';
                         <aside class="wizard-preview">
                             <div class="preview-card">
                                 <div class="preview-card-title">Inventory Summary</div>
+                                <div class="preview-image-frame">
+                                    <img id="previewImage" src="<?= !empty($editItem['image']) ? clean(UPLOAD_URL . $editItem['image']) : '' ?>" alt="Item image preview" <?= empty($editItem['image']) ? 'hidden' : '' ?>>
+                                    <span id="previewImagePlaceholder" <?= !empty($editItem['image']) ? 'hidden' : '' ?>>Image preview</span>
+                                </div>
                                 <div class="preview-item-name" id="previewItemName">Untitled Item</div>
                                 <div class="preview-meta">
                                     <span class="preview-pill" id="previewCategory">Unassigned Category</span>
@@ -1020,7 +1103,6 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('addItemModal')">Cancel</button>
-                <button type="button" class="btn btn-outline">Save Draft</button>
                 <button type="button" class="btn btn-outline" id="inventorySaveContinue">Save & Continue</button>
                 <button type="submit" class="btn btn-primary"><?= $editItem?'Update Item':'Submit Inventory' ?></button>
             </div>
@@ -1042,6 +1124,7 @@ const itemFilterRows = <?= json_encode(array_map(static fn($row) => [
 ], $filterRows), JSON_UNESCAPED_SLASHES) ?>;
 const itemFilterLabels = <?= json_encode($filterOptionLabels, JSON_UNESCAPED_SLASHES) ?>;
 const itemFilterFixedBranch = <?= $isAdmin ? 'null' : (int)$branchId ?>;
+const inventoryFeedback = <?= json_encode($inventoryFeedback, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
 
 function initSmartItemFilters() {
     const fields = {
@@ -1129,6 +1212,35 @@ function initSmartItemFilters() {
 document.addEventListener('DOMContentLoaded', function () {
     initSmartItemFilters();
 
+    if (inventoryFeedback) {
+        const feedbackRow = document.querySelector('[data-inventory-feedback-row="true"]');
+        if (feedbackRow) {
+            feedbackRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `inventory-toast inventory-toast-${inventoryFeedback.type || 'success'}`;
+        toast.setAttribute('role', 'status');
+        const dot = document.createElement('span');
+        dot.className = 'inventory-toast-dot';
+        dot.setAttribute('aria-hidden', 'true');
+        const copy = document.createElement('div');
+        const title = document.createElement('strong');
+        title.textContent = inventoryFeedback.message || 'Inventory change saved.';
+        const detail = document.createElement('small');
+        detail.textContent = inventoryFeedback.code ? `Code ${inventoryFeedback.code}` : 'Inventory list updated';
+        const closeToast = document.createElement('button');
+        closeToast.type = 'button';
+        closeToast.setAttribute('aria-label', 'Dismiss notification');
+        closeToast.textContent = '×';
+        closeToast.addEventListener('click', () => toast.remove());
+        copy.append(title, detail);
+        toast.append(dot, copy, closeToast);
+        document.body.appendChild(toast);
+        window.setTimeout(() => toast.classList.add('show'), 30);
+        window.setTimeout(() => toast.remove(), 5600);
+    }
+
     const deleteItemId = document.getElementById('deleteItemId');
     const deleteItemName = document.getElementById('deleteItemName');
     const deleteItemCode = document.getElementById('deleteItemCode');
@@ -1171,13 +1283,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const stepPanels = Array.from(document.querySelectorAll('.wizard-step-panel'));
     const stepOrder = stepButtons.map(btn => btn.dataset.step);
     const saveContinueBtn = document.getElementById('inventorySaveContinue');
+    const inventoryForm = document.getElementById('inventoryItemForm');
+    const submitBtn = inventoryForm?.querySelector('button[type="submit"]');
+    const existingImageUrl = document.getElementById('reviewImagePreview')?.getAttribute('src') || '';
+    let selectedImageUrl = '';
 
     function showStep(step) {
         stepButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.step === step));
         stepPanels.forEach(panel => panel.classList.toggle('active', panel.dataset.stepPanel === step));
         if (saveContinueBtn) {
-            saveContinueBtn.textContent = step === 'review' ? 'Review Complete' : 'Save & Continue';
-            saveContinueBtn.disabled = step === 'review';
+            saveContinueBtn.textContent = step === 'review' ? 'Back to Documents' : 'Save & Continue';
+            saveContinueBtn.disabled = false;
         }
     }
 
@@ -1192,6 +1308,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const currentIndex = stepButtons.findIndex(btn => btn.classList.contains('active'));
             const currentStep = stepOrder[currentIndex] || stepOrder[0];
             const currentPanel = stepPanels.find(panel => panel.dataset.stepPanel === currentStep);
+            if (currentStep === 'review') {
+                showStep('documents');
+                document.querySelector('#addItemModal .modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+            validateHierarchy();
             const invalidField = currentPanel ? Array.from(currentPanel.querySelectorAll('input, select, textarea')).find(field => !field.checkValidity()) : null;
 
             if (invalidField) {
@@ -1216,7 +1338,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const category = document.getElementById('previewCategoryInput')?.selectedOptions[0]?.text || 'Unassigned Category';
         const section = document.getElementById('previewSectionInput')?.selectedOptions[0]?.text || 'Unassigned department';
         const department = document.getElementById('previewDeptInput')?.selectedOptions[0]?.text || 'Unassigned section/unit';
-        const branch = document.getElementById('previewBranchInput')?.selectedOptions[0]?.text || 'Campus Not Set';
+        const branchInput = document.getElementById('previewBranchInput');
+        const branch = branchInput?.selectedOptions?.[0]?.text || branchInput?.dataset?.label || 'Campus Not Set';
         const supplier = document.getElementById('previewSupplierInput')?.selectedOptions[0]?.text || 'Not assigned';
         const unit = document.getElementById('previewUnitInput')?.value || 'unit';
         const stock = parseInt(document.getElementById('previewCurrentStockInput')?.value || '0', 10);
@@ -1238,6 +1361,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('previewPurchaseDate').textContent = purchaseDate;
         document.getElementById('previewAssetCode').textContent = assetCode;
         document.getElementById('previewQrCode').textContent = qrCode;
+        document.getElementById('reviewItemName').textContent = name;
+        document.getElementById('reviewItemContext').textContent = `${branch} • ${category} • ${stock} ${unit}${stock === 1 ? '' : 's'}`;
     }
 
     function filterSectionOptions() {
@@ -1284,6 +1409,106 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function validateHierarchy() {
+        const branchSelect = document.getElementById('previewBranchInput');
+        const categorySelect = document.getElementById('previewCategoryInput');
+        const sectionSelect = document.getElementById('previewSectionInput');
+        const deptSelect = document.getElementById('previewDeptInput');
+        const branchId = branchSelect?.value || '';
+        const categoryOption = categorySelect?.selectedOptions?.[0];
+        const sectionOption = sectionSelect?.selectedOptions?.[0];
+        const deptOption = deptSelect?.selectedOptions?.[0];
+
+        categorySelect?.setCustomValidity('');
+        sectionSelect?.setCustomValidity('');
+        deptSelect?.setCustomValidity('');
+
+        if (categoryOption?.value && branchId && categoryOption.dataset.branch !== branchId) {
+            categorySelect.setCustomValidity('Choose a category that belongs to the selected campus.');
+        }
+        if (sectionOption?.value && branchId && sectionOption.dataset.branch !== branchId) {
+            sectionSelect.setCustomValidity('Choose a department that belongs to the selected campus.');
+        }
+        if (deptOption?.value && sectionSelect?.value && deptOption.dataset.section !== sectionSelect.value) {
+            deptSelect.setCustomValidity('Choose a section/unit that belongs to the selected department.');
+        }
+    }
+
+    function findInvalidField() {
+        const fields = Array.from(inventoryForm?.querySelectorAll('input, select, textarea') || [])
+            .filter(field => !field.disabled && field.type !== 'hidden');
+        return fields.find(field => !field.checkValidity()) || null;
+    }
+
+    function showFieldStep(field) {
+        const panel = field?.closest('.wizard-step-panel');
+        if (panel?.dataset.stepPanel) {
+            showStep(panel.dataset.stepPanel);
+            document.querySelector('#addItemModal .modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    function showValidationMessage(field) {
+        if (!field) return;
+        showFieldStep(field);
+        setTimeout(() => {
+            field.reportValidity();
+            field.focus();
+        }, 0);
+    }
+
+    function updateImagePreview(url) {
+        const targets = [
+            ['previewImage', 'previewImagePlaceholder'],
+            ['reviewImagePreview', 'reviewImagePlaceholder'],
+            ['inlineImagePreviewImg', null],
+        ];
+        targets.forEach(([imageId, placeholderId]) => {
+            const image = document.getElementById(imageId);
+            const placeholder = placeholderId ? document.getElementById(placeholderId) : null;
+            if (!image) return;
+            if (url) {
+                image.src = url;
+                image.hidden = false;
+                if (placeholder) placeholder.hidden = true;
+            } else {
+                image.removeAttribute('src');
+                image.hidden = true;
+                if (placeholder) placeholder.hidden = false;
+            }
+        });
+        const inlineFrame = document.getElementById('inlineImagePreview');
+        if (inlineFrame) inlineFrame.hidden = !url;
+    }
+
+    document.getElementById('previewImageInput')?.addEventListener('change', function () {
+        if (selectedImageUrl) {
+            URL.revokeObjectURL(selectedImageUrl);
+            selectedImageUrl = '';
+        }
+        const file = this.files && this.files[0] ? this.files[0] : null;
+        if (!file) {
+            updateImagePreview(existingImageUrl);
+            return;
+        }
+        selectedImageUrl = URL.createObjectURL(file);
+        updateImagePreview(selectedImageUrl);
+    });
+
+    inventoryForm?.addEventListener('submit', function (event) {
+        validateHierarchy();
+        const invalidField = findInvalidField();
+        if (invalidField) {
+            event.preventDefault();
+            showValidationMessage(invalidField);
+            return;
+        }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+        }
+    });
+
     ['input', 'change'].forEach(eventName => {
         document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewBrandModelInput, #previewPurchaseDateInput, #previewAssetCodeInput, #previewQrCodeInput').forEach(el => {
             el.addEventListener(eventName, updatePreview);
@@ -1294,17 +1519,23 @@ document.addEventListener('DOMContentLoaded', function () {
         filterSectionOptions();
         filterCategoryOptions();
         filterDepartmentOptions();
+        validateHierarchy();
         updatePreview();
     });
 
     document.getElementById('previewSectionInput')?.addEventListener('change', function () {
         filterDepartmentOptions();
+        validateHierarchy();
         updatePreview();
     });
+
+    document.getElementById('previewCategoryInput')?.addEventListener('change', validateHierarchy);
+    document.getElementById('previewDeptInput')?.addEventListener('change', validateHierarchy);
 
     filterSectionOptions();
     filterCategoryOptions();
     filterDepartmentOptions();
+    validateHierarchy();
     updatePreview();
 });
 </script>
