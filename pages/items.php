@@ -636,10 +636,10 @@ include __DIR__ . '/../includes/header.php';
                         <div>
                             <span class="item-name">
                                 <?= clean($item['name']) ?>
-                                <?php if ($isLatestChange): ?>
-                                <span class="latest-change-marker" title="Last changed <?= clean(date('d M Y, H:i', strtotime($latestChangeDate))) ?>">Latest change</span>
-                                <?php endif; ?>
                             </span>
+                            <?php if ($isLatestChange): ?>
+                            <span class="latest-change-marker" title="Last changed <?= clean(date('d M Y, H:i', strtotime($latestChangeDate))) ?>">Latest change</span>
+                            <?php endif; ?>
                             <span class="item-code"><?= clean($item['item_code']) ?></span>
                         </div>
                     </div>
