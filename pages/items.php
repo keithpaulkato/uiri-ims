@@ -146,9 +146,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($action === 'delete') {
         $itemId = (int)($_POST['item_id'] ?? 0);
-        $pdo->prepare("UPDATE inventory_items SET is_active=0 WHERE id=?")->execute([$itemId]);
-        auditLog('DELETE_ITEM','inventory_items',$itemId,"Deactivated item ID $itemId");
-        setFlash('success','Item removed successfully.');
+        $itemLookup = $pdo->prepare("SELECT id, branch_id, name FROM inventory_items WHERE id=? AND is_active=1");
+        $itemLookup->execute([$itemId]);
+        $itemToDelete = $itemLookup->fetch();
+
+        if (!$itemToDelete) {
+            setFlash('error', 'Item not found or already removed.');
+        } elseif (!canAccessBranch((int)$itemToDelete['branch_id'])) {
+            setFlash('error', 'You are not allowed to delete items from another campus.');
+        } else {
+            $pdo->prepare("UPDATE inventory_items SET is_active=0 WHERE id=?")->execute([$itemId]);
+            auditLog('DELETE_ITEM','inventory_items',$itemId,"Deactivated: {$itemToDelete['name']}");
+            setFlash('success',"Item '{$itemToDelete['name']}' removed successfully.");
+        }
     }
     header('Location: items.php'); exit;
 }
@@ -429,7 +439,7 @@ $offset = ($page - 1) * $itemsPerPage;
 $pageStart = $totalItems ? $offset + 1 : 0;
 $pageEnd = min($offset + $itemsPerPage, $totalItems);
 
-$stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL ORDER BY i.created_at DESC LIMIT $itemsPerPage OFFSET $offset");
+$stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL ORDER BY i.updated_at DESC, i.created_at DESC, i.id DESC LIMIT $itemsPerPage OFFSET $offset");
 $stmt->execute($params);
 $items = $stmt->fetchAll();
 
@@ -616,12 +626,22 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($items as $i => $item):
                 $ss = $item['current_stock']==0 ? 'out' : ($item['current_stock']<=$item['minimum_stock'] ? 'low' : 'good');
                 $sl = $ss==='out' ? 'Out of Stock' : ($ss==='low' ? 'Low Stock' : 'In Stock');
+                $isLatestChange = $page === 1 && $i === 0;
+                $latestChangeDate = $item['updated_at'] ?: $item['created_at'];
             ?>
-            <tr>
+            <tr class="<?= $isLatestChange ? 'inventory-latest-row' : '' ?>">
                 <td><?= $offset + $i + 1 ?></td>
                 <td>
                     <div class="item-cell">
-                        <div><span class="item-name"><?= clean($item['name']) ?></span><span class="item-code"><?= clean($item['item_code']) ?></span></div>
+                        <div>
+                            <span class="item-name">
+                                <?= clean($item['name']) ?>
+                                <?php if ($isLatestChange): ?>
+                                <span class="latest-change-marker" title="Last changed <?= clean(date('d M Y, H:i', strtotime($latestChangeDate))) ?>">Latest change</span>
+                                <?php endif; ?>
+                            </span>
+                            <span class="item-code"><?= clean($item['item_code']) ?></span>
+                        </div>
                     </div>
                 </td>
                 <td><?= clean($item['category_name']) ?></td>
@@ -640,14 +660,9 @@ include __DIR__ . '/../includes/header.php';
                         <a href="items.php?edit=<?= $item['id'] ?>" class="btn-icon" title="Edit">
                             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </a>
-                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this item?')">
-                            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="item_id" value="<?= $item['id'] ?>">
-                            <button type="submit" class="btn-icon btn-icon-danger" title="Delete">
-                                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                            </button>
-                        </form>
+                        <button type="button" class="btn-icon btn-icon-danger js-delete-item" title="Delete" aria-label="Delete <?= clean($item['name']) ?>" data-item-id="<?= $item['id'] ?>" data-item-name="<?= clean($item['name']) ?>" data-item-code="<?= clean($item['item_code']) ?>" data-item-category="<?= clean($item['category_name']) ?>" data-item-stock="<?= (int)$item['current_stock'] ?>" data-item-unit="<?= clean($item['unit']) ?>">
+                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                        </button>
                     </div>
                 </td>
                 <?php endif; ?>
@@ -700,6 +715,32 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <?php if ($canManage): ?>
+<div class="modal-overlay" id="deleteItemModal" role="dialog" aria-modal="true" aria-labelledby="deleteItemTitle">
+    <div class="modal delete-user-modal">
+        <div class="delete-user-topline"></div>
+        <div class="delete-user-body">
+            <div class="delete-user-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </div>
+            <div class="delete-user-copy">
+                <span class="delete-user-kicker">Inventory item removal</span>
+                <h3 id="deleteItemTitle">Confirm item deletion</h3>
+                <p><strong id="deleteItemName">This item</strong> will be removed from active inventory records. Do you want to continue?</p>
+            </div>
+        </div>
+        <div class="delete-user-warning" id="deleteItemWarning">
+            Item code: <strong id="deleteItemCode">-</strong> · Category: <strong id="deleteItemCategory">-</strong> · Stock: <strong id="deleteItemStock">0 units</strong>
+        </div>
+        <form method="POST" id="deleteItemForm" class="delete-user-actions">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="item_id" id="deleteItemId" value="">
+            <button type="button" class="btn btn-outline delete-user-cancel" id="cancelDeleteItem">No, keep item</button>
+            <button type="submit" class="btn btn-danger delete-user-confirm" id="confirmDeleteItem">Yes, remove item</button>
+        </form>
+    </div>
+</div>
+
 <div class="modal-overlay" id="addItemModal" <?= $showAddModal?'style="display:flex"':'' ?>>
     <div class="modal modal-lg">
         <div class="modal-header">
@@ -980,7 +1021,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('addItemModal')">Cancel</button>
                 <button type="button" class="btn btn-outline">Save Draft</button>
-                <button type="button" class="btn btn-outline">Save & Continue</button>
+                <button type="button" class="btn btn-outline" id="inventorySaveContinue">Save & Continue</button>
                 <button type="submit" class="btn btn-primary"><?= $editItem?'Update Item':'Submit Inventory' ?></button>
             </div>
         </form>
@@ -1088,12 +1129,56 @@ function initSmartItemFilters() {
 document.addEventListener('DOMContentLoaded', function () {
     initSmartItemFilters();
 
+    const deleteItemId = document.getElementById('deleteItemId');
+    const deleteItemName = document.getElementById('deleteItemName');
+    const deleteItemCode = document.getElementById('deleteItemCode');
+    const deleteItemCategory = document.getElementById('deleteItemCategory');
+    const deleteItemStock = document.getElementById('deleteItemStock');
+    const cancelDeleteItem = document.getElementById('cancelDeleteItem');
+    const confirmDeleteItem = document.getElementById('confirmDeleteItem');
+    const deleteItemForm = document.getElementById('deleteItemForm');
+
+    document.querySelectorAll('.js-delete-item').forEach(button => {
+        button.addEventListener('click', function () {
+            if (!deleteItemId || !deleteItemName) return;
+            const stock = parseInt(this.dataset.itemStock || '0', 10);
+            const unit = this.dataset.itemUnit || 'unit';
+
+            deleteItemId.value = this.dataset.itemId || '';
+            deleteItemName.textContent = this.dataset.itemName || 'This item';
+            if (deleteItemCode) deleteItemCode.textContent = this.dataset.itemCode || '-';
+            if (deleteItemCategory) deleteItemCategory.textContent = this.dataset.itemCategory || '-';
+            if (deleteItemStock) deleteItemStock.textContent = stock.toLocaleString() + ' ' + unit + (stock === 1 ? '' : 's');
+            openModal('deleteItemModal');
+            if (cancelDeleteItem) cancelDeleteItem.focus();
+        });
+    });
+
+    if (cancelDeleteItem) {
+        cancelDeleteItem.addEventListener('click', function () {
+            closeModal('deleteItemModal');
+        });
+    }
+
+    if (deleteItemForm && confirmDeleteItem) {
+        deleteItemForm.addEventListener('submit', function () {
+            confirmDeleteItem.disabled = true;
+            confirmDeleteItem.textContent = 'Removing...';
+        });
+    }
+
     const stepButtons = Array.from(document.querySelectorAll('.wizard-step-btn'));
     const stepPanels = Array.from(document.querySelectorAll('.wizard-step-panel'));
+    const stepOrder = stepButtons.map(btn => btn.dataset.step);
+    const saveContinueBtn = document.getElementById('inventorySaveContinue');
 
     function showStep(step) {
         stepButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.step === step));
         stepPanels.forEach(panel => panel.classList.toggle('active', panel.dataset.stepPanel === step));
+        if (saveContinueBtn) {
+            saveContinueBtn.textContent = step === 'review' ? 'Review Complete' : 'Save & Continue';
+            saveContinueBtn.disabled = step === 'review';
+        }
     }
 
     stepButtons.forEach(btn => {
@@ -1101,6 +1186,25 @@ document.addEventListener('DOMContentLoaded', function () {
             showStep(this.dataset.step);
         });
     });
+
+    if (saveContinueBtn) {
+        saveContinueBtn.addEventListener('click', function () {
+            const currentIndex = stepButtons.findIndex(btn => btn.classList.contains('active'));
+            const currentStep = stepOrder[currentIndex] || stepOrder[0];
+            const currentPanel = stepPanels.find(panel => panel.dataset.stepPanel === currentStep);
+            const invalidField = currentPanel ? Array.from(currentPanel.querySelectorAll('input, select, textarea')).find(field => !field.checkValidity()) : null;
+
+            if (invalidField) {
+                invalidField.reportValidity();
+                invalidField.focus();
+                return;
+            }
+
+            const nextStep = stepOrder[Math.min(currentIndex + 1, stepOrder.length - 1)];
+            showStep(nextStep);
+            document.querySelector('#addItemModal .modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
 
     function formatCurrency(value) {
         const num = parseFloat(value) || 0;
