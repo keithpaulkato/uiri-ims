@@ -39,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $storageLocation = trim($_POST['storage_location'] ?? '');
         $itemBranch   = $isAdmin ? (int)($_POST['branch_id'] ?? $branchId) : $branchId;
 
-        if (!$name || !$itemCode || !$categoryId) {
-            setFlash('error', 'Name, item code and category are required.');
+        if (!$name || !$categoryId) {
+            setFlash('error', 'Item name and category are required.');
         } else {
             $imageName = $_POST['existing_image'] ?? null;
             if (!empty($_FILES['image']['name'])) {
@@ -111,16 +111,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     header('Location: items.php'); exit;
                 }
             }
-        if ($action === 'add') {
-                $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-                $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$user['id']]);
-                auditLog('ADD_ITEM','inventory_items',$pdo->lastInsertId(),"Added: $name");
-                setFlash('success',"Item '$name' added successfully.");
+            if ($action === 'add' && $itemCode === '') {
+                $itemCode = generateItemCode($categoryId, $itemBranch);
+            }
+
+            if ($action === 'add') {
+                try {
+                    $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                    $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$user['id']]);
+                    auditLog('ADD_ITEM','inventory_items',$pdo->lastInsertId(),"Added: $name");
+                    setFlash('success',"Item '$name' added successfully.");
+                } catch (PDOException $e) {
+                    if (($e->errorInfo[1] ?? null) === 1062) {
+                        setFlash('error', 'That item code already exists. Leave Item Code blank so the system can generate a unique one.');
+                    } else {
+                        throw $e;
+                    }
+                }
             } else {
-                $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=? WHERE id=?");
-                $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$itemBranch,$itemId]);
-                auditLog('EDIT_ITEM','inventory_items',$itemId,"Updated: $name");
-                setFlash('success',"Item '$name' updated successfully.");
+                try {
+                    $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=? WHERE id=?");
+                    $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$itemBranch,$itemId]);
+                    auditLog('EDIT_ITEM','inventory_items',$itemId,"Updated: $name");
+                    setFlash('success',"Item '$name' updated successfully.");
+                } catch (PDOException $e) {
+                    if (($e->errorInfo[1] ?? null) === 1062) {
+                        setFlash('error', 'That item code already exists. Please use another item code.');
+                    } else {
+                        throw $e;
+                    }
+                }
             }
         }
     }
@@ -730,8 +750,9 @@ include __DIR__ . '/../includes/header.php';
                                             <input type="text" name="name" id="previewNameInput" required placeholder="e.g. Dell Latitude Laptop" value="<?= clean($editItem['name']??'') ?>">
                                         </div>
                                         <div class="form-group">
-                                            <label>Item Code *</label>
-                                            <input type="text" name="item_code" required placeholder="e.g. NK-ICT-001" value="<?= clean($editItem['item_code']??'') ?>">
+                                            <label>Item Code</label>
+                                            <input type="text" name="item_code" placeholder="Auto-generated if left blank" value="<?= clean($editItem['item_code']??'') ?>">
+                                            <small>Leave blank when adding a new item; the system will generate a unique code.</small>
                                         </div>
                                         <div class="form-group">
                                             <label>Category *</label>
@@ -812,7 +833,7 @@ include __DIR__ . '/../includes/header.php';
                                         <?php endif; ?>
                                         <div class="form-group">
                                             <label>Department</label>
-                                            <select name="section_id" id="previewSectionInput" <?= $isAdmin ? '' : 'required' ?>>
+                                            <select name="section_id" id="previewSectionInput">
                                                 <option value="">Select department</option>
                                                 <?php foreach ($formSections as $s): ?>
                                                 <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?>" <?= ($editItem['section_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['branch_name']) ?> — <?= clean($s['name']) ?></option>
