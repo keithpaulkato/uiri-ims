@@ -716,7 +716,7 @@ include __DIR__ . '/../includes/header.php';
                 <td>
                     <span class="item-name"><?= clean($item['name']) ?></span>
                     <span class="item-code"><?= clean($item['item_code']) ?></span>
-                    <span class="item-audit-line">Recorded by: <?= clean(trim(($item['recorded_by_name'] ?: 'Not recorded') . ($item['recorded_by_role'] ? ', ' . $item['recorded_by_role'] : ''))) ?></span>
+                    <span class="item-audit-line">Recorded by: <?= clean(trim((($item['recorded_by_name'] ?? '') ?: 'Not recorded') . (($item['recorded_by_role'] ?? '') ? ', ' . $item['recorded_by_role'] : ''))) ?></span>
                 </td>
                 <td><?= clean($item['category_name']) ?></td>
                 <td><?= clean($item['section_name'] ?: '—') ?></td>
@@ -768,7 +768,7 @@ include __DIR__ . '/../includes/header.php';
                             <span class="latest-change-marker" title="Last changed <?= clean(date('d M Y, H:i', strtotime($latestChangeDate))) ?>"><?= clean($latestMarkerLabel) ?></span>
                             <?php endif; ?>
                             <span class="item-code"><?= clean($item['item_code']) ?></span>
-                            <span class="item-audit-line">Recorded by: <?= clean(trim(($item['recorded_by_name'] ?: 'Not recorded') . ($item['recorded_by_role'] ? ', ' . $item['recorded_by_role'] : ''))) ?></span>
+                            <span class="item-audit-line">Recorded by: <?= clean(trim((($item['recorded_by_name'] ?? '') ?: 'Not recorded') . (($item['recorded_by_role'] ?? '') ? ', ' . $item['recorded_by_role'] : ''))) ?></span>
                         </div>
                     </div>
                 </td>
@@ -1209,6 +1209,7 @@ const itemFilterRows = <?= json_encode(array_map(static fn($row) => [
 const itemFilterLabels = <?= json_encode($filterOptionLabels, JSON_UNESCAPED_SLASHES) ?>;
 const itemFilterFixedBranch = <?= $isAdmin ? 'null' : (int)$branchId ?>;
 const inventoryFeedback = <?= json_encode($inventoryFeedback, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+const inventoryPrintGeneratedBy = <?= json_encode(trim(($user['full_name'] ?? '') . (($user['role'] ?? '') ? ', ' . $user['role'] : '')), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
 
 function initSmartItemFilters() {
     const fields = {
@@ -1487,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const campus = document.getElementById('previewBranch')?.textContent || 'Campus Not Set';
         const description = inventoryForm?.querySelector('textarea[name="description"]')?.value?.trim() || 'No description provided.';
         const itemCode = inventoryForm?.querySelector('input[name="item_code"]')?.value?.trim() || 'Auto-generated / not assigned';
-        const generatedBy = '<?= clean(trim(($user['full_name'] ?? '') . (($user['role'] ?? '') ? ', ' . $user['role'] : ''))) ?>';
+        const generatedBy = inventoryPrintGeneratedBy;
         const image = document.getElementById('previewImage');
         const imageSrc = image && !image.hidden && image.getAttribute('src') ? image.getAttribute('src') : '';
         const rows = Array.from(document.querySelectorAll('.preview-list > div')).map((row) => {

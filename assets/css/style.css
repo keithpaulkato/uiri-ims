@@ -1493,7 +1493,8 @@ select.form-control { cursor: pointer; color: var(--gold); }
     line-height: 1.1 !important;
   }
   .inventory-items-table .item-name,
-  .inventory-items-table .item-code {
+  .inventory-items-table .item-code,
+  .inventory-items-table .item-audit-line {
     font-size: inherit !important;
     line-height: inherit !important;
     white-space: normal !important;
