@@ -34,6 +34,7 @@ $reportType = in_array($reportType, $validReports, true) ? $reportType : 'summar
 
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $assetStatusMaster = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
+$assetTypeMaster = ['Fixed Asset','Consumable','Tool','Spare Part','Laboratory Equipment','Office Equipment'];
 $conditionMaster = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
 
 $buildOptionWhere = function (array $keys) use (
@@ -123,7 +124,7 @@ $categories = $fetchOptionRows("
     {WHERE}
     GROUP BY c.name
     ORDER BY c.name
-", ['branch']);
+", ['branch', 'section', 'department']);
 if ($catFilter && !$hasSelectedId($categories, $catFilter)) {
     $catFilter = 0;
     $catNameFilter = '';
@@ -139,7 +140,7 @@ $sections = $fetchOptionRows("
     {WHERE}
     GROUP BY sec.id, sec.name, sec.code, sec.branch_id
     ORDER BY sec.name
-", ['branch', 'category']);
+", ['branch']);
 if (!$hasSelectedId($sections, $sectionFilter)) {
     $sectionFilter = 0;
     $departmentFilter = 0;
@@ -153,7 +154,7 @@ $departments = $fetchOptionRows("
     {WHERE}
     GROUP BY d.id, d.name, d.section_id, sec.name, sec.branch_id
     ORDER BY sec.name, d.name
-", ['branch', 'category', 'section']);
+", ['branch', 'section']);
 if (!$hasSelectedId($departments, $departmentFilter)) {
     $departmentFilter = 0;
 }
@@ -165,13 +166,13 @@ $suppliers = $fetchOptionRows("
     {WHERE}
     GROUP BY s.id, s.company_name
     ORDER BY s.company_name
-", ['branch', 'category', 'section', 'department']);
+", ['branch', 'section', 'department', 'category']);
 if (!$hasSelectedId($suppliers, $supplierFilter)) {
     $supplierFilter = 0;
 }
 
 $stockStatusOptions = [];
-[$stockWhere, $stockParams] = $buildOptionWhere(['branch', 'category', 'section', 'department', 'supplier']);
+[$stockWhere, $stockParams] = $buildOptionWhere(['branch', 'section', 'department', 'category', 'supplier']);
 $stockStmt = $pdo->prepare("
     SELECT
         SUM(CASE WHEN i.current_stock <= i.minimum_stock THEN 1 ELSE 0 END) AS low_stock,
@@ -187,54 +188,37 @@ foreach ([
     'out_of_stock' => 'Out of Stock',
     'available' => 'Available',
 ] as $value => $label) {
-    if ((int)($stockCounts[$value] ?? 0) > 0) {
-        $stockStatusOptions[] = ['value' => $value, 'label' => $label, 'item_count' => (int)$stockCounts[$value]];
-    }
+    $stockStatusOptions[] = ['value' => $value, 'label' => $label, 'item_count' => (int)($stockCounts[$value] ?? 0)];
 }
 if ($statusFilter && !in_array($statusFilter, array_column($stockStatusOptions, 'value'), true)) {
     $statusFilter = '';
 }
 
-$assetStatusOptions = $fetchOptionRows("
-    SELECT i.asset_status AS value, i.asset_status AS label, COUNT(i.id) AS item_count
-    FROM inventory_items i
-    {WHERE}
-      AND i.asset_status IS NOT NULL
-      AND i.asset_status <> ''
-    GROUP BY i.asset_status
-    ORDER BY i.asset_status
-", ['branch', 'category', 'section', 'department', 'supplier', 'status']);
+$assetStatusOptions = array_map(static fn($status) => [
+    'value' => $status,
+    'label' => $status,
+], $assetStatusMaster);
 if ($assetStatusFilter && !in_array($assetStatusFilter, array_column($assetStatusOptions, 'value'), true)) {
     $assetStatusFilter = '';
 }
 
-$assetTypeOptions = $fetchOptionRows("
-    SELECT i.asset_type AS value, i.asset_type AS label, COUNT(i.id) AS item_count
-    FROM inventory_items i
-    {WHERE}
-      AND i.asset_type IS NOT NULL
-      AND i.asset_type <> ''
-    GROUP BY i.asset_type
-    ORDER BY i.asset_type
-", ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status']);
+$assetTypeOptions = array_map(static fn($type) => [
+    'value' => $type,
+    'label' => $type,
+], $assetTypeMaster);
 if ($assetTypeFilter && !in_array($assetTypeFilter, array_column($assetTypeOptions, 'value'), true)) {
     $assetTypeFilter = '';
 }
 
-$conditionOptions = $fetchOptionRows("
-    SELECT i.asset_condition AS value, i.asset_condition AS label, COUNT(i.id) AS item_count
-    FROM inventory_items i
-    {WHERE}
-      AND i.asset_condition IS NOT NULL
-      AND i.asset_condition <> ''
-    GROUP BY i.asset_condition
-    ORDER BY i.asset_condition
-", ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'asset_type']);
+$conditionOptions = array_map(static fn($condition) => [
+    'value' => $condition,
+    'label' => $condition,
+], $conditionMaster);
 if ($conditionFilter && !in_array($conditionFilter, array_column($conditionOptions, 'value'), true)) {
     $conditionFilter = '';
 }
 
-[$dateBoundsWhere, $dateBoundsParams] = $buildOptionWhere(['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'asset_type', 'condition']);
+[$dateBoundsWhere, $dateBoundsParams] = $buildOptionWhere(['branch', 'section', 'department', 'category', 'supplier', 'status', 'asset_status', 'asset_type', 'condition']);
 $dateBoundsStmt = $pdo->prepare("
     SELECT MIN(i.purchase_date) AS min_purchase_date, MAX(i.purchase_date) AS max_purchase_date
     FROM inventory_items i
@@ -303,6 +287,9 @@ $filterOptionLabels = [
         ['id' => 'out_of_stock', 'label' => 'Out of Stock'],
         ['id' => 'available', 'label' => 'Available'],
     ],
+    'asset_statuses' => array_map(static fn($status) => ['id' => $status, 'label' => $status], $assetStatusMaster),
+    'asset_types' => array_map(static fn($type) => ['id' => $type, 'label' => $type], $assetTypeMaster),
+    'conditions' => array_map(static fn($condition) => ['id' => $condition, 'label' => $condition], $conditionMaster),
 ];
 
 $searchSql = '';
@@ -317,7 +304,7 @@ $departmentSql = $departmentFilter ? "AND i.department_id=$departmentFilter" : '
 $supplierSql = $supplierFilter ? "AND i.supplier_id=$supplierFilter" : '';
 $sectionSql = $sectionFilter ? "AND i.section_id=$sectionFilter" : '';
 $assetStatusSql = in_array($assetStatusFilter, $assetStatusMaster, true) ? "AND i.asset_status=" . $pdo->quote($assetStatusFilter) : '';
-$assetTypeSql = $assetTypeFilter !== '' ? "AND i.asset_type=" . $pdo->quote($assetTypeFilter) : '';
+$assetTypeSql = in_array($assetTypeFilter, $assetTypeMaster, true) ? "AND i.asset_type=" . $pdo->quote($assetTypeFilter) : '';
 $conditionSql = in_array($conditionFilter, $conditionMaster, true) ? "AND i.asset_condition=" . $pdo->quote($conditionFilter) : '';
 $purchaseFromSql = preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseFrom) ? "AND i.purchase_date >= " . $pdo->quote($purchaseFrom) : '';
 $purchaseToSql = preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseTo) ? "AND i.purchase_date <= " . $pdo->quote($purchaseTo) : '';
@@ -514,18 +501,6 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
         <?php if (in_array($reportType,['summary','movement','valuation','low_stock'])): ?>
     <div class="filter-group">
-        <label for="categorySelect" class="form-label">Category</label>
-        <select id="categorySelect" name="category" class="form-control">
-            <option value="">All Categories</option>
-            <?php foreach ($categories as $c): ?>
-                <option value="<?= clean($c['name']) ?>" <?= ($catNameFilter === $c['name'] || ($catFilter && $c['id']==$catFilter)) ? 'selected' : '' ?>>
-                    <?= clean($c['name']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-
-    <div class="filter-group">
         <label for="sectionSelect" class="form-label">Department</label>
         <select id="sectionSelect" name="section" class="form-control">
             <option value="">All Departments</option>
@@ -546,6 +521,18 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="filter-group">
+        <label for="categorySelect" class="form-label">Category</label>
+        <select id="categorySelect" name="category" class="form-control">
+            <option value="">All Categories</option>
+            <?php foreach ($categories as $c): ?>
+                <option value="<?= clean($c['name']) ?>" <?= ($catNameFilter === $c['name'] || ($catFilter && $c['id']==$catFilter)) ? 'selected' : '' ?>>
+                    <?= clean($c['name']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="filter-group">
         <label for="supplierSelect" class="form-label">Supplier</label>
         <select id="supplierSelect" name="supplier" class="form-control">
             <option value="">All Suppliers</option>
@@ -556,9 +543,9 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="filter-group">
-        <label for="statusSelect" class="form-label">Status</label>
+        <label for="statusSelect" class="form-label">Stock Status</label>
         <select id="statusSelect" name="status" class="form-control">
-            <option value="">All Statuses</option>
+            <option value="">All Stock Statuses</option>
             <?php foreach ($stockStatusOptions as $status): ?>
             <option value="<?= clean($status['value']) ?>" <?= $statusFilter===$status['value']?'selected':'' ?>><?= clean($status['label']) ?></option>
             <?php endforeach; ?>
@@ -794,20 +781,24 @@ function initSmartReportFilters() {
         purchase_to: document.getElementById('purchaseTo'),
     };
 
-    const order = ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'asset_type', 'condition'];
+    const order = ['branch', 'section', 'department', 'category', 'supplier', 'status', 'asset_status', 'asset_type', 'condition'];
     const optionSources = {
         category: reportFilterLabels.categories,
         section: reportFilterLabels.sections,
         department: reportFilterLabels.departments,
         supplier: reportFilterLabels.suppliers,
         status: reportFilterLabels.stock_statuses,
+        asset_status: reportFilterLabels.asset_statuses,
+        asset_type: reportFilterLabels.asset_types,
+        condition: reportFilterLabels.conditions,
     };
+    const fixedOptionKeys = new Set(['status', 'asset_status', 'asset_type', 'condition']);
     const defaultLabels = {
         category: 'All Categories',
         section: 'All Departments',
         department: 'All Sections / Units',
         supplier: 'All Suppliers',
-        status: 'All Statuses',
+        status: 'All Stock Statuses',
         asset_status: 'All Asset Statuses',
         asset_type: 'All Asset Types',
         condition: 'All Conditions',
@@ -843,10 +834,6 @@ function initSmartReportFilters() {
     };
 
     const labelFor = (key, value) => {
-        if (key === 'asset_status' || key === 'asset_type' || key === 'condition') {
-            return value;
-        }
-
         const source = optionSources[key] || [];
         const option = source.find((item) => String(item.id) === String(value));
         return option ? option.label : value;
@@ -859,7 +846,9 @@ function initSmartReportFilters() {
         }
 
         const selected = select.value;
-        const values = Array.from(uniqueValues(key)).sort((a, b) => labelFor(key, a).localeCompare(labelFor(key, b)));
+        const values = fixedOptionKeys.has(key)
+            ? (optionSources[key] || []).map((item) => String(item.id))
+            : Array.from(uniqueValues(key)).sort((a, b) => labelFor(key, a).localeCompare(labelFor(key, b)));
         select.innerHTML = '';
         select.add(new Option(defaultLabels[key], ''));
 

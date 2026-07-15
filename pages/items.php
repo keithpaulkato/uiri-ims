@@ -302,7 +302,7 @@ $filterCategories = $fetchItemOptionRows("
     {WHERE}
     GROUP BY c.name
     ORDER BY c.name
-", ['branch']);
+", ['branch', 'section', 'department']);
 if ($catFilter && !$hasSelectedId($filterCategories, $catFilter)) {
     $catFilter = 0;
     $catNameFilter = '';
@@ -319,7 +319,7 @@ $sections = $fetchItemOptionRows("
     {WHERE}
     GROUP BY sec.id, sec.name, sec.branch_id, b.name
     ORDER BY b.name, sec.name
-", ['branch', 'category']);
+", ['branch']);
 if (!$hasSelectedId($sections, $sectionFilter)) {
     $sectionFilter = 0;
     $deptFilter = 0;
@@ -334,7 +334,7 @@ $departments = $fetchItemOptionRows("
     {WHERE}
     GROUP BY d.id, d.name, d.section_id, sec.name, sec.branch_id, b.name
     ORDER BY b.name, sec.name, d.name
-", ['branch', 'category', 'section']);
+", ['branch', 'section']);
 if (!$hasSelectedId($departments, $deptFilter)) {
     $deptFilter = 0;
 }
@@ -346,7 +346,7 @@ $suppliers = $fetchItemOptionRows("
     {WHERE}
     GROUP BY s.id, s.company_name
     ORDER BY s.company_name
-", ['branch', 'category', 'section', 'department']);
+", ['branch', 'section', 'department', 'category']);
 if (!$hasSelectedId($suppliers, $supplierFilter)) {
     $supplierFilter = 0;
 }
@@ -490,6 +490,10 @@ $stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS su
 $stmt->execute($itemParams);
 $items = $stmt->fetchAll();
 
+$printStmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL ORDER BY i.id DESC, i.updated_at DESC, i.created_at DESC");
+$printStmt->execute($params);
+$printItems = $printStmt->fetchAll();
+
 $paginationParams = $_GET;
 unset($paginationParams['page'], $paginationParams['edit'], $paginationParams['action'], $paginationParams['saved']);
 $pageUrl = function (int $targetPage) use ($paginationParams): string {
@@ -552,14 +556,18 @@ include __DIR__ . '/../includes/header.php';
             <?php endif; ?>
         </p>
     </div>
-    <?php if ($canManage): ?>
     <div class="page-actions">
+        <button type="button" class="btn btn-outline" onclick="window.print()">
+            <svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print Items
+        </button>
+        <?php if ($canManage): ?>
         <button class="btn btn-primary" onclick="openModal('addItemModal')">
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Item
         </button>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 </div>
 
 <?php if ($inventoryFeedback): ?>
@@ -606,22 +614,6 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <?php endif; ?>
         <div class="filter-group">
-            <select id="categorySelect" name="category">
-                <option value="">All Categories</option>
-                <?php foreach ($filterCategories as $c): ?>
-                <option value="<?= clean($c['name']) ?>" <?= ($catNameFilter === $c['name'] || ($catFilter && $c['id']==$catFilter)) ? 'selected' : '' ?>><?= clean($c['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="filter-group">
-            <select id="supplierSelect" name="supplier">
-                <option value="">All Suppliers</option>
-                <?php foreach ($suppliers as $s): ?>
-                <option value="<?= $s['id'] ?>" <?= $s['id']==$supplierFilter?'selected':'' ?>><?= clean($s['company_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="filter-group">
             <select id="sectionSelect" name="section">
                 <option value="">All Departments</option>
                 <?php foreach ($sections as $s): ?>
@@ -634,6 +626,22 @@ include __DIR__ . '/../includes/header.php';
                 <option value="">All Sections / Units</option>
                 <?php foreach ($departments as $d): ?>
                 <option value="<?= $d['id'] ?>" <?= $d['id']==$deptFilter?'selected':'' ?>><?= clean($d['branch_name']) ?> — <?= clean($d['section_name']) ?> — <?= clean($d['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="categorySelect" name="category">
+                <option value="">All Categories</option>
+                <?php foreach ($filterCategories as $c): ?>
+                <option value="<?= clean($c['name']) ?>" <?= ($catNameFilter === $c['name'] || ($catFilter && $c['id']==$catFilter)) ? 'selected' : '' ?>><?= clean($c['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="supplierSelect" name="supplier">
+                <option value="">All Suppliers</option>
+                <?php foreach ($suppliers as $s): ?>
+                <option value="<?= $s['id'] ?>" <?= $s['id']==$supplierFilter?'selected':'' ?>><?= clean($s['company_name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -684,6 +692,40 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($printFilters as $label => $value): ?>
             <div><strong><?= clean($label) ?>:</strong> <?= clean((string)$value) ?></div>
             <?php endforeach; ?>
+        </div>
+        <div class="inventory-print-table-wrap">
+        <table class="data-table inventory-items-table">
+            <thead><tr>
+                <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
+                <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
+                <th>Model / Specs</th><th>Serial No.</th><th>Purchased</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($printItems as $i => $item):
+                $ss = $item['current_stock']==0 ? 'out' : ($item['current_stock']<=$item['minimum_stock'] ? 'low' : 'good');
+                $sl = $ss==='out' ? 'Out of Stock' : ($ss==='low' ? 'Low Stock' : 'In Stock');
+            ?>
+            <tr>
+                <td><?= $i + 1 ?></td>
+                <td>
+                    <span class="item-name"><?= clean($item['name']) ?></span>
+                    <span class="item-code"><?= clean($item['item_code']) ?></span>
+                </td>
+                <td><?= clean($item['category_name']) ?></td>
+                <td><?= clean($item['section_name'] ?: '—') ?></td>
+                <td><?= clean($item['department_name'] ?: '—') ?></td>
+                <?php if ($isAdmin): ?><td><?= clean($item['branch_name']) ?></td><?php endif; ?>
+                <td><?= $item['brand_model'] ? clean($item['brand_model']) : '<span class="table-muted-value">Not specified</span>' ?></td>
+                <td><?= $item['serial_number'] ? clean($item['serial_number']) : '<span class="table-muted-value">—</span>' ?></td>
+                <td><?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?></td>
+                <td><?= ugx($item['unit_price']) ?></td>
+                <td><strong><?= number_format($item['current_stock']) ?> <?= clean($item['unit']) ?></strong></td>
+                <td><?= $item['minimum_stock'] ?></td>
+                <td><span class="badge badge-<?= $ss==='good'?'success':($ss==='low'?'warn':'danger') ?>"><?= $sl ?></span></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
         </div>
         <div class="inventory-table-scroll">
         <div class="inventory-table-canvas">
@@ -892,6 +934,14 @@ include __DIR__ . '/../includes/header.php';
                                     <p>Classify the item after its campus and organizational assignment are clear.</p>
                                     <div class="form-grid-2">
                                         <div class="form-group">
+                                            <label>Inventory Type</label>
+                                            <select name="inventory_type">
+                                                <?php foreach (['Fixed Asset','Consumable','Tool','Spare Part','Laboratory Equipment','Office Equipment'] as $type): ?>
+                                                <option value="<?= $type ?>" <?= ($editItem['asset_type']??'Consumable')===$type?'selected':'' ?>><?= $type ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
                                             <label>Category *</label>
                                             <select name="category_id" id="previewCategoryInput" required>
                                                 <option value="">Select category</option>
@@ -901,10 +951,11 @@ include __DIR__ . '/../includes/header.php';
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Inventory Type</label>
-                                            <select name="inventory_type">
-                                                <?php foreach (['Fixed Asset','Consumable','Tool','Spare Part','Laboratory Equipment','Office Equipment'] as $type): ?>
-                                                <option value="<?= $type ?>" <?= ($editItem['asset_type']??'Consumable')===$type?'selected':'' ?>><?= $type ?></option>
+                                            <label>Supplier</label>
+                                            <select name="supplier_id" id="previewSupplierInput">
+                                                <option value="">Select supplier</option>
+                                                <?php foreach ($formSuppliers as $s): ?>
+                                                <option value="<?= $s['id'] ?>" <?= ($editItem['supplier_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['company_name']) ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
@@ -1024,15 +1075,6 @@ include __DIR__ . '/../includes/header.php';
                                     <p>Add supporting files and internal tracking references.</p>
                                     <div class="form-grid-2">
                                         <div class="form-group">
-                                            <label>Supplier</label>
-                                            <select name="supplier_id" id="previewSupplierInput">
-                                                <option value="">Select supplier</option>
-                                                <?php foreach ($formSuppliers as $s): ?>
-                                                <option value="<?= $s['id'] ?>" <?= ($editItem['supplier_id']??0)==$s['id']?'selected':'' ?>><?= clean($s['company_name']) ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
                                             <label>Asset Code</label>
                                             <input type="text" name="asset_code" id="previewAssetCodeInput" placeholder="e.g. AST-001" value="<?= clean($editItem['asset_code']??'') ?>">
                                         </div>
@@ -1093,7 +1135,13 @@ include __DIR__ . '/../includes/header.php';
 
                         <aside class="wizard-preview">
                             <div class="preview-card">
-                                <div class="preview-card-title">Inventory Summary</div>
+                                <div class="preview-card-title-row">
+                                    <div class="preview-card-title">Inventory Summary</div>
+                                    <button type="button" class="preview-print-btn" id="printInventorySummaryBtn" title="Print inventory summary">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/><path d="M8 17h8"/></svg>
+                                        <span>Print</span>
+                                    </button>
+                                </div>
                                 <div class="preview-image-frame">
                                     <img id="previewImage" src="<?= !empty($editItem['image']) ? clean(UPLOAD_URL . $editItem['image']) : '' ?>" alt="Item image preview" <?= empty($editItem['image']) ? 'hidden' : '' ?>>
                                     <span id="previewImagePlaceholder" <?= !empty($editItem['image']) ? 'hidden' : '' ?>>Image preview</span>
@@ -1164,7 +1212,7 @@ function initSmartItemFilters() {
         asset_status: document.getElementById('assetStatusSelect'),
         condition: document.getElementById('conditionSelect'),
     };
-    const order = ['branch', 'category', 'section', 'department', 'supplier', 'status', 'asset_status', 'condition'];
+    const order = ['branch', 'section', 'department', 'category', 'supplier', 'status', 'asset_status', 'condition'];
     const optionSources = {
         category: itemFilterLabels.categories,
         section: itemFilterLabels.sections,
@@ -1413,6 +1461,118 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('reviewItemContext').textContent = `${branch} • ${category} • ${stock} ${unit}${stock === 1 ? '' : 's'}`;
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+        }[char]));
+    }
+
+    function printInventorySummary() {
+        updatePreview();
+        const name = document.getElementById('previewItemName')?.textContent || 'Untitled Item';
+        const category = document.getElementById('previewCategory')?.textContent || 'Unassigned Category';
+        const campus = document.getElementById('previewBranch')?.textContent || 'Campus Not Set';
+        const description = inventoryForm?.querySelector('textarea[name="description"]')?.value?.trim() || 'No description provided.';
+        const itemCode = inventoryForm?.querySelector('input[name="item_code"]')?.value?.trim() || 'Auto-generated / not assigned';
+        const image = document.getElementById('previewImage');
+        const imageSrc = image && !image.hidden && image.getAttribute('src') ? image.getAttribute('src') : '';
+        const rows = Array.from(document.querySelectorAll('.preview-list > div')).map((row) => {
+            const label = row.querySelector('dt')?.textContent?.trim() || '';
+            const value = row.querySelector('dd')?.textContent?.trim() || '—';
+            return `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`;
+        }).join('');
+        const printWindow = window.open('', 'inventorySummaryPrint', 'width=900,height=720');
+
+        if (!printWindow) {
+            window.print();
+            return;
+        }
+
+        printWindow.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(name)} - Inventory Summary</title>
+<style>
+@page { size: A4 portrait; margin: 14mm; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #0A1628; background: #fff; font-size: 12px; }
+.sheet { width: 100%; }
+.header { display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 2px solid #0A1628; margin-bottom: 16px; }
+.brand { width: 64px; height: 64px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px; }
+.header h1 { margin: 0 0 4px; font-size: 21px; line-height: 1.15; }
+.header p { margin: 2px 0; color: #475569; font-size: 11px; }
+.summary { display: grid; grid-template-columns: 240px 1fr; gap: 18px; align-items: start; }
+.image-frame { width: 100%; aspect-ratio: 4 / 3; border: 1px solid #cbd5e1; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #f8fafc; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.image-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.title { margin-bottom: 12px; }
+.title h2 { margin: 0 0 6px; font-size: 18px; line-height: 1.2; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { display: inline-flex; padding: 5px 8px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 10px; font-weight: 800; }
+.section-title { margin: 16px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #334155; }
+table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; }
+th, td { padding: 8px 10px; border-top: 1px solid #e2e8f0; vertical-align: top; }
+tr:first-child th, tr:first-child td { border-top: 0; }
+th { width: 34%; background: #f8fafc; text-align: left; text-transform: uppercase; letter-spacing: .05em; font-size: 10px; color: #475569; }
+td { font-weight: 700; }
+.description { border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; line-height: 1.45; white-space: pre-wrap; }
+.footer { margin-top: 18px; padding-top: 10px; border-top: 1px solid #cbd5e1; color: #64748b; font-size: 10px; display: flex; justify-content: space-between; gap: 12px; }
+@media print { .sheet { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main class="sheet">
+    <header class="header">
+        <img class="brand" src="<?= BASE_URL ?>assets/img/uiri-logo.webp" alt="UIRI">
+        <div>
+            <h1>Inventory Item Summary</h1>
+            <p>Uganda Industrial Research Institute</p>
+            <p>Printed: ${escapeHtml(new Date().toLocaleString())}</p>
+        </div>
+    </header>
+    <section class="summary">
+        <div class="image-frame">${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(name)}">` : 'No image selected'}</div>
+        <div>
+            <div class="title">
+                <h2>${escapeHtml(name)}</h2>
+                <div class="pills">
+                    <span class="pill">${escapeHtml(category)}</span>
+                    <span class="pill">${escapeHtml(campus)}</span>
+                    <span class="pill">${escapeHtml(itemCode)}</span>
+                </div>
+            </div>
+            <div class="section-title">Inventory Details</div>
+            <table>${rows}</table>
+        </div>
+    </section>
+    <div class="section-title">Description</div>
+    <div class="description">${escapeHtml(description)}</div>
+    <footer class="footer">
+        <span>Generated from UIRI IMS inventory add/edit preview.</span>
+        <span>${escapeHtml(campus)}</span>
+    </footer>
+</main>
+</body>
+</html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        const printNow = () => {
+            printWindow.print();
+            printWindow.close();
+        };
+        const printImage = printWindow.document.querySelector('.image-frame img');
+        if (printImage && !printImage.complete) {
+            printImage.addEventListener('load', printNow, { once: true });
+            printImage.addEventListener('error', printNow, { once: true });
+        } else {
+            window.setTimeout(printNow, 150);
+        }
+    }
+
     function filterSectionOptions() {
         const branchSelect = document.getElementById('previewBranchInput');
         const sectionSelect = document.getElementById('previewSectionInput');
@@ -1579,6 +1739,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('previewCategoryInput')?.addEventListener('change', validateHierarchy);
     document.getElementById('previewDeptInput')?.addEventListener('change', validateHierarchy);
+    document.getElementById('printInventorySummaryBtn')?.addEventListener('click', printInventorySummary);
 
     filterSectionOptions();
     filterCategoryOptions();
