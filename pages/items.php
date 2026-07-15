@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name         = trim($_POST['name'] ?? '');
         $itemCode     = trim($_POST['item_code'] ?? '');
         $assetCode    = trim($_POST['asset_code'] ?? '');
+        $serialNumber = trim($_POST['serial_number'] ?? '');
         $qrCode       = trim($_POST['qr_code'] ?? '');
         $brandModel   = trim($_POST['brand_model'] ?? '');
         $categoryId   = (int)($_POST['category_id'] ?? 0);
@@ -112,14 +113,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     header('Location: items.php'); exit;
                 }
             }
+            if ($serialNumber !== '') {
+                $duplicateSerial = $pdo->prepare("SELECT id, name FROM inventory_items WHERE serial_number = ? AND is_active = 1 AND (? = 0 OR id <> ?) LIMIT 1");
+                $duplicateSerial->execute([$serialNumber, $itemId, $itemId]);
+                if ($duplicateSerial->fetch()) {
+                    setFlash('error', 'That serial number is already assigned to another active item.');
+                    header('Location: items.php' . ($action === 'edit' ? '?edit=' . $itemId : '?action=add')); exit;
+                }
+            }
             if ($action === 'add' && $itemCode === '') {
                 $itemCode = generateItemCode($categoryId, $itemBranch);
             }
 
             if ($action === 'add') {
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())");
-                    $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$user['id']]);
+                    $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,serial_number,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())");
+                    $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$serialNumber,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$user['id']]);
                     $savedItemId = (int)$pdo->lastInsertId();
                     auditLog('ADD_ITEM','inventory_items',$savedItemId,"Added: $name");
                     $postRedirectParams = ['saved' => $savedItemId];
@@ -141,8 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 try {
-                    $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=?,updated_at=NOW() WHERE id=?");
-                    $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$itemBranch,$itemId]);
+                    $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,serial_number=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=?,updated_at=NOW() WHERE id=?");
+                    $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$serialNumber,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$itemBranch,$itemId]);
                     auditLog('EDIT_ITEM','inventory_items',$itemId,"Updated: $name");
                     $postRedirectParams = ['saved' => $itemId];
                     $_SESSION['inventory_feedback'] = [
@@ -445,8 +454,8 @@ $params = [];
 if (!$isAdmin) { $where[] = "i.branch_id = ?"; $params[] = $branchId; }
 elseif ($branchFilter) { $where[] = "i.branch_id = ?"; $params[] = $branchFilter; }
 if ($search) {
-    $where[] = "(i.name LIKE ? OR i.item_code LIKE ? OR i.asset_code LIKE ? OR i.qr_code LIKE ? OR i.brand_model LIKE ? OR i.description LIKE ? OR c.name LIKE ? OR s.company_name LIKE ? OR b.name LIKE ? OR sec.name LIKE ? OR d.name LIKE ?)";
-    $params = array_merge($params, ["%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%"]);
+    $where[] = "(i.name LIKE ? OR i.item_code LIKE ? OR i.asset_code LIKE ? OR i.serial_number LIKE ? OR i.qr_code LIKE ? OR i.brand_model LIKE ? OR i.description LIKE ? OR c.name LIKE ? OR s.company_name LIKE ? OR b.name LIKE ? OR sec.name LIKE ? OR d.name LIKE ?)";
+    $params = array_merge($params, ["%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%","%$search%"]);
 }
 if ($catFilter) { $where[] = "i.category_id = ?"; $params[] = $catFilter; }
 elseif ($catNameFilter !== '') { $where[] = "c.name = ?"; $params[] = $catNameFilter; }
@@ -583,7 +592,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="filter-group">
             <div class="input-wrap">
                 <svg class="input-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" name="search" placeholder="Search asset code, QR code, name…" value="<?= clean($search) ?>">
+                <input type="text" name="search" placeholder="Search asset code, serial, QR code, name…" value="<?= clean($search) ?>">
             </div>
         </div>
         <?php if ($isAdmin): ?>
@@ -682,7 +691,7 @@ include __DIR__ . '/../includes/header.php';
             <thead><tr>
                 <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
                 <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
-                <th>Model / Specs</th><th>Purchased</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
+                <th>Model / Specs</th><th>Serial No.</th><th>Purchased</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
                 <?php if ($canManage): ?><th class="inventory-actions-col">Actions</th><?php endif; ?>
             </tr></thead>
             <tbody>
@@ -718,6 +727,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= clean($item['department_name'] ?: '—') ?></td>
                 <?php if ($isAdmin): ?><td><?= clean($item['branch_name']) ?></td><?php endif; ?>
                 <td><?= $item['brand_model'] ? clean($item['brand_model']) : '<span class="table-muted-value">Not specified</span>' ?></td>
+                <td><?= $item['serial_number'] ? clean($item['serial_number']) : '<span class="table-muted-value">—</span>' ?></td>
                 <td><?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?></td>
                 <td><?= ugx($item['unit_price']) ?></td>
                 <td><strong><?= number_format($item['current_stock']) ?> <?= clean($item['unit']) ?></strong></td>
@@ -1026,6 +1036,11 @@ include __DIR__ . '/../includes/header.php';
                                             <label>Asset Code</label>
                                             <input type="text" name="asset_code" id="previewAssetCodeInput" placeholder="e.g. AST-001" value="<?= clean($editItem['asset_code']??'') ?>">
                                         </div>
+                                        <div class="form-group" id="serialNumberGroup">
+                                            <label>Serial Number</label>
+                                            <input type="text" name="serial_number" id="previewSerialNumberInput" placeholder="e.g. SN-4CE0460D0G" value="<?= clean($editItem['serial_number']??'') ?>">
+                                            <small id="serialNumberHint">Use this for equipment, ICT assets, tools, and other uniquely identifiable items.</small>
+                                        </div>
                                         <div class="form-group">
                                             <label>QR Code</label>
                                             <input type="text" name="qr_code" id="previewQrCodeInput" placeholder="e.g. QR-001" value="<?= clean($editItem['qr_code']??'') ?>">
@@ -1097,6 +1112,7 @@ include __DIR__ . '/../includes/header.php';
                                     <div><dt>Model / Specs</dt><dd id="previewBrandModel">—</dd></div>
                                     <div><dt>Purchased</dt><dd id="previewPurchaseDate">—</dd></div>
                                     <div><dt>Asset Code</dt><dd id="previewAssetCode">—</dd></div>
+                                    <div><dt>Serial No.</dt><dd id="previewSerialNumber">—</dd></div>
                                     <div><dt>QR Code</dt><dd id="previewQrCode">—</dd></div>
                                 </dl>
                             </div>
@@ -1358,7 +1374,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const brandModel = document.getElementById('previewBrandModelInput')?.value?.trim() || '—';
         const purchaseDate = document.getElementById('previewPurchaseDateInput')?.value || '—';
         const assetCode = document.getElementById('previewAssetCodeInput')?.value?.trim() || '—';
+        const serialNumber = document.getElementById('previewSerialNumberInput')?.value?.trim() || '—';
         const qrCode = document.getElementById('previewQrCodeInput')?.value?.trim() || '—';
+        const serialHint = document.getElementById('serialNumberHint');
+        const serializedCategory = /asset|computer|equipment|ict|instrument|laptop|machine|meter|motor|panel|printer|pump|robot|server|tool|vehicle/i.test(category);
 
         document.getElementById('previewItemName').textContent = name;
         document.getElementById('previewCategory').textContent = category;
@@ -1371,7 +1390,13 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('previewBrandModel').textContent = brandModel;
         document.getElementById('previewPurchaseDate').textContent = purchaseDate;
         document.getElementById('previewAssetCode').textContent = assetCode;
+        document.getElementById('previewSerialNumber').textContent = serialNumber;
         document.getElementById('previewQrCode').textContent = qrCode;
+        if (serialHint) {
+            serialHint.textContent = serializedCategory
+                ? 'Recommended for this category when the item has a manufacturer or device serial.'
+                : 'Optional. Use only when this item has a manufacturer or device serial.';
+        }
         document.getElementById('reviewItemName').textContent = name;
         document.getElementById('reviewItemContext').textContent = `${branch} • ${category} • ${stock} ${unit}${stock === 1 ? '' : 's'}`;
     }
@@ -1521,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     ['input', 'change'].forEach(eventName => {
-        document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewBrandModelInput, #previewPurchaseDateInput, #previewAssetCodeInput, #previewQrCodeInput').forEach(el => {
+        document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewBrandModelInput, #previewPurchaseDateInput, #previewAssetCodeInput, #previewSerialNumberInput, #previewQrCodeInput').forEach(el => {
             el.addEventListener(eventName, updatePreview);
         });
     });

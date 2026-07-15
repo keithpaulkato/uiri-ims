@@ -756,6 +756,7 @@ function ensureInventoryDecisionColumns(): void {
     $pdo = db();
     $columns = [
         'brand_model' => "ALTER TABLE inventory_items ADD COLUMN brand_model VARCHAR(150) DEFAULT NULL AFTER name",
+        'serial_number' => "ALTER TABLE inventory_items ADD COLUMN serial_number VARCHAR(120) DEFAULT NULL AFTER asset_code",
         'asset_status' => "ALTER TABLE inventory_items ADD COLUMN asset_status VARCHAR(30) DEFAULT 'Available' AFTER warranty_date",
         'asset_condition' => "ALTER TABLE inventory_items ADD COLUMN asset_condition VARCHAR(30) DEFAULT 'New' AFTER asset_status",
         'funding_source' => "ALTER TABLE inventory_items ADD COLUMN funding_source VARCHAR(120) DEFAULT NULL AFTER asset_condition",

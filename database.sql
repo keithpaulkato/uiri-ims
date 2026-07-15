@@ -482,6 +482,7 @@ CREATE TABLE inventory_items (
     supplier_id INT,
     item_code VARCHAR(50) NOT NULL UNIQUE,
     asset_code VARCHAR(100) DEFAULT NULL,
+    serial_number VARCHAR(120) DEFAULT NULL,
     qr_code VARCHAR(100) DEFAULT NULL,
     name VARCHAR(200) NOT NULL,
     brand_model VARCHAR(150) DEFAULT NULL,
