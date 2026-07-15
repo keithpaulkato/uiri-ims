@@ -565,6 +565,7 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .item-thumb-placeholder svg { width: 18px; height: 18px; }
 .item-name { display: block; font-weight: 600; color: var(--navy); }
 .item-code { display: block; font-size: .75rem; color: var(--sub); font-family: monospace; }
+.item-audit-line { display: block; margin-top: 2px; color: #475569; font-size: .69rem; font-weight: 750; line-height: 1.25; }
 .inventory-latest-row { position: relative; background: linear-gradient(90deg, rgba(34,197,94,.10) 0%, rgba(255,255,255,.96) 34%, #fff 100%); }
 .inventory-latest-row td:first-child { position: relative; font-weight: 800; color: var(--navy); }
 .inventory-latest-row td:first-child::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: linear-gradient(180deg, #22c55e, #16a34a); }
