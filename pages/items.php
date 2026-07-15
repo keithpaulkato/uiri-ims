@@ -14,6 +14,7 @@ ensureInventoryDecisionColumns();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $action = $_POST['action'] ?? '';
+    $postRedirectParams = [];
 
     if ($action === 'add' || $action === 'edit') {
         $itemId       = (int)($_POST['item_id'] ?? 0);
@@ -117,10 +118,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($action === 'add') {
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                    $stmt = $pdo->prepare("INSERT INTO inventory_items (branch_id,section_id,category_id,supplier_id,department_id,item_code,asset_code,qr_code,name,brand_model,description,unit,unit_price,current_stock,minimum_stock,asset_type,purchase_date,warranty_date,asset_status,asset_condition,funding_source,storage_location,image,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())");
                     $stmt->execute([$itemBranch,$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$user['id']]);
                     $savedItemId = (int)$pdo->lastInsertId();
                     auditLog('ADD_ITEM','inventory_items',$savedItemId,"Added: $name");
+                    $postRedirectParams = ['saved' => $savedItemId];
                     $_SESSION['inventory_feedback'] = [
                         'type' => 'success',
                         'action' => 'added',
@@ -139,9 +141,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 try {
-                    $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=? WHERE id=?");
+                    $stmt = $pdo->prepare("UPDATE inventory_items SET section_id=?,category_id=?,supplier_id=?,department_id=?,item_code=?,asset_code=?,qr_code=?,name=?,brand_model=?,description=?,unit=?,unit_price=?,current_stock=?,minimum_stock=?,asset_type=?,purchase_date=?,warranty_date=?,asset_status=?,asset_condition=?,funding_source=?,storage_location=?,image=?,branch_id=?,updated_at=NOW() WHERE id=?");
                     $stmt->execute([$sectionId,$categoryId,$supplierId,$departmentId,$itemCode,$assetCode,$qrCode,$name,$brandModel,$description,$unit,$unitPrice,$currentStock,$minStock,$assetType,$purchaseDate,$warrantyDate,$assetStatus,$assetCondition,$fundingSource,$storageLocation,$imageName,$itemBranch,$itemId]);
                     auditLog('EDIT_ITEM','inventory_items',$itemId,"Updated: $name");
+                    $postRedirectParams = ['saved' => $itemId];
                     $_SESSION['inventory_feedback'] = [
                         'type' => 'success',
                         'action' => 'updated',
@@ -185,7 +188,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('success',"Item '{$itemToDelete['name']}' removed successfully.");
         }
     }
-    header('Location: items.php'); exit;
+    $redirectQuery = $postRedirectParams ? '?' . http_build_query($postRedirectParams) : '';
+    header('Location: items.php' . $redirectQuery); exit;
 }
 
 $search         = trim($_GET['search'] ?? '');
@@ -202,6 +206,10 @@ $stockFilter = $legacyStockFilters[$stockFilter] ?? $stockFilter;
 $assetStatusFilter = $_GET['asset_status'] ?? '';
 $conditionFilter = $_GET['condition'] ?? '';
 $missingPurchase = ($_GET['missing_purchase'] ?? '') === '1';
+$inventoryFeedback = $_SESSION['inventory_feedback'] ?? null;
+unset($_SESSION['inventory_feedback']);
+$savedItemIdFromQuery = max(0, (int)($_GET['saved'] ?? 0));
+$feedbackItemId = !empty($inventoryFeedback['item_id']) ? (int)$inventoryFeedback['item_id'] : $savedItemIdFromQuery;
 
 $buildItemOptionWhere = function (array $keys) use (
     &$branchFilter,
@@ -464,12 +472,17 @@ $offset = ($page - 1) * $itemsPerPage;
 $pageStart = $totalItems ? $offset + 1 : 0;
 $pageEnd = min($offset + $itemsPerPage, $totalItems);
 
-$stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL ORDER BY i.updated_at DESC, i.created_at DESC, i.id DESC LIMIT $itemsPerPage OFFSET $offset");
-$stmt->execute($params);
+$feedbackOrderSql = $feedbackItemId ? "CASE WHEN i.id = ? THEN 0 ELSE 1 END, " : "";
+$itemParams = $params;
+if ($feedbackItemId) {
+    $itemParams[] = $feedbackItemId;
+}
+$stmt = $pdo->prepare("SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id WHERE $whereSQL ORDER BY {$feedbackOrderSql}i.id DESC, i.updated_at DESC, i.created_at DESC LIMIT $itemsPerPage OFFSET $offset");
+$stmt->execute($itemParams);
 $items = $stmt->fetchAll();
 
 $paginationParams = $_GET;
-unset($paginationParams['page'], $paginationParams['edit'], $paginationParams['action']);
+unset($paginationParams['page'], $paginationParams['edit'], $paginationParams['action'], $paginationParams['saved']);
 $pageUrl = function (int $targetPage) use ($paginationParams): string {
     $query = http_build_query(array_merge($paginationParams, ['page' => $targetPage]));
     return 'items.php' . ($query ? '?' . $query : '');
@@ -497,8 +510,6 @@ if (isset($_GET['edit'])) {
     $editItem = $es->fetch();
 }
 $showAddModal = $canManage && (($_GET['action'] ?? '') === 'add' || $editItem);
-$inventoryFeedback = $_SESSION['inventory_feedback'] ?? null;
-unset($_SESSION['inventory_feedback']);
 
 $branchNames = array_column($branches, 'name', 'id');
 $categoryNames = array_column($filterCategories, 'name', 'name');
@@ -679,13 +690,13 @@ include __DIR__ . '/../includes/header.php';
                 $ss = $item['current_stock']==0 ? 'out' : ($item['current_stock']<=$item['minimum_stock'] ? 'low' : 'good');
                 $sl = $ss==='out' ? 'Out of Stock' : ($ss==='low' ? 'Low Stock' : 'In Stock');
                 $isLatestChange = $page === 1 && $i === 0;
-                $isFeedbackItem = !empty($inventoryFeedback['item_id']) && (int)$inventoryFeedback['item_id'] === (int)$item['id'];
+                $isFeedbackItem = $feedbackItemId && (int)$feedbackItemId === (int)$item['id'];
                 $latestChangeDate = $item['updated_at'] ?: $item['created_at'];
                 $rowClasses = array_filter([
                     $isLatestChange ? 'inventory-latest-row' : '',
                     $isFeedbackItem ? 'inventory-feedback-row' : '',
                 ]);
-                $latestMarkerLabel = $isFeedbackItem ? ('Just ' . ($inventoryFeedback['action'] ?? 'saved')) : 'Latest change';
+                $latestMarkerLabel = $isFeedbackItem ? ($inventoryFeedback ? ('Just ' . ($inventoryFeedback['action'] ?? 'saved')) : 'Saved item') : 'Latest change';
             ?>
             <tr class="<?= clean(implode(' ', $rowClasses)) ?>" <?= $isFeedbackItem ? 'data-inventory-feedback-row="true"' : '' ?>>
                 <td><?= $offset + $i + 1 ?></td>
