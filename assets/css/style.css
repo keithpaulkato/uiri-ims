@@ -499,23 +499,32 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .inventory-table-scroll::-webkit-scrollbar-track { background: #e5edf5; border-radius: 999px; }
 .inventory-table-scroll::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 999px; border: 3px solid #e5edf5; }
 .inventory-table-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
-.inventory-table-canvas { min-width: 1540px; }
-.inventory-items-table { min-width: 1540px; table-layout: fixed; }
-.inventory-items-table th:nth-child(1), .inventory-items-table td:nth-child(1) { width: 42px; }
-.inventory-items-table th:nth-child(2), .inventory-items-table td:nth-child(2) { width: 190px; }
-.inventory-items-table th:nth-child(3), .inventory-items-table td:nth-child(3) { width: 140px; }
-.inventory-items-table th:nth-child(4), .inventory-items-table td:nth-child(4) { width: 170px; }
-.inventory-items-table th:nth-child(5), .inventory-items-table td:nth-child(5) { width: 160px; }
-.inventory-items-table th:nth-child(6), .inventory-items-table td:nth-child(6) { width: 110px; }
-.inventory-items-table th:nth-child(7), .inventory-items-table td:nth-child(7) { width: 120px; }
-.inventory-items-table th:nth-child(8), .inventory-items-table td:nth-child(8) { width: 100px; }
-.inventory-items-table th:nth-child(9), .inventory-items-table td:nth-child(9) { width: 105px; }
-.inventory-items-table th:nth-child(10), .inventory-items-table td:nth-child(10) { width: 90px; }
-.inventory-items-table th:nth-child(11), .inventory-items-table td:nth-child(11) { width: 58px; }
-.inventory-items-table th:nth-child(12), .inventory-items-table td:nth-child(12) { width: 120px; }
-.inventory-items-table th:nth-child(13), .inventory-items-table td:nth-child(13) { width: 98px; }
-.inventory-items-table th, .inventory-items-table td { white-space: normal; overflow-wrap: anywhere; }
-.inventory-items-table .badge { white-space: normal; line-height: 1.15; text-align: center; }
+.inventory-table-canvas { min-width: 1960px; }
+.inventory-items-table { min-width: 1960px; table-layout: auto; }
+.inventory-items-table th:nth-child(1), .inventory-items-table td:nth-child(1) { min-width: 42px; width: 42px; }
+.inventory-items-table th:nth-child(2), .inventory-items-table td:nth-child(2) { min-width: 230px; }
+.inventory-items-table th:nth-child(3), .inventory-items-table td:nth-child(3) { min-width: 160px; }
+.inventory-items-table th:nth-child(4), .inventory-items-table td:nth-child(4) { min-width: 220px; }
+.inventory-items-table th:nth-child(5), .inventory-items-table td:nth-child(5) { min-width: 240px; }
+.inventory-items-table th:nth-child(6), .inventory-items-table td:nth-child(6) { min-width: 120px; }
+.inventory-items-table th:nth-child(7), .inventory-items-table td:nth-child(7) { min-width: 160px; }
+.inventory-items-table th:nth-child(8), .inventory-items-table td:nth-child(8) { min-width: 130px; }
+.inventory-items-table th:nth-child(9), .inventory-items-table td:nth-child(9) { min-width: 115px; }
+.inventory-items-table th:nth-child(10), .inventory-items-table td:nth-child(10) { min-width: 120px; }
+.inventory-items-table th:nth-child(11), .inventory-items-table td:nth-child(11) { min-width: 92px; }
+.inventory-items-table th:nth-child(12), .inventory-items-table td:nth-child(12) { min-width: 58px; }
+.inventory-items-table th:nth-child(13), .inventory-items-table td:nth-child(13) { min-width: 130px; }
+.inventory-items-table th:nth-child(14), .inventory-items-table td:nth-child(14) { min-width: 110px; }
+.inventory-items-table th, .inventory-items-table td { white-space: normal; overflow-wrap: normal; word-break: normal; hyphens: none; }
+.inventory-items-table th,
+.inventory-items-table td:nth-child(8),
+.inventory-items-table td:nth-child(9),
+.inventory-items-table td:nth-child(10),
+.inventory-items-table td:nth-child(11),
+.inventory-items-table td:nth-child(12),
+.inventory-items-table td:nth-child(13),
+.inventory-items-table td:nth-child(14) { white-space: nowrap; }
+.inventory-items-table .badge { white-space: nowrap; line-height: 1.15; text-align: center; }
 .inventory-print-header, .inventory-print-meta { display: none; }
 .users-table-card { overflow: hidden; }
 .users-table-wrap { --users-scale: var(--sidebar-scale, 1); }
@@ -562,7 +571,8 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 .inventory-feedback-row td:first-child { box-shadow: inset 4px 0 0 #16a34a, inset 0 1px 0 rgba(34,197,94,.24), inset 0 -1px 0 rgba(34,197,94,.24); }
 .latest-change-marker { display: flex; align-items: center; width: fit-content; margin-top: 3px; margin-bottom: 2px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(34,197,94,.32); background: rgba(34,197,94,.14); color: #166534; font-size: .66rem; font-weight: 800; line-height: 1; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
 .table-muted-value { color: var(--sub); font-weight: 700; font-size: .8rem; }
-.inventory-feedback { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; margin: -8px 0 18px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(34,197,94,.28); background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); box-shadow: 0 14px 32px rgba(15,23,42,.08); }
+.inventory-feedback { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; margin: -8px 0 18px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(34,197,94,.28); background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); box-shadow: 0 14px 32px rgba(15,23,42,.08); opacity: 1; transform: translateY(0); transition: opacity .28s ease, transform .28s ease, margin .28s ease, padding .28s ease; }
+.inventory-feedback.dismiss { opacity: 0; transform: translateY(-6px); margin-top: -8px; margin-bottom: 0; padding-top: 0; padding-bottom: 0; pointer-events: none; }
 .inventory-feedback-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #16a34a; color: #fff; }
 .inventory-feedback-icon svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .inventory-feedback-copy strong { display: block; color: #14532d; font-size: .95rem; margin-bottom: 3px; }

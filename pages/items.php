@@ -583,7 +583,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endif; ?>
         </span>
     </div>
-    <button type="button" class="inventory-feedback-close" aria-label="Dismiss inventory confirmation" onclick="this.closest('.inventory-feedback').remove()">×</button>
+    <button type="button" class="inventory-feedback-close" aria-label="Dismiss inventory confirmation">×</button>
 </div>
 <?php endif; ?>
 
@@ -1239,6 +1239,17 @@ function initSmartItemFilters() {
 document.addEventListener('DOMContentLoaded', function () {
     initSmartItemFilters();
 
+    function dismissInventoryFeedback() {
+        const feedback = document.getElementById('inventoryFeedback');
+        if (!feedback) {
+            return;
+        }
+        feedback.classList.add('dismiss');
+        window.setTimeout(() => feedback.remove(), 320);
+    }
+
+    document.querySelector('.inventory-feedback-close')?.addEventListener('click', dismissInventoryFeedback);
+
     if (inventoryFeedback) {
         const feedbackRow = document.querySelector('[data-inventory-feedback-row="true"]');
         if (feedbackRow) {
@@ -1266,6 +1277,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.appendChild(toast);
         window.setTimeout(() => toast.classList.add('show'), 30);
         window.setTimeout(() => toast.remove(), 5600);
+        window.setTimeout(dismissInventoryFeedback, 5200);
     }
 
     const deleteItemId = document.getElementById('deleteItemId');
