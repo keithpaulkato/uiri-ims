@@ -583,12 +583,12 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="filter-group">
-        <label for="purchaseFrom" class="form-label">Purchased From</label>
+        <label for="purchaseFrom" class="form-label">Purchase Date From</label>
         <input id="purchaseFrom" type="date" name="purchase_from" value="<?= clean($purchaseFrom) ?>" <?= $minPurchaseDate ? 'min="'.clean($minPurchaseDate).'"' : '' ?> <?= $maxPurchaseDate ? 'max="'.clean($maxPurchaseDate).'"' : '' ?> class="form-control">
     </div>
 
     <div class="filter-group">
-        <label for="purchaseTo" class="form-label">Purchased To</label>
+        <label for="purchaseTo" class="form-label">Purchase Date To</label>
         <input id="purchaseTo" type="date" name="purchase_to" value="<?= clean($purchaseTo) ?>" <?= $minPurchaseDate ? 'min="'.clean($minPurchaseDate).'"' : '' ?> <?= $maxPurchaseDate ? 'max="'.clean($maxPurchaseDate).'"' : '' ?> class="form-control">
     </div>
 <?php endif; ?>
@@ -637,7 +637,7 @@ include __DIR__ . '/../includes/header.php';
     <?php if ($reportType==='summary' && $data): ?>
     <div class="report-table-scroll">
     <table class="data-table">
-        <thead><tr><th>#</th><th>Item Code</th><th>Item Name</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><?php if ($isAdmin): ?><th>Campus</th><?php endif; ?><th>Purchased</th><th>Asset Status</th><th>Unit</th><th>Unit Price</th><th>Stock</th><th>Min Stock</th><th>Total Value</th><th>Stock Status</th></tr></thead>
+        <thead><tr><th>#</th><th>Item Code</th><th>Item Name</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><?php if ($isAdmin): ?><th>Campus</th><?php endif; ?><th>Purchase Date</th><th>Asset Status</th><th>Unit</th><th>Unit Price</th><th>Stock</th><th>Min Stock</th><th>Total Value</th><th>Stock Status</th></tr></thead>
         <tbody>
         <?php $grandTotal=0; foreach ($data as $row) { $grandTotal += $row['total_value']; } ?>
         <?php foreach ($displayData as $i=>$row): $ss=$row['current_stock']==0?'danger':($row['current_stock']<=$row['minimum_stock']?'warn':'success'); ?>
@@ -652,7 +652,7 @@ include __DIR__ . '/../includes/header.php';
     <?php elseif ($reportType==='movement' && $data): ?>
     <div class="report-table-scroll">
     <table class="data-table">
-        <thead><tr><th>#</th><th>Date</th><th>Item</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><th>Campus</th><th>Purchased</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Reference</th><th>Recorded By</th></tr></thead>
+        <thead><tr><th>#</th><th>Date</th><th>Item</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><th>Campus</th><th>Purchase Date</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Reference</th><th>Recorded By</th></tr></thead>
         <tbody>
         <?php foreach ($displayData as $i=>$tx): $tc=['stock_in'=>'badge-success','stock_out'=>'badge-blue','adjustment'=>'badge-warn']; ?>
         <tr><td><?= $rowOffset+$i+1 ?></td><td><?= date('d M Y',strtotime($tx['transaction_date'])) ?></td><td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td><td><?= clean($tx['brand_model'] ?: '—') ?></td><td><?= clean($tx['category_name']) ?></td><td><?= clean($tx['supplier_name'] ?: '—') ?></td><td><?= clean($tx['section_name'] ?: '—') ?></td><td><?= clean($tx['department_name'] ?: '—') ?></td><td><?= clean($tx['branch_name']) ?></td><td><?= $tx['purchase_date'] ? date('d M Y', strtotime($tx['purchase_date'])) : '—' ?></td><td><span class="badge <?= $tc[$tx['transaction_type']]??'badge-blue' ?>"><?= str_replace('_',' ',ucfirst($tx['transaction_type'])) ?></span></td><td><?= number_format($tx['quantity']) ?></td><td><?= $tx['unit_price']>0?ugx($tx['unit_price']):'—' ?></td><td><?= $tx['unit_price']>0?ugx($tx['quantity']*$tx['unit_price']):'—' ?></td><td><?= clean($tx['reference_number']?:'—') ?></td><td><?= clean($tx['user_name']) ?></td></tr>
@@ -680,7 +680,7 @@ include __DIR__ . '/../includes/header.php';
     <?php elseif ($reportType==='low_stock' && $data): ?>
     <div class="report-table-scroll">
     <table class="data-table">
-        <thead><tr><th>#</th><th>Item Code</th><th>Item Name</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><?php if ($isAdmin): ?><th>Campus</th><?php endif; ?><th>Purchased</th><th>Asset Status</th><th>Current Stock</th><th>Min Stock</th><th>Deficit</th><th>Status</th></tr></thead>
+        <thead><tr><th>#</th><th>Item Code</th><th>Item Name</th><th>Model / Specs</th><th>Category</th><th>Supplier</th><th>Department</th><th>Section / Unit</th><?php if ($isAdmin): ?><th>Campus</th><?php endif; ?><th>Purchase Date</th><th>Asset Status</th><th>Current Stock</th><th>Min Stock</th><th>Deficit</th><th>Status</th></tr></thead>
         <tbody>
         <?php foreach ($displayData as $i=>$row): $deficit=max(0,$row['minimum_stock']-$row['current_stock']); ?>
         <tr><td><?= $rowOffset+$i+1 ?></td><td><?= clean($row['item_code']) ?></td><td><?= clean($row['name']) ?></td><td><?= clean($row['brand_model'] ?: '—') ?></td><td><?= clean($row['category_name']) ?></td><td><?= clean($row['supplier_name'] ?: '—') ?></td><td><?= clean($row['section_name'] ?: '—') ?></td><td><?= clean($row['department_name'] ?: '—') ?></td><?php if ($isAdmin): ?><td><?= clean($row['branch_name']) ?></td><?php endif; ?><td><?= $row['purchase_date'] ? date('d M Y', strtotime($row['purchase_date'])) : '—' ?></td><td><?= clean($row['asset_status'] ?: 'Available') ?></td><td><span class="badge <?= $row['current_stock']==0?'badge-danger':'badge-warn' ?>"><?= $row['current_stock'] ?></span></td><td><?= $row['minimum_stock'] ?></td><td><?= $deficit ?></td><td><?= $row['current_stock']==0?'<span class="badge badge-danger">Out of Stock</span>':'<span class="badge badge-warn">Low Stock</span>' ?></td></tr>

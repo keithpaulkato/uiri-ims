@@ -726,6 +726,86 @@ select.form-control { cursor: pointer; color: var(--gold); }
 .inline-image-preview { width: 150px; aspect-ratio: 4 / 3; border-radius: 10px; margin-top: 10px; }
 .readonly-field { min-height: 42px; display: flex; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; color: var(--navy); font-weight: 800; }
 
+.inventory-item-modal {
+  width: min(1180px, calc(100vw - 56px));
+  max-width: 1180px;
+  overflow: hidden;
+}
+.inventory-item-modal .modal-body {
+  max-height: calc(90vh - 124px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.inventory-item-modal .wizard-content {
+  grid-template-columns: minmax(0, .88fr) minmax(340px, .58fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.inventory-item-modal .wizard-form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.inventory-item-modal .wizard-step-nav,
+.inventory-item-modal .wizard-step-panel.active .form-section-card {
+  margin-bottom: 0;
+}
+.inventory-item-modal .wizard-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.inventory-item-modal .inventory-summary-card {
+  flex: 1 1 auto;
+}
+.inventory-item-modal .inventory-summary-card,
+.inventory-item-modal .inventory-tips-card {
+  border-radius: 12px;
+}
+.inventory-item-modal .inventory-tips-card {
+  margin-top: auto;
+  padding: 14px 16px;
+}
+.inventory-item-modal .inventory-tips-card .preview-card-title {
+  margin-bottom: 8px;
+}
+.inventory-item-modal .inventory-tips-card .preview-tips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+.inventory-item-modal .inventory-tips-card .preview-tips li {
+  font-size: .74rem;
+  line-height: 1.35;
+}
+.inventory-item-modal .preview-list div {
+  display: grid;
+  grid-template-columns: minmax(94px, .38fr) minmax(0, .62fr);
+  align-items: start;
+}
+.inventory-item-modal .preview-list dt,
+.inventory-item-modal .preview-list dd {
+  min-width: 0;
+}
+.inventory-item-modal .preview-list dd {
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1024px) {
+  .inventory-item-modal {
+    width: 100%;
+    max-width: 100%;
+  }
+  .inventory-item-modal .wizard-content {
+    grid-template-columns: 1fr;
+  }
+  .inventory-item-modal .inventory-tips-card .preview-tips {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* REPORT TABS */
 .report-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--white); padding: 6px; border-radius: var(--radius); border: 1px solid var(--border); flex-wrap: wrap; }
 .report-tab { padding: 8px 16px; border-radius: 7px; font-size: .82rem; font-weight: 600; color: var(--sub); transition: all .15s; }

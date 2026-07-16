@@ -33,16 +33,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $minStock     = (int)($_POST['minimum_stock'] ?? 5);
         $description  = trim($_POST['description'] ?? '');
         $assetType    = trim($_POST['inventory_type'] ?? 'Consumable');
-        $purchaseDate = $_POST['purchase_date'] ?: null;
+        $purchaseDate = trim($_POST['purchase_date'] ?? '');
+        $purchaseDate = $purchaseDate !== '' ? $purchaseDate : null;
         $warrantyDate = $_POST['warranty_date'] ?: null;
         $assetStatus  = trim($_POST['asset_status'] ?? 'Available');
         $assetCondition = trim($_POST['asset_condition'] ?? 'New');
         $fundingSource = trim($_POST['funding_source'] ?? '');
         $storageLocation = trim($_POST['storage_location'] ?? '');
         $itemBranch   = $isAdmin ? (int)($_POST['branch_id'] ?? $branchId) : $branchId;
+        $validationRedirectParams = ($action === 'edit' && $itemId > 0) ? ['edit' => $itemId] : ['action' => 'add'];
+        $purchaseDateValid = false;
+        if ($purchaseDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchaseDate)) {
+            $purchaseDateObj = DateTime::createFromFormat('Y-m-d', $purchaseDate);
+            $purchaseDateValid = $purchaseDateObj && $purchaseDateObj->format('Y-m-d') === $purchaseDate;
+        }
 
-        if (!$name || !$categoryId) {
-            setFlash('error', 'Item name and category are required.');
+        if (!$name || !$categoryId || !$purchaseDate) {
+            $postRedirectParams = $validationRedirectParams;
+            setFlash('error', 'Item name, category, and purchase date are required.');
+        } elseif (!$purchaseDateValid) {
+            $postRedirectParams = $validationRedirectParams;
+            setFlash('error', 'Please enter a valid purchase date.');
         } else {
             $imageName = $_POST['existing_image'] ?? null;
             if (!empty($_FILES['image']['name'])) {
@@ -755,7 +766,7 @@ include __DIR__ . '/../includes/header.php';
             <thead><tr>
                 <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
                 <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
-                <th>Model / Specs</th><th>Serial No.</th><th>Purchased</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
+                <th>Model / Specs</th><th>Serial No.</th><th>Purchase Date</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
             </tr></thead>
             <tbody>
             <?php foreach ($printItems as $i => $item):
@@ -792,7 +803,7 @@ include __DIR__ . '/../includes/header.php';
             <thead><tr>
                 <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
                 <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
-                <th>Model / Specs</th><th>Serial No.</th><th>Purchased</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
+                <th>Model / Specs</th><th>Serial No.</th><th>Purchase Date</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
                 <?php if ($canManage): ?><th class="inventory-actions-col">Actions</th><?php endif; ?>
             </tr></thead>
             <tbody>
@@ -924,7 +935,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="modal-overlay" id="addItemModal" <?= $showAddModal?'style="display:flex"':'' ?>>
-    <div class="modal modal-lg">
+    <div class="modal modal-lg inventory-item-modal">
         <div class="modal-header">
             <h3><?= $editItem?'Edit Item':'Add New Item' ?></h3>
             <button class="modal-close" onclick="closeModal('addItemModal')">×</button>
@@ -1041,8 +1052,8 @@ include __DIR__ . '/../includes/header.php';
                                             <input type="text" name="funding_source" placeholder="e.g. Government Grant" value="<?= clean($editItem['funding_source']??'') ?>">
                                         </div>
                                         <div class="form-group">
-                                            <label>Date of Purchase</label>
-                                            <input type="date" name="purchase_date" id="previewPurchaseDateInput" value="<?= clean($editItem['purchase_date']??'') ?>">
+                                            <label>Purchase Date *</label>
+                                            <input type="date" name="purchase_date" id="previewPurchaseDateInput" value="<?= clean($editItem['purchase_date']??'') ?>" required>
                                         </div>
                                     </div>
                                 </div>
@@ -1193,10 +1204,18 @@ include __DIR__ . '/../includes/header.php';
                                     </div>
                                 </div>
                             </div>
+                            <div class="preview-card inventory-tips-card">
+                                <div class="preview-card-title">Inventory Tips</div>
+                                <ul class="preview-tips">
+                                    <li>Item codes are usually generated automatically.</li>
+                                    <li>Required fields are marked with an asterisk.</li>
+                                    <li>Duplicate serials and codes should be avoided.</li>
+                                </ul>
+                            </div>
                         </div>
 
                         <aside class="wizard-preview">
-                            <div class="preview-card">
+                            <div class="preview-card inventory-summary-card">
                                 <div class="preview-card-title-row">
                                     <div class="preview-card-title">Inventory Summary</div>
                                     <button type="button" class="preview-print-btn" id="printInventorySummaryBtn" title="Print inventory summary">
@@ -1220,20 +1239,12 @@ include __DIR__ . '/../includes/header.php';
                                     <div><dt>Current Stock</dt><dd id="previewStock">0 units</dd></div>
                                     <div><dt>Estimated Value</dt><dd id="previewValue">UGX 0</dd></div>
                                     <div><dt>Model / Specs</dt><dd id="previewBrandModel">—</dd></div>
-                                    <div><dt>Purchased</dt><dd id="previewPurchaseDate">—</dd></div>
+                                    <div><dt>Purchase Date</dt><dd id="previewPurchaseDate">—</dd></div>
                                     <div><dt>Asset Code</dt><dd id="previewAssetCode">—</dd></div>
                                     <div><dt>Serial No.</dt><dd id="previewSerialNumber">—</dd></div>
                                     <div><dt>QR Code</dt><dd id="previewQrCode">—</dd></div>
                                     <div><dt>Recorded by</dt><dd id="previewRecordedBy"><?= clean($recordingOfficer) ?></dd></div>
                                 </dl>
-                            </div>
-                            <div class="preview-card">
-                                <div class="preview-card-title">Inventory Tips</div>
-                                <ul class="preview-tips">
-                                    <li>Item codes are usually generated automatically.</li>
-                                    <li>Required fields are marked with an asterisk.</li>
-                                    <li>Duplicate serials and codes should be avoided.</li>
-                                </ul>
                             </div>
                         </aside>
                     </div>
