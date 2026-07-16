@@ -1200,14 +1200,15 @@ select.form-control { cursor: pointer; color: var(--gold); }
 }
 
 /* LOGIN */
-.login-body { background: linear-gradient(135deg, var(--navy) 0%, #163a5a 45%, #0b1220 100%); min-height: 100vh; }
+.login-body { background: linear-gradient(135deg, var(--navy) 0%, #163a5a 45%, #0b1220 100%); min-height: 100vh; position: relative; overflow: hidden; }
+.login-body::before { content: ''; position: absolute; inset: 0; background-image: url('../img/uiri-logo.webp'); background-repeat: no-repeat; background-position: center top; background-size: 40%; opacity: 0.06; pointer-events: none; filter: blur(1px) saturate(.9); }
 .login-page { display: flex; min-height: 100vh; position: relative; overflow: hidden; }
 .login-page::before, .login-page::after { content: ''; position: absolute; border-radius: 50%; filter: blur(24px); opacity: .22; pointer-events: none; }
 .login-page::before { width: 260px; height: 260px; background: var(--gold); top: -70px; right: -40px; }
 .login-page::after { width: 320px; height: 320px; background: #29ABE2; bottom: -120px; left: -80px; }
 .login-panel-left { width: 440px; background: linear-gradient(180deg, rgba(10,22,40,.94) 0%, rgba(13,33,59,.96) 100%); padding: 48px 40px; display: flex; flex-direction: column; justify-content: space-between; flex-shrink: 0; position: relative; z-index: 1; }
 .login-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 36px; }
-.login-logo { background: #fff; border-radius: 16px; padding: 6px; width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 12px 24px rgba(0,0,0,.18); }
+.login-logo { background: #fff; border-radius: 16px; padding: 10px; width: 86px; height: 86px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 18px 40px rgba(0,0,0,.18); }
 .login-logo img { width: 100%; height: 100%; object-fit: contain; }
 .login-brand h1 { font-size: 1.6rem; font-weight: 900; color: var(--white); }
 .login-brand p { color: rgba(255,255,255,.6); font-size: .8rem; }
