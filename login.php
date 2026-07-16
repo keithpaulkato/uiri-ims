@@ -206,9 +206,6 @@ $flash = getFlash();
     <div class="login-panel-right">
         <div class="login-form-wrap">
             <div class="login-form-header">
-                <div class="login-form-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6l7-4z"/><path d="M9.5 12.5l1.8 1.8 3.2-3.8"/></svg>
-                </div>
                 <h3>Welcome back to UIRI IMS</h3>
                 <p class="login-form-subtext">Use your registered UIRI credentials to access the inventory portal.</p>
                 <p class="login-return-link"><a href="<?= BASE_URL ?>pages/landing.html">← Back to landing page</a></p>
