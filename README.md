@@ -1,6 +1,6 @@
 # UIRI Inventory Management System
 
-This repository contains the source code and documentation for a web based Inventory Management System developed for Uganda Industrial Research Institute as an ICT internship project.
+This repository contains the source code and documentation for a web based Inventory Management System developed for Uganda Industrial Research Institute by the ICT interns as a database project.
 
 The system supports inventory tracking across UIRI Nakawa and Namanve campuses, departments, sections and physical inventory locations. It handles both consumable stock and durable fixed assets.
 
