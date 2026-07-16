@@ -1355,8 +1355,10 @@ select.form-control { cursor: pointer; color: var(--gold); }
 .login-form-wrap .checkbox-group { margin-top: 2px; padding-left: 2px; }
 .login-form-wrap .checkbox-group label { min-height: 24px; align-items: center; gap: 11px; font-size: .9rem; line-height: 1.4; }
 .login-form-wrap .checkbox-group input { width: 16px; height: 16px; flex: 0 0 16px; }
-.login-form-wrap .btn-primary { min-height: 58px; padding: 15px 22px; font-size: 1rem; box-shadow: 0 12px 24px rgba(201,162,39,.2); }
+.login-form-wrap .btn-primary { min-height: 58px; padding: 15px 22px; font-size: 1rem; box-shadow: 0 12px 24px rgba(201,162,39,.2); display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
 .login-form-wrap .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 30px rgba(201,162,39,.25); }
+.login-form-wrap .checkbox-group { margin-top: 2px; padding-left: 2px; }
+.login-form-wrap .login-security-note { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: linear-gradient(90deg, rgba(41,171,226,.10) 0%, rgba(201,162,39,.08) 100%); color: var(--navy); font-size: .78rem; font-weight: 600; text-align: center; border: 1px solid rgba(41,171,226,.12); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
