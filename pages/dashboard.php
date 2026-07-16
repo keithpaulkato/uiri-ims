@@ -37,7 +37,7 @@ $healthLabel = $healthScore >= 85 ? 'Stable' : ($healthScore >= 65 ? 'Watch' : '
 $healthClass = $healthScore >= 85 ? 'good' : ($healthScore >= 65 ? 'warn' : 'critical');
 $turnoverRatio = $stockInMonth > 0 ? round(($stockOutMonth / max(1, $stockInMonth)) * 100) : 0;
 $monthStart = date('Y-m-01');
-$today = date('Y-m-d');
+$today = date('Y-m-d'); ## the current date for filtering movement data
 
 $movementData = [];
 for ($i = 5; $i >= 0; $i--) {
