@@ -9,6 +9,7 @@ $branchId   = (int)$user['branch_id'];
 $isAdmin    = hasRole('Administrator', 'Executive');
 $pdo        = db();
 ensureInventoryDecisionColumns();
+
 $assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
 $conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
 $requestQueueFilters = ['priority' => 'Pending first', 'Pending' => 'Pending', 'Approved' => 'Approved', 'Issued' => 'Issued', 'Rejected' => 'Rejected', 'Cancelled' => 'Cancelled'];
@@ -125,9 +126,6 @@ if ($isAdmin) {
         ORDER BY value DESC
     ")->fetchAll();
 }
-
-
-
 
 $recentTx = $pdo->query("
     SELECT activity_type, activity_id, activity_at, transaction_type, quantity, transaction_date, item_name, item_code, user_name, branch_name
@@ -321,9 +319,6 @@ include __DIR__ . '/../includes/header.php';
         </a>
     </div>
 </div>
-
-
-
 
 <section class="enterprise-hero">
     <div class="enterprise-health-panel">
