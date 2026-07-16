@@ -2,7 +2,7 @@
    UIRI IMS — Master Stylesheet
    Palette: Navy #0A1628 | Gold #C9A227 | Slate #4A5568
    ============================================================ */
-
+/* Uiri IMS STYLESHEET*/
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -1643,5 +1643,5 @@ body {
   transition: color 0.3s ease;
 
 
-  
+
 }
