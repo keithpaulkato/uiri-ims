@@ -355,6 +355,25 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </section>
 
+<section class="dashboard-focus-strip" aria-label="Operational focus summary">
+    <div class="dashboard-focus-pill">
+        <span>Operational Focus</span>
+        <strong><?= number_format($pendingRequests) ?> pending requests</strong>
+    </div>
+    <div class="dashboard-focus-pill">
+        <span>Stock Attention</span>
+        <strong><?= number_format($riskCount) ?> items need attention</strong>
+    </div>
+    <div class="dashboard-focus-pill">
+        <span>Movement Balance</span>
+        <strong><?= $turnoverRatio ?>% issue/receipt ratio</strong>
+    </div>
+    <div class="dashboard-focus-pill">
+        <span>Health Status</span>
+        <strong><?= $healthLabel ?> (<?= $healthScore ?>%)</strong>
+    </div>
+</section>
+
 <section class="decision-strip">
     <a href="<?= clean($movementMonthUrl) ?>&tx_type=stock_in">
         <span>Stock In This Month</span>
