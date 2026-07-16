@@ -1200,9 +1200,9 @@ select.form-control { cursor: pointer; color: var(--gold); }
 }
 
 /* LOGIN */
-.login-body { background: linear-gradient(135deg, var(--navy) 0%, #163a5a 45%, #0b1220 100%); min-height: 100vh; position: relative; overflow: hidden; }
-.login-body::before { content: ''; position: absolute; inset: 0; background-image: url('../img/uiri-logo.webp'); background-repeat: no-repeat; background-position: center top; background-size: 40%; opacity: 0.06; pointer-events: none; filter: blur(1px) saturate(.9); }
-.login-page { display: flex; min-height: 100vh; position: relative; overflow: hidden; }
+.login-body { background: linear-gradient(135deg, var(--navy) 0%, #163a5a 45%, #0b1220 100%); min-height: 100vh; position: relative; }
+.login-body::before { content: ''; position: absolute; inset: 0; background-image: url('../img/uiri-logo.webp'); background-repeat: no-repeat; background-position: center 18%; background-size: 55%; opacity: 0.06; pointer-events: none; filter: blur(1px) saturate(.9); }
+.login-page { display: flex; min-height: 100vh; position: relative; }
 .login-page::before, .login-page::after { content: ''; position: absolute; border-radius: 50%; filter: blur(24px); opacity: .22; pointer-events: none; }
 .login-page::before { width: 260px; height: 260px; background: var(--gold); top: -70px; right: -40px; }
 .login-page::after { width: 320px; height: 320px; background: #29ABE2; bottom: -120px; left: -80px; }
