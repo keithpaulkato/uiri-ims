@@ -128,13 +128,57 @@ if ($isAdmin) {
 }
 
 $recentTx = $pdo->query("
-    SELECT t.transaction_type, t.quantity, t.transaction_date, i.name AS item_name, i.item_code, u.full_name AS user_name, b.name AS branch_name
-    FROM stock_transactions t
-    JOIN inventory_items i ON t.item_id=i.id
-    JOIN users u ON t.user_id=u.id
-    JOIN branches b ON t.branch_id=b.id
-    WHERE 1=1 $branchSql
-    ORDER BY t.created_at DESC
+    SELECT activity_type, activity_id, activity_at, transaction_type, quantity, transaction_date, item_name, item_code, user_name, branch_name
+    FROM (
+        SELECT
+            'stock' AS activity_type,
+            t.id AS activity_id,
+            CASE
+                WHEN t.created_at <= NOW() THEN t.created_at
+                WHEN t.transaction_date <= CURDATE() THEN TIMESTAMP(t.transaction_date)
+                ELSE '1970-01-01 00:00:00'
+            END AS activity_at,
+            1 AS activity_priority,
+            t.transaction_type,
+            t.quantity,
+            t.transaction_date,
+            i.name AS item_name,
+            i.item_code,
+            u.full_name AS user_name,
+            b.name AS branch_name
+        FROM stock_transactions t
+        JOIN inventory_items i ON t.item_id=i.id
+        JOIN users u ON t.user_id=u.id
+        JOIN branches b ON t.branch_id=b.id
+        WHERE 1=1 $branchSql
+
+        UNION ALL
+
+        SELECT
+            'item' AS activity_type,
+            a.id AS activity_id,
+            CASE WHEN a.created_at <= NOW() THEN a.created_at ELSE '1970-01-01 00:00:00' END AS activity_at,
+            2 AS activity_priority,
+            CASE a.action
+                WHEN 'ADD_ITEM' THEN 'item_added'
+                WHEN 'EDIT_ITEM' THEN 'item_updated'
+                ELSE LOWER(a.action)
+            END AS transaction_type,
+            0 AS quantity,
+            DATE(a.created_at) AS transaction_date,
+            i.name AS item_name,
+            i.item_code,
+            COALESCE(u.full_name, 'System') AS user_name,
+            b.name AS branch_name
+        FROM audit_log a
+        JOIN inventory_items i ON a.table_name='inventory_items' AND a.record_id=i.id
+        LEFT JOIN users u ON a.user_id=u.id
+        JOIN branches b ON i.branch_id=b.id
+        WHERE a.action IN ('ADD_ITEM','EDIT_ITEM')
+          AND i.is_active=1
+          $branchSql
+    ) recent_activity
+    ORDER BY activity_at DESC, activity_priority DESC, activity_id DESC
     LIMIT 6
 ")->fetchAll();
 
@@ -244,8 +288,9 @@ $sparkMetrics = [
 
 $recentStockInCount = count(array_filter($recentTx, fn($tx) => in_array($tx['transaction_type'], ['stock_in', 'transfer_in'], true)));
 $recentStockOutCount = count(array_filter($recentTx, fn($tx) => in_array($tx['transaction_type'], ['stock_out', 'transfer_out'], true)));
+$recentItemChangeCount = count(array_filter($recentTx, fn($tx) => in_array($tx['transaction_type'], ['item_added', 'item_updated'], true)));
 $recentActivityQty = array_sum(array_map(fn($tx) => (int)$tx['quantity'], $recentTx));
-$recentActivityDate = $recentTx ? date('d M Y', strtotime($recentTx[0]['transaction_date'])) : 'No activity';
+$recentActivityDate = $recentTx ? date('d M Y', strtotime($recentTx[0]['activity_at'] ?? $recentTx[0]['transaction_date'])) : 'No activity';
 $assetCoverageText = number_format($totalItems) . ' live asset' . ($totalItems === 1 ? '' : 's');
 $itemsScopeQuery = $isAdmin ? 'branch=all' : '';
 $itemsAllUrl = BASE_URL . 'pages/items.php' . ($itemsScopeQuery ? '?' . $itemsScopeQuery : '');
@@ -586,17 +631,34 @@ include __DIR__ . '/../includes/header.php';
     <div class="card enterprise-list-card recent-activity-card">
         <div class="card-header">
             <h3>Recent Inventory Activity</h3>
-            <a class="card-link" href="<?= BASE_URL ?>pages/transactions.php">Transactions</a>
+            <a class="card-link" href="<?= BASE_URL ?>pages/audit.php">Audit Trail</a>
         </div>
         <div class="card-body p0">
             <table class="data-table">
                 <thead><tr><th>Date</th><th>Item</th><th>Action</th><th>By</th></tr></thead>
                 <tbody>
                 <?php foreach ($recentTx as $tx): ?>
+                    <?php
+                        $activityLabels = [
+                            'stock_in' => 'Stock in',
+                            'stock_out' => 'Stock out',
+                            'transfer_in' => 'Transfer in',
+                            'transfer_out' => 'Transfer out',
+                            'adjustment' => 'Adjusted',
+                            'item_added' => 'Item added',
+                            'item_updated' => 'Item updated',
+                        ];
+                        $activityType = $tx['transaction_type'];
+                        $activityLabel = $activityLabels[$activityType] ?? ucwords(str_replace('_', ' ', $activityType));
+                        $activityBadge = in_array($activityType, ['stock_in', 'transfer_in', 'item_added'], true)
+                            ? 'badge-success'
+                            : (in_array($activityType, ['stock_out', 'transfer_out', 'item_updated'], true) ? 'badge-blue' : 'badge-warn');
+                        $activityQty = (int)$tx['quantity'] > 0 ? ' · ' . number_format((int)$tx['quantity']) : '';
+                    ?>
                     <tr>
-                        <td><?= date('d M', strtotime($tx['transaction_date'])) ?></td>
+                        <td><?= date('d M', strtotime($tx['activity_at'] ?? $tx['transaction_date'])) ?></td>
                         <td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td>
-                        <td><span class="badge <?= $tx['transaction_type'] === 'stock_in' ? 'badge-success' : 'badge-blue' ?>"><?= clean(str_replace('_', ' ', $tx['transaction_type'])) ?> · <?= number_format($tx['quantity']) ?></span></td>
+                        <td><span class="badge <?= $activityBadge ?>"><?= clean($activityLabel . $activityQty) ?></span></td>
                         <td><?= clean($tx['user_name']) ?></td>
                     </tr>
                 <?php endforeach; ?>
@@ -608,12 +670,12 @@ include __DIR__ . '/../includes/header.php';
                     <strong><?= clean($scopeText) ?></strong>
                 </div>
                 <div>
-                    <span>Transactions</span>
+                    <span>Activities</span>
                     <strong><?= number_format(count($recentTx)) ?></strong>
                 </div>
                 <div>
                     <span>Movement Mix</span>
-                    <strong><?= number_format($recentStockInCount) ?> in / <?= number_format($recentStockOutCount) ?> out</strong>
+                    <strong><?= number_format($recentStockInCount) ?> in / <?= number_format($recentStockOutCount) ?> out / <?= number_format($recentItemChangeCount) ?> changes</strong>
                 </div>
                 <div>
                     <span>Units Moved</span>

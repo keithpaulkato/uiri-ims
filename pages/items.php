@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $categoryId   = (int)($_POST['category_id'] ?? 0);
         $supplierId   = (int)($_POST['supplier_id'] ?? 0) ?: null;
         $departmentId = (int)($_POST['department_id'] ?? 0) ?: null;
-        $unit         = trim($_POST['unit'] ?? 'piece');
+        $unit         = trim($_POST['unit'] ?? '');
         $unitPrice    = (float)($_POST['unit_price'] ?? 0);
         $currentStock = max(0, (int)($_POST['current_stock'] ?? 0));
         $minStock     = (int)($_POST['minimum_stock'] ?? 5);
@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($categoryId) {
-                $pc = $pdo->prepare("SELECT branch_id FROM categories WHERE id=?");
+                $pc = $pdo->prepare("SELECT branch_id, name FROM categories WHERE id=?");
                 $pc->execute([$categoryId]);
                 $catRow = $pc->fetch();
                 if (!$catRow) {
@@ -112,6 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     setFlash('error', 'Selected category does not belong to the chosen campus.');
                     header('Location: items.php'); exit;
                 }
+                $unit = inventoryNormalizeUnitForItem($unit, $assetType, $catRow['name'] ?? '', $name, $brandModel, $description);
             }
             if ($serialNumber !== '') {
                 $duplicateSerial = $pdo->prepare("SELECT id, name FROM inventory_items WHERE serial_number = ? AND is_active = 1 AND (? = 0 OR id <> ?) LIMIT 1");
@@ -505,8 +506,13 @@ $offset = ($page - 1) * $itemsPerPage;
 $pageStart = $totalItems ? $offset + 1 : 0;
 $pageEnd = min($offset + $itemsPerPage, $totalItems);
 
-$inventoryItemSelect = "SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name, recorder.full_name AS recorded_by_name, recorder_role.name AS recorded_by_role FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id LEFT JOIN users recorder ON recorder.id=i.created_by LEFT JOIN roles recorder_role ON recorder_role.id=recorder.role_id";
-$inventoryItemOrder = "COALESCE(i.updated_at, i.created_at) DESC, i.created_at DESC, i.id DESC";
+$inventoryRecordTimestampSql = "COALESCE(i.updated_at, i.created_at)";
+$inventorySafeRecordTimestampSql = "CASE WHEN $inventoryRecordTimestampSql <= NOW() THEN $inventoryRecordTimestampSql ELSE '1970-01-01 00:00:00' END";
+$inventoryActivityAuditAtSql = "(SELECT MAX(al.created_at) FROM audit_log al WHERE al.table_name='inventory_items' AND al.record_id=i.id AND al.action IN ('ADD_ITEM','EDIT_ITEM') AND al.created_at <= NOW())";
+$inventoryActivityAuditIdSql = "(SELECT MAX(al.id) FROM audit_log al WHERE al.table_name='inventory_items' AND al.record_id=i.id AND al.action IN ('ADD_ITEM','EDIT_ITEM') AND al.created_at <= NOW())";
+$inventoryActivityAtSql = "GREATEST($inventorySafeRecordTimestampSql, COALESCE($inventoryActivityAuditAtSql, $inventorySafeRecordTimestampSql))";
+$inventoryItemSelect = "SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name, recorder.full_name AS recorded_by_name, recorder_role.name AS recorded_by_role, $inventoryActivityAtSql AS activity_at, COALESCE($inventoryActivityAuditIdSql, 0) AS activity_log_id FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id LEFT JOIN users recorder ON recorder.id=i.created_by LEFT JOIN roles recorder_role ON recorder_role.id=recorder.role_id";
+$inventoryItemOrder = "activity_at DESC, activity_log_id DESC, i.id DESC";
 $feedbackOrderSql = $feedbackItemId ? "CASE WHEN i.id = ? THEN 0 ELSE 1 END, " : "";
 $itemParams = $params;
 if ($feedbackItemId) {
@@ -572,6 +578,10 @@ $recordingOfficer = $editItem
     ? trim(($editItem['recorded_by_name'] ?? '') . (($editItem['recorded_by_role'] ?? '') ? ', ' . $editItem['recorded_by_role'] : ''))
     : trim(($user['full_name'] ?? '') . (($user['role'] ?? '') ? ', ' . $user['role'] : ''));
 $recordingOfficer = $recordingOfficer !== '' ? $recordingOfficer : 'Not recorded';
+$unitFrontendPayload = inventoryUnitFrontendPayload();
+$editUnit = $editItem
+    ? inventoryNormalizeUnitForItem($editItem['unit'] ?? '', $editItem['asset_type'] ?? '', $editItem['category_name'] ?? '', $editItem['name'] ?? '', $editItem['brand_model'] ?? '', $editItem['description'] ?? '')
+    : 'EA';
 $printFilters = [
     'Campus' => $branchFilter ? ($branchNames[$branchFilter] ?? 'Selected campus') : ($isAdmin ? 'All Campuses' : ($branchNames[$branchId] ?? 'Current campus')),
     'Category' => ($catNameFilter !== '' || $catFilter) ? ($catNameFilter ?: ($categoryNames[$catFilter] ?? 'Selected category')) : 'All Categories',
@@ -751,6 +761,7 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($printItems as $i => $item):
                 $ss = $item['current_stock']==0 ? 'out' : ($item['current_stock']<=$item['minimum_stock'] ? 'low' : 'good');
                 $sl = $ss==='out' ? 'Out of Stock' : ($ss==='low' ? 'Low Stock' : 'In Stock');
+                $displayUnit = inventoryDisplayUnit($item['unit'] ?? '', $item['asset_type'] ?? '', $item['category_name'] ?? '', $item['name'] ?? '', $item['brand_model'] ?? '', $item['description'] ?? '');
             ?>
             <tr>
                 <td><?= $i + 1 ?></td>
@@ -767,7 +778,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= $item['serial_number'] ? clean($item['serial_number']) : '<span class="table-muted-value">—</span>' ?></td>
                 <td><?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?></td>
                 <td><?= ugx($item['unit_price']) ?></td>
-                <td><strong><?= number_format($item['current_stock']) ?> <?= clean($item['unit']) ?></strong></td>
+                <td><strong><?= number_format($item['current_stock']) ?> <?= clean($displayUnit) ?></strong></td>
                 <td><?= $item['minimum_stock'] ?></td>
                 <td><span class="badge badge-<?= $ss==='good'?'success':($ss==='low'?'warn':'danger') ?>"><?= $sl ?></span></td>
             </tr>
@@ -788,9 +799,10 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($items as $i => $item):
                 $ss = $item['current_stock']==0 ? 'out' : ($item['current_stock']<=$item['minimum_stock'] ? 'low' : 'good');
                 $sl = $ss==='out' ? 'Out of Stock' : ($ss==='low' ? 'Low Stock' : 'In Stock');
+                $displayUnit = inventoryDisplayUnit($item['unit'] ?? '', $item['asset_type'] ?? '', $item['category_name'] ?? '', $item['name'] ?? '', $item['brand_model'] ?? '', $item['description'] ?? '');
                 $isLatestChange = $page === 1 && $i === 0;
                 $isFeedbackItem = $feedbackItemId && (int)$feedbackItemId === (int)$item['id'];
-                $latestChangeDate = $item['updated_at'] ?: $item['created_at'];
+                $latestChangeDate = $item['activity_at'] ?: ($item['updated_at'] ?: $item['created_at']);
                 $rowClasses = array_filter([
                     $isLatestChange ? 'inventory-latest-row' : '',
                     $isFeedbackItem ? 'inventory-feedback-row' : '',
@@ -821,7 +833,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= $item['serial_number'] ? clean($item['serial_number']) : '<span class="table-muted-value">—</span>' ?></td>
                 <td><?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?></td>
                 <td><?= ugx($item['unit_price']) ?></td>
-                <td><strong><?= number_format($item['current_stock']) ?> <?= clean($item['unit']) ?></strong></td>
+                <td><strong><?= number_format($item['current_stock']) ?> <?= clean($displayUnit) ?></strong></td>
                 <td><?= $item['minimum_stock'] ?></td>
                 <td><span class="badge badge-<?= $ss==='good'?'success':($ss==='low'?'warn':'danger') ?>"><?= $sl ?></span></td>
                 <?php if ($canManage): ?>
@@ -830,7 +842,7 @@ include __DIR__ . '/../includes/header.php';
                         <a href="items.php?edit=<?= $item['id'] ?>" class="btn-icon" title="Edit">
                             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </a>
-                        <button type="button" class="btn-icon btn-icon-danger js-delete-item" title="Delete" aria-label="Delete <?= clean($item['name']) ?>" data-item-id="<?= $item['id'] ?>" data-item-name="<?= clean($item['name']) ?>" data-item-code="<?= clean($item['item_code']) ?>" data-item-category="<?= clean($item['category_name']) ?>" data-item-stock="<?= (int)$item['current_stock'] ?>" data-item-unit="<?= clean($item['unit']) ?>">
+                        <button type="button" class="btn-icon btn-icon-danger js-delete-item" title="Delete" aria-label="Delete <?= clean($item['name']) ?>" data-item-id="<?= $item['id'] ?>" data-item-name="<?= clean($item['name']) ?>" data-item-code="<?= clean($item['item_code']) ?>" data-item-category="<?= clean($item['category_name']) ?>" data-item-stock="<?= (int)$item['current_stock'] ?>" data-item-unit="<?= clean($displayUnit) ?>">
                             <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                         </button>
                     </div>
@@ -984,7 +996,7 @@ include __DIR__ . '/../includes/header.php';
                                     <div class="form-grid-2">
                                         <div class="form-group">
                                             <label>Inventory Type</label>
-                                            <select name="inventory_type">
+                                            <select name="inventory_type" id="previewInventoryTypeInput">
                                                 <?php foreach (['Fixed Asset','Consumable','Tool','Spare Part','Laboratory Equipment','Office Equipment'] as $type): ?>
                                                 <option value="<?= $type ?>" <?= ($editItem['asset_type']??'Consumable')===$type?'selected':'' ?>><?= $type ?></option>
                                                 <?php endforeach; ?>
@@ -995,7 +1007,7 @@ include __DIR__ . '/../includes/header.php';
                                             <select name="category_id" id="previewCategoryInput" required>
                                                 <option value="">Select category</option>
                                                 <?php foreach ($categories as $c): ?>
-                                                <option value="<?= $c['id'] ?>" data-branch="<?= $c['branch_id'] ?>" <?= ($editItem['category_id']??0)==$c['id']?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
+                                                <option value="<?= $c['id'] ?>" data-branch="<?= $c['branch_id'] ?>" data-category-name="<?= clean($c['name']) ?>" <?= ($editItem['category_id']??0)==$c['id']?'selected':'' ?>><?= clean($c['name']) ?><?= $isAdmin ? ' — ' . clean($branches[array_search($c['branch_id'], array_column($branches,'id'))]['name'] ?? '') : '' ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
@@ -1093,10 +1105,11 @@ include __DIR__ . '/../includes/header.php';
                                         <div class="form-group">
                                             <label>Unit of Measure</label>
                                             <select name="unit" id="previewUnitInput">
-                                                <?php foreach (['piece','ream','box','set','litre','kg','metre','carton','dozen','pair'] as $u): ?>
-                                                <option value="<?= $u ?>" <?= ($editItem['unit']??'piece')===$u?'selected':'' ?>><?= ucfirst($u) ?></option>
+                                                <?php foreach ($unitFrontendPayload['catalog'] as $code => $unitOption): ?>
+                                                <option value="<?= clean($code) ?>" <?= $editUnit===$code?'selected':'' ?>><?= clean($unitOption['label']) ?></option>
                                                 <?php endforeach; ?>
                                             </select>
+                                            <small id="unitMeasureHint">Select category and item type to filter allowed units.</small>
                                         </div>
                                         <div class="form-group">
                                             <label>Unit Price (UGX)</label>
@@ -1251,6 +1264,7 @@ const itemFilterLabels = <?= json_encode($filterOptionLabels, JSON_UNESCAPED_SLA
 const itemFilterFixedBranch = <?= $isAdmin ? 'null' : (int)$branchId ?>;
 const inventoryFeedback = <?= json_encode($inventoryFeedback, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
 const inventoryPrintGeneratedBy = <?= json_encode(trim(($user['full_name'] ?? '') . (($user['role'] ?? '') ? ', ' . $user['role'] : '')), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+const inventoryUnitRules = <?= json_encode($unitFrontendPayload, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
 
 function initSmartItemFilters() {
     const fields = {
@@ -1426,6 +1440,81 @@ document.addEventListener('DOMContentLoaded', function () {
     const existingImageUrl = document.getElementById('reviewImagePreview')?.getAttribute('src') || '';
     let selectedImageUrl = '';
 
+    function unitCatalogLabel(code, field = 'short') {
+        return inventoryUnitRules.catalog?.[code]?.[field] || code || 'EA';
+    }
+
+    function selectedCategoryName() {
+        const option = document.getElementById('previewCategoryInput')?.selectedOptions?.[0];
+        return option?.dataset?.categoryName || option?.textContent?.split(' - ')[0]?.trim() || '';
+    }
+
+    function unitProfileForCurrentItem() {
+        const assetType = document.getElementById('previewInventoryTypeInput')?.value || '';
+        const name = document.getElementById('previewNameInput')?.value || '';
+        const category = selectedCategoryName();
+        const brandModel = document.getElementById('previewBrandModelInput')?.value || '';
+        const description = inventoryForm?.querySelector('textarea[name="description"]')?.value || '';
+        const profiles = inventoryUnitRules.profiles || [];
+        const byId = (id) => profiles.find(profile => profile.id === id) || profiles[profiles.length - 1];
+        const keywordMatches = (text, keyword) => {
+            const needle = String(keyword || '').trim().toLowerCase();
+            if (!needle) return false;
+            if (needle.includes(' ')) return text.includes(needle);
+            const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(`\\b${escaped}\\b`).test(text);
+        };
+        const matchProfile = (text, priority) => {
+            const haystack = String(text || '').toLowerCase();
+            for (const id of priority) {
+                const profile = byId(id);
+                if ((profile.keywords || []).some(keyword => keywordMatches(haystack, keyword))) {
+                    return profile;
+                }
+            }
+            return null;
+        };
+        const itemPriority = ['software_service', 'paper', 'cable', 'ict_hardware', 'kit_set', 'machinery_equipment', 'furniture', 'safety', 'packaging', 'liquid_chemical', 'dry_bulk', 'packaged_consumable'];
+        const categoryPriority = ['paper', 'cable', 'ict_hardware', 'packaging', 'liquid_chemical', 'dry_bulk', 'machinery_equipment', 'furniture', 'safety', 'packaged_consumable'];
+        const itemText = `${assetType} ${name} ${brandModel}`;
+        const itemMatch = matchProfile(itemText, itemPriority);
+        if (itemMatch) return itemMatch;
+        const categoryMatch = matchProfile(category, categoryPriority);
+        if (categoryMatch) return categoryMatch;
+
+        const typeKey = assetType.trim().toLowerCase();
+
+        if (['fixed asset', 'laboratory equipment', 'office equipment'].includes(typeKey)) {
+            return byId('countable_default');
+        }
+        if (typeKey === 'tool') {
+            return byId('kit_set');
+        }
+        if (['consumable', 'spare part'].includes(typeKey)) {
+            return byId('packaged_consumable');
+        }
+
+        return byId('countable_default');
+    }
+
+    function refreshUnitOptions() {
+        const unitSelect = document.getElementById('previewUnitInput');
+        const hint = document.getElementById('unitMeasureHint');
+        if (!unitSelect) return;
+
+        const profile = unitProfileForCurrentItem();
+        const allowed = profile?.units?.length ? profile.units : ['EA'];
+        const current = unitSelect.value;
+        unitSelect.innerHTML = '';
+        allowed.forEach(code => {
+            unitSelect.add(new Option(unitCatalogLabel(code, 'label'), code));
+        });
+        unitSelect.value = allowed.includes(current) ? current : (profile.default || allowed[0] || 'EA');
+        if (hint) {
+            hint.textContent = profile.hint || 'Allowed units are filtered by the selected item nature.';
+        }
+    }
+
     function showStep(step) {
         stepButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.step === step));
         stepPanels.forEach(panel => panel.classList.toggle('active', panel.dataset.stepPanel === step));
@@ -1451,6 +1540,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelector('#addItemModal .modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
                 return;
             }
+            refreshUnitOptions();
             validateHierarchy();
             const invalidField = currentPanel ? Array.from(currentPanel.querySelectorAll('input, select, textarea')).find(field => !field.checkValidity()) : null;
 
@@ -1473,13 +1563,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updatePreview() {
         const name = document.getElementById('previewNameInput')?.value?.trim() || 'Untitled Item';
-        const category = document.getElementById('previewCategoryInput')?.selectedOptions[0]?.text || 'Unassigned Category';
+        const category = selectedCategoryName() || 'Unassigned Category';
         const section = document.getElementById('previewSectionInput')?.selectedOptions[0]?.text || 'Unassigned department';
         const department = document.getElementById('previewDeptInput')?.selectedOptions[0]?.text || 'Unassigned section/unit';
         const branchInput = document.getElementById('previewBranchInput');
         const branch = branchInput?.selectedOptions?.[0]?.text || branchInput?.dataset?.label || 'Campus Not Set';
         const supplier = document.getElementById('previewSupplierInput')?.selectedOptions[0]?.text || 'Not assigned';
-        const unit = document.getElementById('previewUnitInput')?.value || 'unit';
+        const unit = unitCatalogLabel(document.getElementById('previewUnitInput')?.value || 'EA');
         const stock = parseInt(document.getElementById('previewCurrentStockInput')?.value || '0', 10);
         const price = parseFloat(document.getElementById('previewPriceInput')?.value || '0');
         const brandModel = document.getElementById('previewBrandModelInput')?.value?.trim() || '—';
@@ -1496,7 +1586,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('previewDepartment').textContent = department;
         document.getElementById('previewBranch').textContent = branch;
         document.getElementById('previewSupplier').textContent = supplier;
-        document.getElementById('previewStock').textContent = stock + ' ' + unit + (stock === 1 ? '' : 's');
+        document.getElementById('previewStock').textContent = stock + ' ' + unit;
         document.getElementById('previewValue').textContent = formatCurrency(price * Math.max(stock, 1));
         document.getElementById('previewBrandModel').textContent = brandModel;
         document.getElementById('previewPurchaseDate').textContent = purchaseDate;
@@ -1509,7 +1599,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 : 'Optional. Use only when this item has a manufacturer or device serial.';
         }
         document.getElementById('reviewItemName').textContent = name;
-        document.getElementById('reviewItemContext').textContent = `${branch} • ${category} • ${stock} ${unit}${stock === 1 ? '' : 's'}`;
+        document.getElementById('reviewItemContext').textContent = `${branch} • ${category} • ${stock} ${unit}`;
+    }
+
+    function syncInventoryClassification() {
+        refreshUnitOptions();
+        validateHierarchy();
+        updatePreview();
     }
 
     function escapeHtml(value) {
@@ -1756,6 +1852,7 @@ td { font-weight: 700; }
     });
 
     inventoryForm?.addEventListener('submit', function (event) {
+        refreshUnitOptions();
         validateHierarchy();
         const invalidField = findInvalidField();
         if (invalidField) {
@@ -1770,8 +1867,8 @@ td { font-weight: 700; }
     });
 
     ['input', 'change'].forEach(eventName => {
-        document.querySelectorAll('#previewNameInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewBrandModelInput, #previewPurchaseDateInput, #previewAssetCodeInput, #previewSerialNumberInput, #previewQrCodeInput').forEach(el => {
-            el.addEventListener(eventName, updatePreview);
+        document.querySelectorAll('#previewNameInput, #previewInventoryTypeInput, #previewCategoryInput, #previewSectionInput, #previewDeptInput, #previewBranchInput, #previewSupplierInput, #previewUnitInput, #previewCurrentStockInput, #previewMinStockInput, #previewPriceInput, #previewBrandModelInput, #previewPurchaseDateInput, #previewAssetCodeInput, #previewSerialNumberInput, #previewQrCodeInput, textarea[name="description"]').forEach(el => {
+            el.addEventListener(eventName, syncInventoryClassification);
         });
     });
 
@@ -1779,20 +1876,19 @@ td { font-weight: 700; }
         filterSectionOptions();
         filterCategoryOptions();
         filterDepartmentOptions();
-        validateHierarchy();
-        updatePreview();
+        syncInventoryClassification();
     });
 
     document.getElementById('previewSectionInput')?.addEventListener('change', function () {
         filterDepartmentOptions();
-        validateHierarchy();
-        updatePreview();
+        syncInventoryClassification();
     });
 
-    document.getElementById('previewCategoryInput')?.addEventListener('change', validateHierarchy);
-    document.getElementById('previewDeptInput')?.addEventListener('change', validateHierarchy);
+    document.getElementById('previewCategoryInput')?.addEventListener('change', syncInventoryClassification);
+    document.getElementById('previewDeptInput')?.addEventListener('change', syncInventoryClassification);
     document.getElementById('printInventorySummaryBtn')?.addEventListener('click', printInventorySummary);
 
+    refreshUnitOptions();
     filterSectionOptions();
     filterCategoryOptions();
     filterDepartmentOptions();

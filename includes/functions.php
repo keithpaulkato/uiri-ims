@@ -777,6 +777,307 @@ function ensureInventoryDecisionColumns(): void {
     }
 }
 
+function inventoryUnitCatalog(): array {
+    return [
+        'EA' => ['label' => 'EA - Each', 'short' => 'EA'],
+        'SET' => ['label' => 'SET - Set', 'short' => 'SET'],
+        'KIT' => ['label' => 'KIT - Kit', 'short' => 'KIT'],
+        'BOX' => ['label' => 'BOX - Box', 'short' => 'BOX'],
+        'PACK' => ['label' => 'PACK - Pack', 'short' => 'PACK'],
+        'CARTON' => ['label' => 'CARTON - Carton', 'short' => 'CARTON'],
+        'REAM' => ['label' => 'REAM - Ream', 'short' => 'REAM'],
+        'ROLL' => ['label' => 'ROLL - Roll', 'short' => 'ROLL'],
+        'BAG' => ['label' => 'BAG - Bag', 'short' => 'BAG'],
+        'KG' => ['label' => 'KG - Kilogram', 'short' => 'KG'],
+        'L' => ['label' => 'L - Litre', 'short' => 'L'],
+        'ML' => ['label' => 'ML - Millilitre', 'short' => 'ML'],
+        'M' => ['label' => 'M - Metre', 'short' => 'M'],
+        'PAIR' => ['label' => 'PAIR - Pair', 'short' => 'PAIR'],
+        'DOZEN' => ['label' => 'DOZEN - Dozen', 'short' => 'DOZEN'],
+        'LICENSE' => ['label' => 'LICENSE - Software licence', 'short' => 'LICENSE'],
+        'USER' => ['label' => 'USER - Licensed user', 'short' => 'USER'],
+        'SERVICE' => ['label' => 'SERVICE - Service', 'short' => 'SERVICE'],
+    ];
+}
+
+function inventoryUnitProfiles(): array {
+    return [
+        [
+            'id' => 'software_service',
+            'label' => 'Software, subscriptions and services',
+            'units' => ['LICENSE', 'USER', 'SERVICE'],
+            'default' => 'LICENSE',
+            'hint' => 'Use licence/user/service units for software, hosting and subscriptions.',
+            'keywords' => ['software', 'license', 'licence', 'subscription', 'hosting', 'cloud', 'service'],
+        ],
+        [
+            'id' => 'paper',
+            'label' => 'Paper and printed stock',
+            'units' => ['REAM', 'PACK', 'BOX'],
+            'default' => 'REAM',
+            'hint' => 'Paper stock is normally recorded by ream unless it is deliberately boxed or packed.',
+            'keywords' => ['a4 paper', 'paper ream', 'ream', 'printer paper', 'copy paper'],
+        ],
+        [
+            'id' => 'cable',
+            'label' => 'Cables and wiring',
+            'units' => ['M', 'ROLL', 'EA'],
+            'default' => 'M',
+            'hint' => 'Bulk cable is measured in metres; prepacked cable rolls use roll.',
+            'keywords' => ['cable', 'wire', 'wiring', 'fibre', 'fiber'],
+        ],
+        [
+            'id' => 'liquid_chemical',
+            'label' => 'Liquids, chemicals and coatings',
+            'units' => ['L', 'ML', 'KG', 'BAG'],
+            'default' => 'L',
+            'hint' => 'Use litres for liquid chemicals/coatings, kilograms or bags for dry bulk material.',
+            'keywords' => ['chemical', 'reagent', 'solvent', 'varnish', 'paint', 'oil', 'detergent', 'sanitizer', 'acid', 'alkali', 'liquid'],
+        ],
+        [
+            'id' => 'dry_bulk',
+            'label' => 'Dry bulk materials',
+            'units' => ['BAG', 'KG', 'PACK'],
+            'default' => 'BAG',
+            'hint' => 'Dry bulk materials are recorded by bag or kilogram depending on packaging.',
+            'keywords' => ['powder', 'clay', 'sand', 'cement', 'flour', 'grain', 'pellet'],
+        ],
+        [
+            'id' => 'packaging',
+            'label' => 'Packaging materials',
+            'units' => ['ROLL', 'PACK', 'BOX', 'CARTON', 'EA'],
+            'default' => 'ROLL',
+            'hint' => 'Packaging film uses roll; labels, cartons and boxes use their packed unit.',
+            'keywords' => ['packaging', 'film', 'label', 'carton', 'wrap', 'wrapping'],
+        ],
+        [
+            'id' => 'ict_hardware',
+            'label' => 'ICT hardware',
+            'units' => ['EA'],
+            'default' => 'EA',
+            'hint' => 'ICT hardware is counted as individual assets: use EA for each PC, workstation, monitor, printer or network device.',
+            'keywords' => ['ict', 'computer', 'pc', 'workstation', 'desktop', 'laptop', 'monitor', 'printer', 'scanner', 'server', 'router', 'switch', 'ups', 'keyboard', 'mouse', 'tablet', 'phone', 'hmi', 'plc', 'dell', 'hp ', 'lenovo'],
+        ],
+        [
+            'id' => 'machinery_equipment',
+            'label' => 'Machinery and equipment',
+            'units' => ['EA'],
+            'default' => 'EA',
+            'hint' => 'Machinery, instruments and equipment are distinct countable assets: use EA.',
+            'keywords' => ['machine', 'machinery', 'equipment', 'oven', 'mixer', 'pasteurizer', 'lathe', 'cnc', 'robot', 'pump', 'compressor', 'furnace', 'kiln', 'motor', 'panel', 'workbench', 'microscope', 'meter', 'gauge', 'caliper', 'holder', 'arm', 'jack', 'wheel', 'rack', 'sealer', 'extractor', 'dehydrator', 'kettle', 'vat', 'churn', 'grinder', 'sheeter', 'tumbler', 'cylinder', 'hydraulic', 'pneumatic', 'welding', 'frame', 'probe', 'timer', 'scale', 'trolley', 'bin'],
+        ],
+        [
+            'id' => 'furniture',
+            'label' => 'Furniture and fittings',
+            'units' => ['EA'],
+            'default' => 'EA',
+            'hint' => 'Furniture and fittings are counted as individual assets: use EA.',
+            'keywords' => ['furniture', 'chair', 'desk', 'table', 'cabinet', 'shelf', 'shelves', 'stool', 'bench'],
+        ],
+        [
+            'id' => 'safety',
+            'label' => 'Safety and PPE',
+            'units' => ['EA', 'PAIR', 'PACK'],
+            'default' => 'EA',
+            'hint' => 'Use EA for devices, PAIR for paired PPE, and PACK only for packed consumable PPE.',
+            'keywords' => ['safety', 'ppe', 'glove', 'goggles', 'helmet', 'harness', 'extinguisher', 'mask', 'apron'],
+        ],
+        [
+            'id' => 'kit_set',
+            'label' => 'Kits and sets',
+            'units' => ['KIT', 'SET', 'EA'],
+            'default' => 'SET',
+            'hint' => 'Use SET or KIT only when the item is intentionally managed as one grouped kit.',
+            'keywords' => ['kit', 'set', 'tool set', 'manual set', 'models'],
+        ],
+        [
+            'id' => 'packaged_consumable',
+            'label' => 'Packaged consumables',
+            'units' => ['PACK', 'BOX', 'BAG', 'CARTON', 'DOZEN', 'EA'],
+            'default' => 'PACK',
+            'hint' => 'Consumables should use the package unit printed on the stock record.',
+            'keywords' => ['consumable', 'stationery', 'supplies', 'spare', 'manual', 'material'],
+        ],
+        [
+            'id' => 'countable_default',
+            'label' => 'Countable item',
+            'units' => ['EA'],
+            'default' => 'EA',
+            'hint' => 'Use EA when the item is a distinct countable asset.',
+            'keywords' => [],
+        ],
+    ];
+}
+
+function inventoryNormalizeUnitCode(?string $unit): string {
+    $key = strtolower(trim((string)$unit));
+    $key = rtrim($key, '.');
+    $aliases = [
+        '' => '',
+        'ea' => 'EA',
+        'each' => 'EA',
+        'unit' => 'EA',
+        'piece' => 'EA',
+        'pieces' => 'EA',
+        'pc' => 'EA',
+        'pcs' => 'EA',
+        'set' => 'SET',
+        'kit' => 'KIT',
+        'box' => 'BOX',
+        'pack' => 'PACK',
+        'packet' => 'PACK',
+        'carton' => 'CARTON',
+        'ream' => 'REAM',
+        'roll' => 'ROLL',
+        'bag' => 'BAG',
+        'kg' => 'KG',
+        'kgs' => 'KG',
+        'kilogram' => 'KG',
+        'kilograms' => 'KG',
+        'l' => 'L',
+        'ltr' => 'L',
+        'litre' => 'L',
+        'liter' => 'L',
+        'litres' => 'L',
+        'liters' => 'L',
+        'ml' => 'ML',
+        'millilitre' => 'ML',
+        'milliliter' => 'ML',
+        'm' => 'M',
+        'metre' => 'M',
+        'meter' => 'M',
+        'metres' => 'M',
+        'meters' => 'M',
+        'pair' => 'PAIR',
+        'dozen' => 'DOZEN',
+        'license' => 'LICENSE',
+        'licence' => 'LICENSE',
+        'user' => 'USER',
+        'service' => 'SERVICE',
+    ];
+
+    return $aliases[$key] ?? strtoupper($key);
+}
+
+function inventoryUnitProfileForItem(string $assetType = '', string $categoryName = '', string $itemName = '', string $brandModel = '', string $description = ''): array {
+    $profiles = inventoryUnitProfiles();
+    $profileById = static function (string $id) use ($profiles): array {
+        foreach ($profiles as $profile) {
+            if ($profile['id'] === $id) {
+                return $profile;
+            }
+        }
+        return end($profiles);
+    };
+    $keywordMatches = static function (string $text, string $keyword): bool {
+        $keyword = strtolower(trim($keyword));
+        if ($keyword === '') {
+            return false;
+        }
+        if (str_contains($keyword, ' ')) {
+            return str_contains($text, $keyword);
+        }
+        return (bool)preg_match('/\b' . preg_quote($keyword, '/') . '\b/', $text);
+    };
+    $matchProfile = static function (string $text, array $priority) use ($profileById, $keywordMatches): ?array {
+        foreach ($priority as $id) {
+            $profile = $profileById($id);
+            foreach ($profile['keywords'] as $keyword) {
+                if ($keywordMatches($text, $keyword)) {
+                    return $profile;
+                }
+            }
+        }
+        return null;
+    };
+
+    $itemText = strtolower(trim($assetType . ' ' . $itemName . ' ' . $brandModel));
+    $categoryText = strtolower(trim($categoryName));
+    $itemPriority = ['software_service', 'paper', 'cable', 'ict_hardware', 'kit_set', 'machinery_equipment', 'furniture', 'safety', 'packaging', 'liquid_chemical', 'dry_bulk', 'packaged_consumable'];
+    $categoryPriority = ['paper', 'cable', 'ict_hardware', 'packaging', 'liquid_chemical', 'dry_bulk', 'machinery_equipment', 'furniture', 'safety', 'packaged_consumable'];
+
+    $matched = $matchProfile($itemText, $itemPriority);
+    if ($matched) {
+        return $matched;
+    }
+    $matched = $matchProfile($categoryText, $categoryPriority);
+    if ($matched) {
+        return $matched;
+    }
+
+    $assetTypeKey = strtolower(trim($assetType));
+    if (in_array($assetTypeKey, ['fixed asset', 'laboratory equipment', 'office equipment'], true)) {
+        return $profileById('countable_default');
+    }
+
+    if ($assetTypeKey === 'tool') {
+        return $profileById('kit_set');
+    }
+    if (in_array($assetTypeKey, ['consumable', 'spare part'], true)) {
+        return $profileById('packaged_consumable');
+    }
+
+    return end($profiles);
+}
+
+function inventoryUnitOptionsForItem(string $assetType = '', string $categoryName = '', string $itemName = '', string $brandModel = '', string $description = ''): array {
+    $catalog = inventoryUnitCatalog();
+    $profile = inventoryUnitProfileForItem($assetType, $categoryName, $itemName, $brandModel, $description);
+    $options = [];
+
+    foreach ($profile['units'] as $code) {
+        if (isset($catalog[$code])) {
+            $options[$code] = $catalog[$code];
+        }
+    }
+
+    return $options ?: ['EA' => $catalog['EA']];
+}
+
+function inventoryDefaultUnitForItem(string $assetType = '', string $categoryName = '', string $itemName = '', string $brandModel = '', string $description = ''): string {
+    $profile = inventoryUnitProfileForItem($assetType, $categoryName, $itemName, $brandModel, $description);
+    return $profile['default'] ?? 'EA';
+}
+
+function inventoryNormalizeUnitForItem(?string $unit, string $assetType = '', string $categoryName = '', string $itemName = '', string $brandModel = '', string $description = ''): string {
+    $code = inventoryNormalizeUnitCode($unit);
+    $options = inventoryUnitOptionsForItem($assetType, $categoryName, $itemName, $brandModel, $description);
+
+    if ($code !== '' && isset($options[$code])) {
+        return $code;
+    }
+
+    return inventoryDefaultUnitForItem($assetType, $categoryName, $itemName, $brandModel, $description);
+}
+
+function inventoryDisplayUnit(?string $unit, string $assetType = '', string $categoryName = '', string $itemName = '', string $brandModel = '', string $description = ''): string {
+    $code = ($assetType || $categoryName || $itemName || $brandModel || $description)
+        ? inventoryNormalizeUnitForItem($unit, $assetType, $categoryName, $itemName, $brandModel, $description)
+        : inventoryNormalizeUnitCode($unit);
+    $catalog = inventoryUnitCatalog();
+
+    return $catalog[$code]['short'] ?? ($code ?: 'EA');
+}
+
+function inventoryUnitFrontendPayload(): array {
+    $catalog = inventoryUnitCatalog();
+    $profiles = array_map(static function (array $profile): array {
+        return [
+            'id' => $profile['id'],
+            'label' => $profile['label'],
+            'units' => $profile['units'],
+            'default' => $profile['default'],
+            'hint' => $profile['hint'],
+            'keywords' => $profile['keywords'],
+        ];
+    }, inventoryUnitProfiles());
+
+    return [
+        'catalog' => $catalog,
+        'profiles' => $profiles,
+    ];
+}
+
 /**
  * Build pagination values for list pages.
  */
