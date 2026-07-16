@@ -193,7 +193,6 @@ $flash = getFlash();
         </div>
 
         <div class="login-tagline">
-            <div class="hero-badge">Secure Inventory Access</div>
             <h2>Manage inventory, stock movements, and branch operations in one place.</h2>
             <p>Sign in to continue using the UIRI Inventory Management System.</p>
         </div>
@@ -207,16 +206,11 @@ $flash = getFlash();
     <div class="login-panel-right">
         <div class="login-form-wrap">
             <div class="login-form-header">
-                <div class="login-badge">Secure Access</div>
                 <div class="login-form-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6l7-4z"/><path d="M9.5 12.5l1.8 1.8 3.2-3.8"/></svg>
                 </div>
                 <h3>Welcome back to UIRI IMS</h3>
-                <p class="login-form-subtext">Use your registered UIRI credentials to access the secure inventory portal.</p>
-                <div class="login-quick-note">
-                    <svg viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6l7-4z"/><path d="M9.5 12.5l1.8 1.8 3.2-3.8"/></svg>
-                    Secure access for staff, managers and administrators.
-                </div>
+                <p class="login-form-subtext">Use your registered UIRI credentials to access the inventory portal.</p>
                 <p class="login-return-link"><a href="<?= BASE_URL ?>pages/landing.html">← Back to landing page</a></p>
             </div>
 
@@ -276,7 +270,7 @@ $flash = getFlash();
                     <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                 </button>
 
-                <div class="login-security-note">Your session is protected with encrypted access and role-based permissions.</div>
+                <!-- security note removed for a cleaner login layout -->
 
                 <div class="login-help">
                     <p><a href="forgot-password.php">Forgot password?</a></p>
