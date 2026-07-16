@@ -109,7 +109,7 @@ $flash = getFlash();
 <div class="page-header">
     <div>
         <h1 class="page-title">Notifications</h1>
-        <p class="page-sub">Stay on top of stock alerts, requests, transfers, and maintenance items.</p>
+        <p class="page-sub">Stay on top of stock alerts, requests, transfers, approvals, and branch activity with a calm, clear review space that helps your team follow through without delay.</p>
     </div>
     <div class="page-actions">
         <a href="?mark_all_read&csrf_token=<?= csrfToken() ?>" class="btn btn-outline">Mark All as Read</a>
@@ -148,6 +148,40 @@ $flash = getFlash();
             <strong><?= count(array_filter($notifications, fn($n) => $n['type'] === 'transfers')) ?></strong>
             <span>Transfers</span>
         </div>
+    </div>
+</div>
+
+<div class="notification-hero-panel">
+    <div class="notification-hero-copy">
+        <div class="notification-badge notification-badge-strong">Operations overview</div>
+        <h3>This is your calm command center for branch activity.</h3>
+        <p>This notifications area brings important operational updates together in one place so your team can quickly see what needs attention, what is already underway, and what has already been handled. It is designed to make daily follow-up easier, clearer, and less stressful when the workload becomes busy.</p>
+        <p>Use this page to review low-stock warnings, fresh requests, transfer updates, approvals, and other activity that can affect planning, fulfillment, and branch coordination. The more consistently this space is reviewed, the easier it becomes to stay ahead of issues before they grow into larger problems.</p>
+    </div>
+    <div class="notification-hero-stack">
+        <div class="notification-tip">
+            <strong>How to work with this page</strong>
+            <p>Filter by type or read state to narrow the list to what matters right now. Review unread updates first, mark them as read after you act, and use the clear actions to keep the page tidy and useful.</p>
+        </div>
+        <div class="notification-tip">
+            <strong>Why this matters</strong>
+            <p>When stock levels drop, requests pile up, or transfers need attention, this page becomes a practical reminder system. It helps your team focus on the next best action instead of losing track of small but important updates.</p>
+        </div>
+    </div>
+</div>
+
+<div class="notification-guidance-grid">
+    <div class="notification-guidance-card">
+        <h4>Watch stock pressure</h4>
+        <p>Low-stock notices are meant to highlight the items that may need replenishment soon. Review them quickly so you can prevent avoidable shortages before they affect operations or customer service.</p>
+    </div>
+    <div class="notification-guidance-card">
+        <h4>Check request urgency</h4>
+        <p>New requests often carry immediate priorities that should not be left waiting. Keeping them visible helps your team respond quickly and makes the workflow feel more organized and accountable.</p>
+    </div>
+    <div class="notification-guidance-card">
+        <h4>Confirm transfer progress</h4>
+        <p>Transfer updates help the branch understand what is moving, what is pending, and what needs follow-up. Staying aware of them improves coordination and reduces confusion across departments.</p>
     </div>
 </div>
 

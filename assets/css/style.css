@@ -1164,6 +1164,17 @@ select.form-control { cursor: pointer; color: var(--gold); }
 .notification-summary-icon { width: 42px; height: 42px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: rgba(201,162,39,.12); color: var(--gold); font-size: 1rem; font-weight: 700; }
 .notification-summary-card strong { display: block; font-size: 1.1rem; color: var(--navy); }
 .notification-summary-card span { display: block; font-size: .8rem; color: var(--sub); }
+.notification-hero-panel { display: grid; grid-template-columns: 1.4fr .9fr; gap: 16px; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(135deg, #fcfdff 0%, #f8fbff 100%); box-shadow: var(--shadow); margin-bottom: 16px; }
+.notification-hero-copy h3 { font-size: 1.08rem; font-weight: 900; color: var(--navy); margin: 10px 0 8px; }
+.notification-hero-copy p { font-size: .9rem; color: var(--sub); line-height: 1.65; margin-bottom: 8px; }
+.notification-hero-stack { display: grid; gap: 10px; }
+.notification-tip { padding: 12px 14px; border: 1px solid #e6edf5; border-radius: 12px; background: var(--white); }
+.notification-tip strong { display: block; color: var(--navy); font-size: .9rem; margin-bottom: 6px; }
+.notification-tip p { font-size: .82rem; color: var(--sub); line-height: 1.55; margin: 0; }
+.notification-guidance-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.notification-guidance-card { padding: 14px 15px; border: 1px solid var(--border); border-radius: 12px; background: var(--white); box-shadow: var(--shadow); }
+.notification-guidance-card h4 { font-size: .9rem; font-weight: 800; color: var(--navy); margin-bottom: 8px; }
+.notification-guidance-card p { font-size: .82rem; color: var(--sub); line-height: 1.55; margin: 0; }
 .notification-group-card { padding: 16px 0; border-top: 1px solid var(--border); }
 .notification-group-card:first-of-type { border-top: none; padding-top: 0; }
 .notification-group-card h4 { display: flex; align-items: center; justify-content: space-between; font-size: .95rem; font-weight: 700; color: var(--navy); margin-bottom: 12px; }
@@ -1175,12 +1186,18 @@ select.form-control { cursor: pointer; color: var(--gold); }
 .notification-item p { font-size: .82rem; color: var(--sub); margin-bottom: 6px; line-height: 1.5; }
 .notification-meta { font-size: .75rem; color: var(--sub); }
 .notification-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #f8fafc; color: var(--navy); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.notification-badge-strong { background: rgba(201,162,39,.14); color: var(--gold); }
 .notification-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-sm { padding: 7px 12px; font-size: .8rem; box-shadow: none; }
 .btn-secondary { background: #f8fafc; color: var(--navy); border: 1px solid var(--border); box-shadow: none; }
 .btn-secondary:hover { background: #f1f5f9; transform: none; box-shadow: none; }
 .btn-danger { background: #ef4444; color: #fff; border: 1px solid #ef4444; box-shadow: none; }
 .btn-danger:hover { background: #dc2626; color: #fff; transform: none; box-shadow: none; }
+
+@media (max-width: 900px) {
+  .notification-hero-panel { grid-template-columns: 1fr; }
+  .notification-guidance-grid { grid-template-columns: 1fr; }
+}
 
 /* LOGIN */
 .login-body { background: linear-gradient(135deg, var(--navy) 0%, #163a5a 45%, #0b1220 100%); min-height: 100vh; }
