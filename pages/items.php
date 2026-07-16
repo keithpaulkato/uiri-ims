@@ -214,6 +214,18 @@ $legacyStockFilters = ['good' => 'available', 'low' => 'low_stock', 'out' => 'ou
 $stockFilter = $legacyStockFilters[$stockFilter] ?? $stockFilter;
 $assetStatusFilter = $_GET['asset_status'] ?? '';
 $conditionFilter = $_GET['condition'] ?? '';
+$normalizeDateFilter = static function (string $value): string {
+    $value = trim($value);
+    if ($value === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+        return '';
+    }
+    $date = DateTime::createFromFormat('Y-m-d', $value);
+    return $date && $date->format('Y-m-d') === $value ? $value : '';
+};
+$dateFrom = trim($_GET['date_from'] ?? '');
+$dateTo = trim($_GET['date_to'] ?? '');
+$dateFrom = $normalizeDateFilter($dateFrom);
+$dateTo = $normalizeDateFilter($dateTo);
 $missingPurchase = ($_GET['missing_purchase'] ?? '') === '1';
 $inventoryFeedback = $_SESSION['inventory_feedback'] ?? null;
 unset($_SESSION['inventory_feedback']);
@@ -230,6 +242,8 @@ $buildItemOptionWhere = function (array $keys) use (
     &$stockFilter,
     &$assetStatusFilter,
     &$conditionFilter,
+    &$dateFrom,
+    &$dateTo,
     $isAdmin,
     $branchId
 ) {
@@ -279,6 +293,14 @@ $buildItemOptionWhere = function (array $keys) use (
         $where[] = 'i.asset_condition = ?';
         $params[] = $conditionFilter;
     }
+    if (in_array('purchase_date', $keys, true) && $dateFrom !== '') {
+        $where[] = 'i.purchase_date >= ?';
+        $params[] = $dateFrom;
+    }
+    if (in_array('purchase_date', $keys, true) && $dateTo !== '') {
+        $where[] = 'i.purchase_date <= ?';
+        $params[] = $dateTo;
+    }
 
     return ['WHERE ' . implode(' AND ', $where), $params];
 };
@@ -302,7 +324,7 @@ $filterCategories = $fetchItemOptionRows("
     {WHERE}
     GROUP BY c.name
     ORDER BY c.name
-", ['branch', 'section', 'department']);
+", ['branch', 'section', 'department', 'purchase_date']);
 if ($catFilter && !$hasSelectedId($filterCategories, $catFilter)) {
     $catFilter = 0;
     $catNameFilter = '';
@@ -319,7 +341,7 @@ $sections = $fetchItemOptionRows("
     {WHERE}
     GROUP BY sec.id, sec.name, sec.branch_id, b.name
     ORDER BY b.name, sec.name
-", ['branch']);
+", ['branch', 'purchase_date']);
 if (!$hasSelectedId($sections, $sectionFilter)) {
     $sectionFilter = 0;
     $deptFilter = 0;
@@ -334,7 +356,7 @@ $departments = $fetchItemOptionRows("
     {WHERE}
     GROUP BY d.id, d.name, d.section_id, sec.name, sec.branch_id, b.name
     ORDER BY b.name, sec.name, d.name
-", ['branch', 'section']);
+", ['branch', 'section', 'purchase_date']);
 if (!$hasSelectedId($departments, $deptFilter)) {
     $deptFilter = 0;
 }
@@ -346,13 +368,13 @@ $suppliers = $fetchItemOptionRows("
     {WHERE}
     GROUP BY s.id, s.company_name
     ORDER BY s.company_name
-", ['branch', 'section', 'department', 'category']);
+", ['branch', 'section', 'department', 'category', 'purchase_date']);
 if (!$hasSelectedId($suppliers, $supplierFilter)) {
     $supplierFilter = 0;
 }
 
 $stockStatusOptions = [];
-[$stockWhere, $stockParams] = $buildItemOptionWhere(['branch', 'category', 'section', 'department', 'supplier']);
+[$stockWhere, $stockParams] = $buildItemOptionWhere(['branch', 'category', 'section', 'department', 'supplier', 'purchase_date']);
 $stockStmt = $pdo->prepare("
     SELECT
         SUM(CASE WHEN i.current_stock <= i.minimum_stock AND i.current_stock > 0 THEN 1 ELSE 0 END) AS low_stock,
@@ -384,7 +406,7 @@ $assetStatusOptions = $fetchItemOptionRows("
       AND i.asset_status <> ''
     GROUP BY i.asset_status
     ORDER BY i.asset_status
-", ['branch', 'category', 'section', 'department', 'supplier', 'stock']);
+", ['branch', 'category', 'section', 'department', 'supplier', 'stock', 'purchase_date']);
 if ($assetStatusFilter && !in_array($assetStatusFilter, array_column($assetStatusOptions, 'value'), true)) {
     $assetStatusFilter = '';
 }
@@ -397,7 +419,7 @@ $conditionOptions = $fetchItemOptionRows("
       AND i.asset_condition <> ''
     GROUP BY i.asset_condition
     ORDER BY i.asset_condition
-", ['branch', 'category', 'section', 'department', 'supplier', 'stock', 'asset_status']);
+", ['branch', 'category', 'section', 'department', 'supplier', 'stock', 'asset_status', 'purchase_date']);
 if ($conditionFilter && !in_array($conditionFilter, array_column($conditionOptions, 'value'), true)) {
     $conditionFilter = '';
 }
@@ -467,6 +489,8 @@ if ($stockFilter === 'out_of_stock') $where[] = "i.current_stock = 0";
 if ($stockFilter === 'available') $where[] = "i.current_stock > i.minimum_stock";
 if ($assetStatusFilter !== '') { $where[] = "i.asset_status = ?"; $params[] = $assetStatusFilter; }
 if ($conditionFilter !== '') { $where[] = "i.asset_condition = ?"; $params[] = $conditionFilter; }
+if ($dateFrom !== '') { $where[] = "i.purchase_date >= ?"; $params[] = $dateFrom; }
+if ($dateTo !== '') { $where[] = "i.purchase_date <= ?"; $params[] = $dateTo; }
 if ($missingPurchase) $where[] = "i.purchase_date IS NULL";
 $whereSQL = implode(' AND ', $where);
 
@@ -534,6 +558,16 @@ $supplierNames = array_column($suppliers, 'company_name', 'id');
 $stockStatusNames = array_column($stockStatusOptions, 'label', 'value');
 $assetStatusNames = array_column($assetStatusOptions, 'label', 'value');
 $conditionNames = array_column($conditionOptions, 'label', 'value');
+$purchaseDateFilterLabel = 'All purchase dates';
+if ($dateFrom !== '' || $dateTo !== '') {
+    if ($dateFrom !== '' && $dateTo !== '') {
+        $purchaseDateFilterLabel = date('d M Y', strtotime($dateFrom)) . ' to ' . date('d M Y', strtotime($dateTo));
+    } elseif ($dateFrom !== '') {
+        $purchaseDateFilterLabel = 'From ' . date('d M Y', strtotime($dateFrom));
+    } else {
+        $purchaseDateFilterLabel = 'To ' . date('d M Y', strtotime($dateTo));
+    }
+}
 $recordingOfficer = $editItem
     ? trim(($editItem['recorded_by_name'] ?? '') . (($editItem['recorded_by_role'] ?? '') ? ', ' . $editItem['recorded_by_role'] : ''))
     : trim(($user['full_name'] ?? '') . (($user['role'] ?? '') ? ', ' . $user['role'] : ''));
@@ -547,6 +581,7 @@ $printFilters = [
     'Stock Level' => $stockFilter ? ($stockStatusNames[$stockFilter] ?? $stockFilter) : 'All Stock Levels',
     'Asset Status' => $assetStatusFilter ? ($assetStatusNames[$assetStatusFilter] ?? $assetStatusFilter) : 'All Asset Statuses',
     'Condition' => $conditionFilter ? ($conditionNames[$conditionFilter] ?? $conditionFilter) : 'All Conditions',
+    'Purchase Date' => $purchaseDateFilterLabel,
     'Search' => $search ?: 'None',
 ];
 
@@ -674,6 +709,12 @@ include __DIR__ . '/../includes/header.php';
                 <option value="<?= clean($condition['value']) ?>" <?= $conditionFilter===$condition['value']?'selected':'' ?>><?= clean($condition['label']) ?></option>
                 <?php endforeach; ?>
             </select>
+        </div>
+        <div class="filter-group date-range-filter" aria-label="Purchase date range">
+            <label for="dateFromFilter">From</label>
+            <input type="date" id="dateFromFilter" name="date_from" value="<?= clean($dateFrom) ?>">
+            <label for="dateToFilter">To</label>
+            <input type="date" id="dateToFilter" name="date_to" value="<?= clean($dateTo) ?>">
         </div>
         <?php if ($missingPurchase): ?>
         <input type="hidden" name="missing_purchase" value="1">
