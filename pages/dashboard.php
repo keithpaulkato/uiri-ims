@@ -126,6 +126,9 @@ if ($isAdmin) {
     ")->fetchAll();
 }
 
+
+
+
 $recentTx = $pdo->query("
     SELECT activity_type, activity_id, activity_at, transaction_type, quantity, transaction_date, item_name, item_code, user_name, branch_name
     FROM (
@@ -318,6 +321,9 @@ include __DIR__ . '/../includes/header.php';
         </a>
     </div>
 </div>
+
+
+
 
 <section class="enterprise-hero">
     <div class="enterprise-health-panel">
