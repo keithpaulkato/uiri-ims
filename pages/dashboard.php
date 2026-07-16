@@ -8,7 +8,7 @@ $user       = currentUser();
 $branchId   = (int)$user['branch_id'];
 $isAdmin    = hasRole('Administrator', 'Executive');
 $pdo        = db();
-ensureInventoryDecisionColumns();
+ensureInventoryDecisionColumns(); ## ensure the database has the necessary columns for decision metrics
 
 $assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
 $conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
