@@ -9,7 +9,6 @@ $branchId   = (int)$user['branch_id'];
 $isAdmin    = hasRole('Administrator', 'Executive');
 $pdo        = db();
 ensureInventoryDecisionColumns();
-
 $assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
 $conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
 $requestQueueFilters = ['priority' => 'Pending first', 'Pending' => 'Pending', 'Approved' => 'Approved', 'Issued' => 'Issued', 'Rejected' => 'Rejected', 'Cancelled' => 'Cancelled'];
