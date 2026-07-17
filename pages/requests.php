@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $quantity = (int)($_POST['quantity'] ?? 0);
         $reason = trim($_POST['reason'] ?? '');
         if ($itemId && $quantity > 0) {
-            $stmt = $pdo->prepare("SELECT id, branch_id, name, current_stock FROM inventory_items WHERE id = ? AND is_active = 1");
+            $stmt = $pdo->prepare("SELECT i.*, c.name AS category_name FROM inventory_items i JOIN categories c ON i.category_id = c.id WHERE i.id = ? AND i.is_active = 1");
             $stmt->execute([$itemId]);
             $item = $stmt->fetch();
             if ($item) {
@@ -88,11 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $pdo->beginTransaction();
                         try {
-                            $itemStmt = $pdo->prepare("SELECT id, current_stock, name FROM inventory_items WHERE id = ? FOR UPDATE");
+                            $itemStmt = $pdo->prepare("SELECT i.*, c.name AS category_name FROM inventory_items i JOIN categories c ON i.category_id = c.id WHERE i.id = ? FOR UPDATE");
                             $itemStmt->execute([$request['item_id']]);
                             $item = $itemStmt->fetch();
                             if (!$item || $item['current_stock'] < $request['quantity']) {
-                                throw new Exception('Insufficient stock.');
+                                $available = $item ? inventoryQuantityWithUnit($item['current_stock'], $item) : '0';
+                                throw new Exception('Insufficient stock. Available: ' . $available . '.');
                             }
                             $pdo->prepare("UPDATE inventory_items SET current_stock = current_stock - ? WHERE id = ?")
                                 ->execute([$request['quantity'], $request['item_id']]);
@@ -156,9 +157,10 @@ $totalRequests = (int)$countStmt->fetchColumn();
 $pagination = getPagination($totalRequests, 10);
 
 $stmt = $pdo->prepare(
-    "SELECT r.*, i.item_code, i.name AS item_name, u.full_name AS requester_name, b.name AS branch_name, d.name AS department_name
+    "SELECT r.*, i.item_code, i.name AS item_name, i.brand_model, i.description, i.unit, i.asset_type, c.name AS category_name, u.full_name AS requester_name, b.name AS branch_name, d.name AS department_name
      FROM inventory_requests r
      JOIN inventory_items i ON r.item_id = i.id
+     JOIN categories c ON i.category_id = c.id
      JOIN users u ON r.user_id = u.id
      JOIN branches b ON r.branch_id = b.id
      LEFT JOIN departments d ON r.department_id = d.id
@@ -170,14 +172,19 @@ $stmt->execute($params);
 $requests = $stmt->fetchAll();
 
 $items = $pdo->prepare(
-    "SELECT i.id, i.item_code, i.name, i.current_stock, b.name AS branch_name
+    "SELECT i.id, i.item_code, i.name, i.current_stock, i.brand_model, i.description, i.unit, i.asset_type, c.name AS category_name, b.name AS branch_name
      FROM inventory_items i
+     JOIN categories c ON i.category_id = c.id
      JOIN branches b ON i.branch_id = b.id
      WHERE i.is_active = 1 AND i.branch_id = ?
      ORDER BY i.name"
 );
 $items->execute([$branchId]);
 $items = $items->fetchAll();
+foreach ($items as &$requestItem) {
+    $requestItem['display_unit'] = inventoryDisplayUnitForRow($requestItem);
+}
+unset($requestItem);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -219,7 +226,7 @@ include __DIR__ . '/../includes/header.php';
                 </td>
                 <td><?= clean($row['requester_name']) ?></td>
                 <td><?= clean($row['branch_name']) ?></td>
-                <td><?= number_format($row['quantity']) ?></td>
+                <td><?= clean(inventoryQuantityWithUnit($row['quantity'], $row)) ?></td>
                 <td>
                     <span class="badge <?= $row['status'] === 'Approved' ? 'badge-success' : ($row['status'] === 'Issued' ? 'badge-blue' : ($row['status'] === 'Rejected' ? 'badge-danger' : 'badge-warn')) ?>">
                         <?= clean($row['status']) ?>
@@ -288,7 +295,7 @@ include __DIR__ . '/../includes/header.php';
                     <select name="item_id" required>
                         <option value="">Select item</option>
                         <?php foreach ($items as $item): ?>
-                        <option value="<?= $item['id'] ?>"><?= clean($item['item_code']) ?> — <?= clean($item['name']) ?> (<?= $item['current_stock'] ?> available)</option>
+                        <option value="<?= $item['id'] ?>"><?= clean($item['item_code']) ?> — <?= clean($item['name']) ?> (<?= number_format($item['current_stock']) ?> <?= clean($item['display_unit']) ?> available)</option>
                         <?php endforeach; ?>
                     </select>
                 </div>

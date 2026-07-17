@@ -28,11 +28,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!$fromBranch || !$toBranch || !$itemId || $quantity <= 0 || $fromBranch === $toBranch) {
             setFlash('error', 'Please provide valid transfer details.');
         } else {
-            $itemStmt = $pdo->prepare("SELECT id, current_stock, name FROM inventory_items WHERE id = ? AND branch_id = ? AND is_active = 1");
+            $itemStmt = $pdo->prepare("SELECT i.*, c.name AS category_name FROM inventory_items i JOIN categories c ON i.category_id = c.id WHERE i.id = ? AND i.branch_id = ? AND i.is_active = 1");
             $itemStmt->execute([$itemId, $fromBranch]);
             $item = $itemStmt->fetch();
             if (!$item || $item['current_stock'] < $quantity) {
-                setFlash('error', 'Selected item is not available for transfer.');
+                $available = $item ? inventoryQuantityWithUnit($item['current_stock'], $item) : '0';
+                setFlash('error', 'Selected item is not available for transfer. Available: ' . $available . '.');
             } else {
                 $transferCode = 'TRF-' . date('Ymd') . '-' . rand(1000, 9999);
                 $pdo->beginTransaction();
@@ -184,9 +185,13 @@ $transfers = $pdo->query($transfersQuery)->fetchAll();
 
 $items = [];
 if ($canRequest) {
-    $itemStmt = $pdo->prepare("SELECT i.id, i.item_code, i.name, i.current_stock FROM inventory_items i WHERE i.is_active = 1 AND i.branch_id = ? ORDER BY i.name");
+    $itemStmt = $pdo->prepare("SELECT i.id, i.item_code, i.name, i.current_stock, i.brand_model, i.description, i.unit, i.asset_type, c.name AS category_name FROM inventory_items i JOIN categories c ON i.category_id = c.id WHERE i.is_active = 1 AND i.branch_id = ? ORDER BY i.name");
     $itemStmt->execute([$branchId]);
     $items = $itemStmt->fetchAll();
+    foreach ($items as &$transferItem) {
+        $transferItem['display_unit'] = inventoryDisplayUnitForRow($transferItem);
+    }
+    unset($transferItem);
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -319,7 +324,7 @@ include __DIR__ . '/../includes/header.php';
                         <select name="item_id" required>
                             <option value="">Select item</option>
                             <?php foreach ($items as $item): ?>
-                            <option value="<?= $item['id'] ?>"><?= clean($item['item_code']) ?> — <?= clean($item['name']) ?> (<?= $item['current_stock'] ?> available)</option>
+                            <option value="<?= $item['id'] ?>"><?= clean($item['item_code']) ?> — <?= clean($item['name']) ?> (<?= number_format($item['current_stock']) ?> <?= clean($item['display_unit']) ?> available)</option>
                             <?php endforeach; ?>
                         </select>
                     </div>

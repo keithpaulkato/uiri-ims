@@ -228,8 +228,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $branchFilter = $isAdmin ? (int)($_GET['branch'] ?? 0) : $branchId;
 $bWhere = $isAdmin ? ($branchFilter ? "AND i.branch_id=$branchFilter" : '') : "AND i.branch_id=$branchId";
-$items = $pdo->query("SELECT i.id,i.name,i.item_code,i.unit,i.unit_price,i.current_stock,i.minimum_stock,i.purchase_date,i.image,i.asset_type,i.branch_id,i.supplier_id,c.name AS category_name,s.company_name AS supplier_name,s.phone AS supplier_phone,s.email AS supplier_email,s.address AS supplier_address,b.name AS branch_name,b.location AS branch_location FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id WHERE i.is_active=1 $bWhere ORDER BY i.name")->fetchAll();
+$items = $pdo->query("SELECT i.id,i.name,i.item_code,i.brand_model,i.description,i.unit,i.unit_price,i.current_stock,i.minimum_stock,i.purchase_date,i.image,i.asset_type,i.branch_id,i.supplier_id,c.name AS category_name,s.company_name AS supplier_name,s.phone AS supplier_phone,s.email AS supplier_email,s.address AS supplier_address,b.name AS branch_name,b.location AS branch_location FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id WHERE i.is_active=1 $bWhere ORDER BY i.name")->fetchAll();
 foreach ($items as &$stockInItem) {
+    $stockInItem['display_unit'] = inventoryDisplayUnitForRow($stockInItem);
     if (!empty($stockInItem['image']) && !preg_match('/^https?:\/\//i', $stockInItem['image'])) {
         $stockInItem['image'] = UPLOAD_URL . $stockInItem['image'];
     }
@@ -238,7 +239,11 @@ unset($stockInItem);
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $tWhere = $isAdmin ? ($branchFilter ? "AND t.branch_id=$branchFilter" : '') : "AND t.branch_id=$branchId";
-$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.supplier_id, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 8")->fetchAll();
+$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, i.supplier_id, c.name AS category_name, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN categories c ON c.id=i.category_id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 8")->fetchAll();
+foreach ($recent as &$recentStockIn) {
+    $recentStockIn['display_unit'] = inventoryDisplayUnitForRow($recentStockIn);
+}
+unset($recentStockIn);
 $itemStatsRaw = $pdo->query("SELECT item_id, MAX(transaction_date) AS last_stock_in_date, AVG(unit_price) AS avg_purchase_cost FROM stock_transactions WHERE transaction_type='stock_in' GROUP BY item_id")->fetchAll(PDO::FETCH_ASSOC);
 $itemStats = [];
 foreach ($itemStatsRaw as $stat) {
@@ -607,7 +612,8 @@ function setProductPreview(item) {
     document.getElementById('productSku').value = item.item_code || '';
     document.getElementById('productCategory').value = item.category_name || '';
     document.getElementById('productBrand').value = item.asset_type || 'N/A';
-    document.getElementById('productUnit').value = item.unit || '';
+    const displayUnit = item.display_unit || item.unit || 'EA';
+    document.getElementById('productUnit').value = displayUnit;
     document.getElementById('itemIdInput').value = item.id;
     document.getElementById('productSearch').value = `${item.item_code} - ${item.name}`;
     document.getElementById('barcodeInput').value = item.item_code || '';
@@ -620,7 +626,7 @@ function setProductPreview(item) {
     document.getElementById('previewImage').src = item.image || stockImagePlaceholder;
     document.getElementById('previewName').textContent = item.name || 'Selected product';
     document.getElementById('previewSku').textContent = `SKU: ${item.item_code || '—'}`;
-    document.getElementById('previewCurrentStock').textContent = item.current_stock !== null ? item.current_stock : '—';
+    document.getElementById('previewCurrentStock').textContent = item.current_stock !== null ? `${item.current_stock} ${displayUnit}` : '—';
     document.getElementById('previewMinStock').textContent = item.minimum_stock !== null ? item.minimum_stock : '—';
     document.getElementById('previewWarehouse').textContent = item.branch_location || item.branch_name || '—';
 
@@ -699,8 +705,9 @@ function calculateTotals() {
     document.getElementById('calcGrandTotal').textContent = formatCurrency(grandTotal);
     document.getElementById('calcExpectedRevenue').textContent = formatCurrency(expectedRevenue);
     document.getElementById('calcProfitMargin').textContent = `${margin.toFixed(2)}%`;
-    document.getElementById('previewQtyIn').textContent = qty ? qty : '0';
-    document.getElementById('previewProjectedStock').textContent = projectedStock === null ? '—' : projectedStock;
+    const displayUnit = selectedStockInItem ? (selectedStockInItem.display_unit || selectedStockInItem.unit || 'EA') : 'EA';
+    document.getElementById('previewQtyIn').textContent = qty ? `${qty} ${displayUnit}` : `0 ${displayUnit}`;
+    document.getElementById('previewProjectedStock').textContent = projectedStock === null ? '—' : `${projectedStock} ${displayUnit}`;
     document.getElementById('previewGrandTotal').textContent = formatCurrency(grandTotal);
     updateStockReview(grandTotal, projectedStock);
 }
@@ -717,8 +724,9 @@ function updateStockReview(grandTotal = null, projectedStock = null) {
 
     document.getElementById('reviewProduct').textContent = selectedStockInItem ? `${selectedStockInItem.item_code} - ${selectedStockInItem.name}` : 'Select product';
     document.getElementById('reviewSupplier').textContent = selectedSupplier && selectedSupplier.value ? selectedSupplier.textContent : 'Select supplier';
-    document.getElementById('reviewQty').textContent = qty ? qty : '0';
-    document.getElementById('reviewProjectedStock').textContent = projectedStock === null ? '—' : projectedStock;
+    const displayUnit = selectedStockInItem ? (selectedStockInItem.display_unit || selectedStockInItem.unit || 'EA') : 'EA';
+    document.getElementById('reviewQty').textContent = qty ? `${qty} ${displayUnit}` : `0 ${displayUnit}`;
+    document.getElementById('reviewProjectedStock').textContent = projectedStock === null ? '—' : `${projectedStock} ${displayUnit}`;
     document.getElementById('reviewDate').textContent = dateValue;
     document.getElementById('reviewGrandTotal').textContent = totalText;
 }
@@ -775,7 +783,7 @@ function buildRecentTable() {
                 <td>${new Date(tx.transaction_date).toLocaleDateString('en-GB')}</td>
                 <td><strong>${tx.item_code}</strong> <small>${tx.item_name}</small></td>
                 <td>${tx.supplier_name || '—'}</td>
-                <td>${tx.quantity}</td>
+                <td>${tx.quantity} ${tx.display_unit || ''}</td>
                 <td>${formatCurrency(tx.unit_price * tx.quantity)}</td>
                 <td class="table-actions">
                     <button type="button" class="btn btn-outline-secondary btn-sm action-icon-btn action-view" title="View stock-in" aria-label="View stock-in" onclick="viewRecent(${tx.id})">
@@ -861,7 +869,7 @@ function viewRecent(id) {
         html: `
             <strong>Product:</strong> ${tx.item_code} - ${tx.item_name}<br>
             <strong>Supplier:</strong> ${tx.supplier_name || '—'}<br>
-            <strong>Quantity:</strong> ${tx.quantity}<br>
+            <strong>Quantity:</strong> ${tx.quantity} ${tx.display_unit || ''}<br>
             <strong>Unit Cost:</strong> ${formatCurrency(tx.unit_price)}<br>
             <strong>Total Cost:</strong> ${formatCurrency(tx.unit_price * tx.quantity)}<br>
             <strong>Warehouse:</strong> ${tx.branch_name || '—'}<br>
@@ -919,7 +927,7 @@ function exportRecentStock() {
         tx.transaction_date,
         `${tx.item_code} - ${tx.item_name}`,
         tx.supplier_name || '',
-        tx.quantity,
+        `${tx.quantity} ${tx.display_unit || ''}`,
         tx.unit_price,
         tx.unit_price * tx.quantity,
         tx.branch_name,

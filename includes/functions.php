@@ -1059,6 +1059,21 @@ function inventoryDisplayUnit(?string $unit, string $assetType = '', string $cat
     return $catalog[$code]['short'] ?? ($code ?: 'EA');
 }
 
+function inventoryDisplayUnitForRow(array $row): string {
+    return inventoryDisplayUnit(
+        $row['unit'] ?? '',
+        $row['asset_type'] ?? '',
+        $row['category_name'] ?? '',
+        $row['name'] ?? ($row['item_name'] ?? ''),
+        $row['brand_model'] ?? '',
+        $row['description'] ?? ''
+    );
+}
+
+function inventoryQuantityWithUnit($quantity, array $row): string {
+    return number_format((float)$quantity) . ' ' . inventoryDisplayUnitForRow($row);
+}
+
 function inventoryUnitFrontendPayload(): array {
     $catalog = inventoryUnitCatalog();
     $profiles = array_map(static function (array $profile): array {

@@ -106,7 +106,7 @@ $supplierExposure = $pdo->query("
 ")->fetchAll();
 
 $riskItems = $pdo->query("
-    SELECT i.name, i.item_code, i.current_stock, i.minimum_stock, i.brand_model, c.name AS category_name, b.name AS branch_name
+    SELECT i.name, i.item_code, i.current_stock, i.minimum_stock, i.brand_model, i.description, i.unit, i.asset_type, c.name AS category_name, b.name AS branch_name
     FROM inventory_items i
     JOIN categories c ON i.category_id=c.id
     JOIN branches b ON i.branch_id=b.id
@@ -128,7 +128,7 @@ if ($isAdmin) {
 }
 
 $recentTx = $pdo->query("
-    SELECT activity_type, activity_id, activity_at, transaction_type, quantity, transaction_date, item_name, item_code, user_name, branch_name
+    SELECT activity_type, activity_id, activity_at, transaction_type, quantity, transaction_date, item_name, item_code, brand_model, description, unit, asset_type, category_name, user_name, branch_name
     FROM (
         SELECT
             'stock' AS activity_type,
@@ -144,10 +144,16 @@ $recentTx = $pdo->query("
             t.transaction_date,
             i.name AS item_name,
             i.item_code,
+            i.brand_model,
+            i.description,
+            i.unit,
+            i.asset_type,
+            c.name AS category_name,
             u.full_name AS user_name,
             b.name AS branch_name
         FROM stock_transactions t
         JOIN inventory_items i ON t.item_id=i.id
+        JOIN categories c ON i.category_id=c.id
         JOIN users u ON t.user_id=u.id
         JOIN branches b ON t.branch_id=b.id
         WHERE 1=1 $branchSql
@@ -168,10 +174,16 @@ $recentTx = $pdo->query("
             DATE(a.created_at) AS transaction_date,
             i.name AS item_name,
             i.item_code,
+            i.brand_model,
+            i.description,
+            i.unit,
+            i.asset_type,
+            c.name AS category_name,
             COALESCE(u.full_name, 'System') AS user_name,
             b.name AS branch_name
         FROM audit_log a
         JOIN inventory_items i ON a.table_name='inventory_items' AND a.record_id=i.id
+        JOIN categories c ON i.category_id=c.id
         LEFT JOIN users u ON a.user_id=u.id
         JOIN branches b ON i.branch_id=b.id
         WHERE a.action IN ('ADD_ITEM','EDIT_ITEM')
@@ -187,9 +199,10 @@ $requestOrderSql = $requestQueueFilter === 'priority'
     ? "FIELD(r.status,'Pending','Approved','Issued','Rejected','Cancelled'), r.requested_at DESC"
     : "r.requested_at DESC";
 $requestQueue = $pdo->query("
-    SELECT r.quantity, r.status, r.requested_at, i.name AS item_name, i.item_code, u.full_name AS requester_name, b.name AS branch_name
+    SELECT r.quantity, r.status, r.requested_at, i.name AS item_name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, c.name AS category_name, u.full_name AS requester_name, b.name AS branch_name
     FROM inventory_requests r
     JOIN inventory_items i ON r.item_id=i.id
+    JOIN categories c ON i.category_id=c.id
     JOIN users u ON r.user_id=u.id
     JOIN branches b ON r.branch_id=b.id
     WHERE 1=1 " . ($isAdmin ? '' : 'AND r.branch_id=' . $branchId) . "
@@ -398,7 +411,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <td><?= clean($request['requester_name']) ?></td>
                         <td><span class="status-dot <?= strtolower(str_replace(' ', '-', $request['status'])) ?>"></span><?= clean($request['status']) ?></td>
-                        <td><span class="item-name"><?= clean($request['item_name']) ?></span><span class="item-code"><?= clean($request['item_code']) ?> · <?= number_format($request['quantity']) ?> requested</span></td>
+                        <td><span class="item-name"><?= clean($request['item_name']) ?></span><span class="item-code"><?= clean($request['item_code']) ?> · <?= clean(inventoryQuantityWithUnit($request['quantity'], $request)) ?> requested</span></td>
                         <td><?= date('d M', strtotime($request['requested_at'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
@@ -617,7 +630,8 @@ include __DIR__ . '/../includes/header.php';
                         <td><span class="item-name"><?= clean($item['name']) ?></span><span class="item-code"><?= clean($item['item_code']) ?> · <?= clean($item['brand_model'] ?: 'No specs') ?></span></td>
                         <td><?= clean($item['category_name']) ?></td>
                         <td><?= clean($item['branch_name']) ?></td>
-                        <td><span class="badge <?= (int)$item['current_stock'] === 0 ? 'badge-danger' : 'badge-warn' ?>"><?= number_format($item['current_stock']) ?> / <?= number_format($item['minimum_stock']) ?></span></td>
+                        <?php $displayUnit = inventoryDisplayUnitForRow($item); ?>
+                        <td><span class="badge <?= (int)$item['current_stock'] === 0 ? 'badge-danger' : 'badge-warn' ?>"><?= number_format($item['current_stock']) ?> <?= clean($displayUnit) ?> / <?= number_format($item['minimum_stock']) ?> <?= clean($displayUnit) ?></span></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -653,7 +667,7 @@ include __DIR__ . '/../includes/header.php';
                         $activityBadge = in_array($activityType, ['stock_in', 'transfer_in', 'item_added'], true)
                             ? 'badge-success'
                             : (in_array($activityType, ['stock_out', 'transfer_out', 'item_updated'], true) ? 'badge-blue' : 'badge-warn');
-                        $activityQty = (int)$tx['quantity'] > 0 ? ' · ' . number_format((int)$tx['quantity']) : '';
+                        $activityQty = (int)$tx['quantity'] > 0 ? ' · ' . inventoryQuantityWithUnit($tx['quantity'], $tx) : '';
                     ?>
                     <tr>
                         <td><?= date('d M', strtotime($tx['activity_at'] ?? $tx['transaction_date'])) ?></td>

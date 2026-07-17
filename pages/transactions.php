@@ -25,7 +25,7 @@ $countStmt->execute($params);
 $totalTransactions = (int)$countStmt->fetchColumn();
 $pagination = getPagination($totalTransactions, 10);
 
-$stmt = $pdo->prepare("SELECT t.*,i.name AS item_name,i.item_code,u.full_name AS user_name,b.name AS branch_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN users u ON t.user_id=u.id JOIN branches b ON t.branch_id=b.id $whereSQL ORDER BY t.created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
+$stmt = $pdo->prepare("SELECT t.*,i.name AS item_name,i.item_code,i.brand_model,i.description,i.unit,i.asset_type,c.name AS category_name,u.full_name AS user_name,b.name AS branch_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN categories c ON c.id=i.category_id JOIN users u ON t.user_id=u.id JOIN branches b ON t.branch_id=b.id $whereSQL ORDER BY t.created_at DESC LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
 $stmt->execute($params);
 $transactions = $stmt->fetchAll();
 
@@ -81,7 +81,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td>
                 <td><?= clean($tx['branch_name']) ?></td>
                 <td><span class="badge <?= $typeBadge[$tx['transaction_type']]??'badge-blue' ?>"><?= str_replace('_',' ',ucfirst($tx['transaction_type'])) ?></span></td>
-                <td><?= number_format($tx['quantity']) ?></td>
+                <td><?= clean(inventoryQuantityWithUnit($tx['quantity'], $tx)) ?></td>
                 <td><?= $tx['unit_price']>0?ugx($tx['unit_price']):'—' ?></td>
                 <td><?= $tx['unit_price']>0?ugx($tx['quantity']*$tx['unit_price']):'—' ?></td>
                 <td><?= clean($tx['reference_number']?:'—') ?></td>

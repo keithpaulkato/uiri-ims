@@ -35,9 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pdo->beginTransaction();
     try {
         $itemStmt = $pdo->prepare("
-            SELECT id, branch_id, current_stock, name, item_code, unit_price
-            FROM inventory_items
-            WHERE id = ? AND is_active = 1
+            SELECT i.id, i.branch_id, i.current_stock, i.name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, i.unit_price, c.name AS category_name
+            FROM inventory_items i
+            JOIN categories c ON c.id = i.category_id
+            WHERE i.id = ? AND i.is_active = 1
             FOR UPDATE
         ");
         $itemStmt->execute([$itemId]);
@@ -49,8 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$isAdmin && (int)$itemData['branch_id'] !== $branchId) {
             throw new Exception('Selected item is outside your active branch.');
         }
+        $displayUnit = inventoryDisplayUnitForRow($itemData);
         if ((int)$itemData['current_stock'] < $qty) {
-            throw new Exception("Insufficient stock. Available: {$itemData['current_stock']} unit(s).");
+            throw new Exception("Insufficient stock. Available: {$itemData['current_stock']} {$displayUnit}.");
         }
 
         $detailParts = [];
@@ -74,8 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ->execute([$qty, $itemId]);
 
         $pdo->commit();
-        auditLog('STOCK_OUT', 'stock_transactions', $newTransactionId, "Stock out: $qty x {$itemData['name']}");
-        setFlash('success', "Stock out recorded - $qty unit(s) issued.");
+        auditLog('STOCK_OUT', 'stock_transactions', $newTransactionId, "Stock out: $qty {$displayUnit} x {$itemData['name']}");
+        setFlash('success', "Stock out recorded - $qty {$displayUnit} issued.");
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
@@ -92,7 +94,7 @@ $branchClause = $isAdmin ? ($branchFilter ? "AND i.branch_id = $branchFilter" : 
 $txClause = $isAdmin ? ($branchFilter ? "AND t.branch_id = $branchFilter" : '') : "AND t.branch_id = $branchId";
 
 $items = $pdo->query("
-    SELECT i.id, i.name, i.item_code, i.unit, i.unit_price, i.current_stock, i.minimum_stock,
+    SELECT i.id, i.name, i.item_code, i.brand_model, i.description, i.unit, i.unit_price, i.current_stock, i.minimum_stock,
            i.asset_type, i.branch_id, c.name AS category_name, b.name AS branch_name, b.location AS branch_location
     FROM inventory_items i
     JOIN categories c ON i.category_id = c.id
@@ -100,18 +102,27 @@ $items = $pdo->query("
     WHERE i.is_active = 1 AND i.current_stock > 0 $branchClause
     ORDER BY i.name
 ")->fetchAll();
+foreach ($items as &$stockOutItem) {
+    $stockOutItem['display_unit'] = inventoryDisplayUnitForRow($stockOutItem);
+}
+unset($stockOutItem);
 
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $recent = $pdo->query("
-    SELECT t.*, i.name AS item_name, i.item_code, i.unit, b.name AS branch_name, u.full_name AS issued_by
+    SELECT t.*, i.name AS item_name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, c.name AS category_name, b.name AS branch_name, u.full_name AS issued_by
     FROM stock_transactions t
     JOIN inventory_items i ON t.item_id = i.id
+    JOIN categories c ON c.id = i.category_id
     JOIN branches b ON t.branch_id = b.id
     JOIN users u ON t.user_id = u.id
     WHERE t.transaction_type = 'stock_out' $txClause
     ORDER BY t.transaction_date DESC, t.created_at DESC
     LIMIT 8
 ")->fetchAll();
+foreach ($recent as &$recentStockOut) {
+    $recentStockOut['display_unit'] = inventoryDisplayUnitForRow($recentStockOut);
+}
+unset($recentStockOut);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -382,15 +393,16 @@ function setStockOutItem(item) {
         return;
     }
     selectedStockOutItem = item;
+    const displayUnit = item.display_unit || item.unit || 'EA';
     document.getElementById('stockOutItemId').value = item.id;
     document.getElementById('stockOutProductSearch').value = `${item.item_code} - ${item.name}`;
     document.getElementById('stockOutBarcode').value = item.item_code || '';
     document.getElementById('stockOutSku').value = item.item_code || '';
     document.getElementById('stockOutCategory').value = item.category_name || '';
-    document.getElementById('stockOutAvailableField').value = `${item.current_stock || 0} ${item.unit || ''}`;
-    document.getElementById('stockOutUnitField').value = item.unit || '';
+    document.getElementById('stockOutAvailableField').value = `${item.current_stock || 0} ${displayUnit}`;
+    document.getElementById('stockOutUnitField').value = displayUnit;
     qty.max = item.current_stock || '';
-    document.getElementById('stockOutLimit').textContent = `${item.current_stock || 0} ${item.unit || 'unit(s)'} available`;
+    document.getElementById('stockOutLimit').textContent = `${item.current_stock || 0} ${displayUnit} available`;
     updateStockOutPreview();
 }
 
@@ -424,20 +436,21 @@ function updateStockOutPreview() {
     const min = parseInt(item.minimum_stock, 10) || 0;
     const price = parseFloat(item.unit_price) || 0;
     const after = stock - qty;
+    const displayUnit = item.display_unit || item.unit || 'EA';
     document.getElementById('outPreviewName').textContent = item.name || 'Selected item';
     document.getElementById('outPreviewCode').textContent = `SKU: ${item.item_code || '-'}`;
-    document.getElementById('outAvailable').textContent = `${stock} ${item.unit || ''}`;
-    document.getElementById('outAfter').textContent = qty ? `${after} ${item.unit || ''}` : '-';
-    document.getElementById('outMinimum').textContent = `${min} ${item.unit || ''}`;
-    document.getElementById('outQtyPreview').textContent = qty ? qty : '0';
+    document.getElementById('outAvailable').textContent = `${stock} ${displayUnit}`;
+    document.getElementById('outAfter').textContent = qty ? `${after} ${displayUnit}` : '-';
+    document.getElementById('outMinimum').textContent = `${min} ${displayUnit}`;
+    document.getElementById('outQtyPreview').textContent = qty ? `${qty} ${displayUnit}` : `0 ${displayUnit}`;
     document.getElementById('outUnitValue').textContent = formatOutCurrency(price);
     document.getElementById('outTotalValue').textContent = qty ? formatOutCurrency(price * qty) : '-';
     document.getElementById('outBranch').textContent = item.branch_name || '-';
     document.getElementById('outStatus').textContent = qty > stock ? 'Insufficient' : (qty ? 'Ready' : '-');
     document.getElementById('stockOutSubmit').disabled = qty > stock;
     document.getElementById('stockOutLimit').textContent = qty > stock
-        ? `Only ${stock} ${item.unit || 'unit(s)'} available`
-        : `${stock} ${item.unit || 'unit(s)'} available`;
+        ? `Only ${stock} ${displayUnit} available`
+        : `${stock} ${displayUnit} available`;
     updateStockOutReview();
 }
 
@@ -445,9 +458,10 @@ function updateStockOutReview() {
     const qty = parseInt(document.getElementById('stockOutQty').value, 10) || 0;
     const stock = selectedStockOutItem ? (parseInt(selectedStockOutItem.current_stock, 10) || 0) : null;
     const price = selectedStockOutItem ? (parseFloat(selectedStockOutItem.unit_price) || 0) : 0;
+    const displayUnit = selectedStockOutItem ? (selectedStockOutItem.display_unit || selectedStockOutItem.unit || 'EA') : 'EA';
     document.getElementById('outReviewProduct').textContent = selectedStockOutItem ? `${selectedStockOutItem.item_code} - ${selectedStockOutItem.name}` : 'Select product';
-    document.getElementById('outReviewQty').textContent = qty ? qty : '0';
-    document.getElementById('outReviewAfter').textContent = stock === null || !qty ? '-' : `${stock - qty} ${selectedStockOutItem.unit || ''}`;
+    document.getElementById('outReviewQty').textContent = qty ? `${qty} ${displayUnit}` : `0 ${displayUnit}`;
+    document.getElementById('outReviewAfter').textContent = stock === null || !qty ? '-' : `${stock - qty} ${displayUnit}`;
     document.getElementById('outReviewIssuedTo').textContent = document.getElementById('stockOutIssuedTo').value || '-';
     document.getElementById('outReviewDate').textContent = document.getElementById('stockOutDate').value || new Date().toISOString().slice(0, 10);
     document.getElementById('outReviewTotal').textContent = qty ? formatOutCurrency(price * qty) : '-';
@@ -483,7 +497,7 @@ function buildRecentOutTable() {
                 <td>${new Date(tx.transaction_date).toLocaleDateString('en-GB')}</td>
                 <td><strong>${tx.item_code}</strong> <small>${tx.item_name}</small></td>
                 <td>${tx.issued_by || '-'}</td>
-                <td>${tx.quantity}</td>
+                <td>${tx.quantity} ${tx.display_unit || ''}</td>
                 <td>${formatOutCurrency(tx.unit_price * tx.quantity)}</td>
                 <td class="table-actions">
                     <button type="button" class="btn btn-outline-secondary btn-sm action-icon-btn action-view" title="View stock-out" aria-label="View stock-out" onclick="viewRecentOut(${tx.id})">
@@ -540,7 +554,7 @@ function viewRecentOut(id) {
         title: 'Stock-Out Details',
         html: `
             <strong>Product:</strong> ${tx.item_code} - ${tx.item_name}<br>
-            <strong>Quantity:</strong> ${tx.quantity} ${tx.unit || ''}<br>
+            <strong>Quantity:</strong> ${tx.quantity} ${tx.display_unit || ''}<br>
             <strong>Total Value:</strong> ${formatOutCurrency(tx.unit_price * tx.quantity)}<br>
             <strong>Issued By:</strong> ${tx.issued_by || '-'}<br>
             <strong>Branch:</strong> ${tx.branch_name || '-'}<br>

@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             // Get current item data
-            $itemStmt = $pdo->prepare("SELECT current_stock, branch_id FROM inventory_items WHERE id = ?");
+            $itemStmt = $pdo->prepare("SELECT i.*, c.name AS category_name FROM inventory_items i JOIN categories c ON i.category_id = c.id WHERE i.id = ?");
             $itemStmt->execute([$itemId]);
             $item = $itemStmt->fetch();
             
@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $currentStock = $item['current_stock'];
             $difference = $physicalCount - $currentStock;
+            $displayUnit = inventoryDisplayUnitForRow($item);
             
             if ($difference != 0) {
                 // Determine transaction type
@@ -53,21 +54,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $quantity,
                     0,
                     'ADJUSTMENT',
-                    "Physical count adjustment: $currentStock → $physicalCount. Reason: $reason"
+                    "Physical count adjustment: $currentStock $displayUnit to $physicalCount $displayUnit. Reason: $reason"
                 );
                 
                 // Update item stock
                 updateItemStock($itemId, $difference);
                 
                 // Create audit log
-                auditLog('ADJUST_STOCK', 'inventory_items', $itemId, "Adjusted stock for item $itemId from $currentStock to $physicalCount. Reason: $reason");
+                auditLog('ADJUST_STOCK', 'inventory_items', $itemId, "Adjusted stock for item $itemId from $currentStock $displayUnit to $physicalCount $displayUnit. Reason: $reason");
                 
                 // Check low stock
                 $itemStmt->execute([$itemId]);
                 $updatedItem = $itemStmt->fetch();
                 maybeNotifyLowStock($updatedItem);
                 
-                $success = "Stock adjusted successfully. Change: $difference unit(s)";
+                $success = 'Stock adjusted successfully. Change: ' . number_format($difference) . ' ' . $displayUnit;
             } else {
                 $success = 'Stock count matches current inventory - no adjustment needed.';
             }
@@ -80,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get items for dropdown
 $branchFilter = $user['branch_id'];
 $items = $pdo->query("
-    SELECT i.id, i.name, i.item_code, i.current_stock, i.minimum_stock, c.name as category_name, b.name as branch_name
+    SELECT i.id, i.name, i.item_code, i.current_stock, i.minimum_stock, i.brand_model, i.description, i.unit, i.asset_type, c.name as category_name, b.name as branch_name
     FROM inventory_items i
     JOIN categories c ON i.category_id = c.id
     JOIN branches b ON i.branch_id = b.id
@@ -97,14 +98,23 @@ $adjustmentCount = $pdo->query("
 ")->fetchColumn();
 $pagination = getPagination((int)$adjustmentCount, 10);
 $recentAdjustments = $pdo->query("
-    SELECT st.*, i.name as item_name, i.item_code, u.full_name as user_name
+    SELECT st.*, i.name as item_name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, c.name AS category_name, u.full_name as user_name
     FROM stock_transactions st
     JOIN inventory_items i ON st.item_id = i.id
+    JOIN categories c ON i.category_id = c.id
     JOIN users u ON st.user_id = u.id
     WHERE i.branch_id = $branchFilter AND st.reference_number = 'ADJUSTMENT'
     ORDER BY st.created_at DESC
     LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}
 ")->fetchAll();
+foreach ($recentAdjustments as &$recentAdjustment) {
+    $recentAdjustment['display_unit'] = inventoryDisplayUnitForRow($recentAdjustment);
+}
+unset($recentAdjustment);
+foreach ($items as &$adjustmentItem) {
+    $adjustmentItem['display_unit'] = inventoryDisplayUnitForRow($adjustmentItem);
+}
+unset($adjustmentItem);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -146,9 +156,9 @@ include __DIR__ . '/../includes/header.php';
                     <select id="item_id" name="item_id" required onchange="updateCurrentStock(this.value)">
                         <option value="">-- Select Item --</option>
                         <?php foreach ($items as $item): ?>
-                        <option value="<?= $item['id'] ?>" data-stock="<?= $item['current_stock'] ?>">
+                        <option value="<?= $item['id'] ?>" data-stock="<?= $item['current_stock'] ?>" data-unit="<?= clean($item['display_unit']) ?>">
                             <?= clean($item['item_code']) ?> - <?= clean($item['name']) ?>
-                            (Current: <?= $item['current_stock'] ?>)
+                            (Current: <?= number_format($item['current_stock']) ?> <?= clean($item['display_unit']) ?>)
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -174,7 +184,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Difference</label>
-                    <div class="computed-field" id="difference">0 unit(s)</div>
+                    <div class="computed-field" id="difference">0</div>
                 </div>
             </div>
 
@@ -213,7 +223,7 @@ include __DIR__ . '/../includes/header.php';
                             <?= ucfirst(str_replace('_', ' ', $adj['transaction_type'])) ?>
                         </span>
                     </td>
-                    <td><?= $adj['quantity'] ?></td>
+                    <td><?= number_format($adj['quantity']) ?> <?= clean($adj['display_unit']) ?></td>
                     <td><?= clean($adj['remarks']) ?></td>
                     <td><?= clean($adj['user_name']) ?></td>
                 </tr>
@@ -239,16 +249,19 @@ function updateCurrentStock(itemId) {
     const selectedOption = document.querySelector(`#item_id option[value="${itemId}"]`);
     if (selectedOption) {
         const stock = selectedOption.getAttribute('data-stock');
-        document.getElementById('current_stock').value = stock;
+        const unit = selectedOption.getAttribute('data-unit') || 'EA';
+        document.getElementById('current_stock').value = `${stock} ${unit}`;
         calculateDifference();
     }
 }
 
 function calculateDifference() {
-    const current = parseInt(document.getElementById('current_stock').value) || 0;
+    const current = parseInt(document.getElementById('current_stock').value, 10) || 0;
     const physical = parseInt(document.getElementById('physical_count').value) || 0;
     const difference = physical - current;
-    document.getElementById('difference').textContent = difference;
+    const selectedOption = document.querySelector('#item_id option:checked');
+    const unit = selectedOption ? (selectedOption.getAttribute('data-unit') || 'EA') : 'EA';
+    document.getElementById('difference').textContent = `${difference} ${unit}`;
 }
 
 document.getElementById('physical_count').addEventListener('input', calculateDifference);
