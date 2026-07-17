@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UIRI Inventory Intelligence System</title>
+    <title>UIRI Inventory Management System</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <style>
         :root {
@@ -785,6 +785,13 @@
             }
         }
     </style>
+    <script>
+        if (!Object.hasOwn) {
+            Object.hasOwn = function(obj, prop) {
+                return Object.prototype.hasOwnProperty.call(obj, prop);
+            };
+        }
+    </script>
 </head>
 <body>
     <div class="site-shell">
@@ -803,8 +810,7 @@
                 <a href="#access">Access</a>
             </div>
             <div class="nav-actions">
-                <a class="public-btn secondary" href="https://uiri.go.ug/">UIRI Website</a>
-                <a class="public-btn primary" href="../login.php">Staff Sign In</a>
+                <a class="public-btn primary" href="../login.php">Sign In</a>
             </div>
         </nav>
 

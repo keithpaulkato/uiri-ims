@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
-requireLogin();
+requireLogin(); ## hehehhbxdhdjhb
 
 $pageTitle  = 'Dashboard';
 $activePage = 'dashboard';
@@ -8,7 +8,7 @@ $user       = currentUser();
 $branchId   = (int)$user['branch_id'];
 $isAdmin    = hasRole('Administrator', 'Executive');
 $pdo        = db();
-ensureInventoryDecisionColumns();
+ensureInventoryDecisionColumns(); ## ensure the database has the necessary columns for decision metrics
 
 $assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
 $conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
@@ -37,7 +37,7 @@ $healthLabel = $healthScore >= 85 ? 'Stable' : ($healthScore >= 65 ? 'Watch' : '
 $healthClass = $healthScore >= 85 ? 'good' : ($healthScore >= 65 ? 'warn' : 'critical');
 $turnoverRatio = $stockInMonth > 0 ? round(($stockOutMonth / max(1, $stockInMonth)) * 100) : 0;
 $monthStart = date('Y-m-01');
-$today = date('Y-m-d');
+$today = date('Y-m-d'); ## the current date for filtering movement data
 
 $movementData = [];
 for ($i = 5; $i >= 0; $i--) {
@@ -365,6 +365,25 @@ include __DIR__ . '/../includes/header.php';
             <strong><?= number_format($pendingRequests) ?></strong>
             <small>Awaiting action</small>
         </a>
+    </div>
+</section>
+
+<section class="dashboard-focus-strip" aria-label="Operational focus summary">
+    <div class="dashboard-focus-pill">
+        <span>Operational Focus</span>
+        <strong><?= number_format($pendingRequests) ?> pending requests</strong>
+    </div>
+    <div class="dashboard-focus-pill">
+        <span>Stock Attention</span>
+        <strong><?= number_format($riskCount) ?> items need attention</strong>
+    </div>
+    <div class="dashboard-focus-pill">
+        <span>Movement Balance</span>
+        <strong><?= $turnoverRatio ?>% issue/receipt ratio</strong>
+    </div>
+    <div class="dashboard-focus-pill">
+        <span>Health Status</span>
+        <strong><?= $healthLabel ?> (<?= $healthScore ?>%)</strong>
     </div>
 </section>
 
