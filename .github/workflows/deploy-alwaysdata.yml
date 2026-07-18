@@ -1,0 +1,94 @@
+name: Deploy to Alwaysdata
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alwaysdata-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy production site
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_KEY_PRESENT: ${{ secrets.ALWAYSDATA_SSH_PRIVATE_KEY != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check deployment secret
+        if: env.DEPLOY_KEY_PRESENT != 'true'
+        run: |
+          echo "::warning::ALWAYSDATA_SSH_PRIVATE_KEY is not configured, so deployment was skipped."
+
+      - name: Set up PHP
+        if: env.DEPLOY_KEY_PRESENT == 'true'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_mysql, mbstring
+          coverage: none
+
+      - name: Install dependencies
+        if: env.DEPLOY_KEY_PRESENT == 'true'
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Lint PHP
+        if: env.DEPLOY_KEY_PRESENT == 'true'
+        run: |
+          find . \
+            -path './.git' -prune -o \
+            -path './vendor' -prune -o \
+            -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Configure SSH
+        if: env.DEPLOY_KEY_PRESENT == 'true'
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.ALWAYSDATA_SSH_PRIVATE_KEY }}" > ~/.ssh/alwaysdata_deploy_key
+          chmod 600 ~/.ssh/alwaysdata_deploy_key
+          printf '%s\n' 'ssh-keith.alwaysdata.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMYE80baN21FB1CAKDMqQ5jY/K2a19Bu0A6fZtM2jlSM' > ~/.ssh/known_hosts
+
+      - name: Deploy files
+        if: env.DEPLOY_KEY_PRESENT == 'true'
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/alwaysdata_deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.gitignore' \
+            --exclude='.alwaysdata_*' \
+            --exclude='deploy/' \
+            --exclude='docs/' \
+            --exclude='documentation/' \
+            --exclude='uploads/' \
+            --exclude='includes/config.local.php' \
+            --exclude='*.sql' \
+            --exclude='debug.log' \
+            --exclude='__debug_login.php' \
+            --exclude='__check_login.php' \
+            --exclude='setup_schema.php' \
+            --exclude='tmp_schema_check.php' \
+            ./ keith@ssh-keith.alwaysdata.net:/home/keith/www/
+
+      - name: Prepare remote app
+        if: env.DEPLOY_KEY_PRESENT == 'true'
+        run: |
+          ssh -i ~/.ssh/alwaysdata_deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            keith@ssh-keith.alwaysdata.net <<'REMOTE'
+          set -eu
+          mkdir -p /home/keith/www/uploads/items /home/keith/www/uploads/profiles
+          chmod -R u+rwX,go+rX /home/keith/www
+          chmod -R u+rwX /home/keith/www/uploads
+          php -r 'require "/home/keith/www/includes/config.php"; db()->query("SELECT 1"); echo "deploy-ok\n";'
+          REMOTE

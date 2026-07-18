@@ -3,14 +3,31 @@
 //  UIRI IMS - Configuration
 // ============================================================
 
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'uiri_ims');
+$localConfig = __DIR__ . '/config.local.php';
+if (is_file($localConfig)) {
+    require_once $localConfig;
+}
+
+if (!function_exists('appConfigValue')) {
+    function appConfigValue(string $constantName, string $envName, $default) {
+        if (defined($constantName)) {
+            return constant($constantName);
+        }
+
+        $envValue = getenv($envName);
+        return ($envValue !== false && $envValue !== '') ? $envValue : $default;
+    }
+}
+
+define('DB_HOST', appConfigValue('APP_DB_HOST', 'APP_DB_HOST', 'localhost'));
+define('DB_USER', appConfigValue('APP_DB_USER', 'APP_DB_USER', 'root'));
+define('DB_PASS', appConfigValue('APP_DB_PASS', 'APP_DB_PASS', ''));
+define('DB_NAME', appConfigValue('APP_DB_NAME', 'APP_DB_NAME', 'uiri_ims'));
 
 define('SITE_NAME', 'UIRI Inventory System');
 define('SITE_SHORT', 'UIRI IMS');
-define('BASE_URL', 'http://localhost/uiri-ims/');
+$baseUrl = (string)appConfigValue('APP_BASE_URL', 'APP_BASE_URL', 'http://localhost/uiri-ims/');
+define('BASE_URL', rtrim($baseUrl, '/') . '/');
 define('UPLOAD_DIR', __DIR__ . '/../uploads/items/');
 define('UPLOAD_URL', BASE_URL . 'uploads/items/');
 define('PROFILE_UPLOAD_DIR', __DIR__ . '/../uploads/profiles/');
@@ -22,12 +39,12 @@ define('APP_TIMEZONE_OFFSET', '+03:00');
 date_default_timezone_set(APP_TIMEZONE);
 
 // SMTP settings — configure these for real email delivery
-define('SMTP_HOST', ''); // e.g. smtp.mailtrap.io or smtp.yourdomain.com
-define('SMTP_PORT', 587);
-define('SMTP_USER', '');
-define('SMTP_PASS', '');
-define('SMTP_FROM_EMAIL', 'no-reply@localhost');
-define('SMTP_FROM_NAME', SITE_SHORT);
+define('SMTP_HOST', appConfigValue('APP_SMTP_HOST', 'APP_SMTP_HOST', '')); // e.g. smtp.gmail.com
+define('SMTP_PORT', (int)appConfigValue('APP_SMTP_PORT', 'APP_SMTP_PORT', 587));
+define('SMTP_USER', appConfigValue('APP_SMTP_USER', 'APP_SMTP_USER', ''));
+define('SMTP_PASS', appConfigValue('APP_SMTP_PASS', 'APP_SMTP_PASS', ''));
+define('SMTP_FROM_EMAIL', appConfigValue('APP_SMTP_FROM_EMAIL', 'APP_SMTP_FROM_EMAIL', 'no-reply@localhost'));
+define('SMTP_FROM_NAME', appConfigValue('APP_SMTP_FROM_NAME', 'APP_SMTP_FROM_NAME', SITE_SHORT));
 
 // Connect
 function createDbConnection(): PDO {

@@ -1,0 +1,5 @@
+/vendor/
+/includes/config.local.php
+/.alwaysdata_*
+/deploy/
+/*.zip
