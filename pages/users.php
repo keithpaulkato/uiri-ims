@@ -31,6 +31,20 @@ function usernameExists(PDO $pdo, string $username, int $excludeUserId = 0): boo
     return (int)$stmt->fetchColumn() > 0;
 }
 
+function userTemporaryPasswordEmail(string $fullName, string $username, string $temporaryPassword, string $reason = 'created'): string {
+    $intro = $reason === 'reset'
+        ? 'Your UIRI IMS password has been reset by an administrator.'
+        : 'An account has been created for you on ' . SITE_NAME . '.';
+
+    return "Hello {$fullName},\n\n" .
+        "{$intro}\n\n" .
+        "Login link: " . BASE_URL . "login.php\n" .
+        "Username: {$username}\n" .
+        "Temporary password: {$temporaryPassword}\n\n" .
+        "For security, the system will ask you to create your own password immediately after your first login.\n\n" .
+        "Regards,\n" . SITE_SHORT . " Team";
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $action = $_POST['action']??'';
@@ -88,13 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 else {
                     $hash = password_hash($pass, PASSWORD_BCRYPT);
                     try {
-                        $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active,profile_photo) VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status,null]);
+                        $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active,profile_photo,must_change_password,password_changed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,NULL)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status,null]);
                     } catch (PDOException $e) {
                         if (($e->errorInfo[1] ?? null) !== 1062) {
                             throw $e;
                         }
                         $username = generateUsername($fullName, $branchId);
-                        $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active,profile_photo) VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status,null]);
+                        $pdo->prepare("INSERT INTO users (branch_id,section_id,department_id,role_id,full_name,email,username,password,phone,is_active,profile_photo,must_change_password,password_changed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,NULL)")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$hash,$phone,$status,null]);
                     }
                     $newId = $pdo->lastInsertId();
                     if ($hasProfilePhotoUpload) {
@@ -107,15 +121,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $sent = false;
                     if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                        $subject = SITE_SHORT . ' — Account created';
-                        $body = "Hello {$fullName},\n\nAn account has been created for you on " . SITE_NAME . ".\n\nUsername: {$username}\nPassword: {$pass}\n\nPlease sign in and change your password after your first login.";
+                        $subject = SITE_SHORT . ' - Account created';
+                        $body = userTemporaryPasswordEmail($fullName, $username, $pass);
                         $sent = sendMail($email, $subject, $body);
                     }
 
                     if ($sent) {
-                        setFlash('success',"User '$fullName' added successfully.");
+                        setFlash('success',"User '$fullName' added successfully. Login email sent.");
                     } else {
-                        setFlash('success',"User '$fullName' added successfully.");
+                        setFlash('success',"User '$fullName' added successfully, but the login email could not be sent.");
                     }
                 }
             } else {
@@ -134,13 +148,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $profilePhoto = $uploadedPhoto;
                 }
+                if ($pass !== '' && strlen($pass) < 8) {
+                    setFlash('error','Password must be at least 8 characters.');
+                    header('Location: users.php'); exit;
+                }
                 $pdo->prepare("UPDATE users SET branch_id=?,section_id=?,department_id=?,role_id=?,full_name=?,email=?,username=?,phone=?,is_active=?,profile_photo=? WHERE id=?")->execute([$branchId,$sectionId?:null,$departmentId?:null,$roleId,$fullName,$email,$username,$phone,$status,$profilePhoto,$id]);
-                if ($pass && strlen($pass)>=8) {
+                $passwordResetEmailSent = null;
+                if ($pass !== '') {
                     $hash=password_hash($pass,PASSWORD_BCRYPT);
-                    $pdo->prepare("UPDATE users SET password=? WHERE id=?")->execute([$hash,$id]);
+                    $pdo->prepare("UPDATE users SET password=?, must_change_password=1, password_changed_at=NULL, remember_token=NULL WHERE id=?")->execute([$hash,$id]);
+                    if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $subject = SITE_SHORT . ' - Password reset';
+                        $body = userTemporaryPasswordEmail($fullName, $username, $pass, 'reset');
+                        $passwordResetEmailSent = sendMail($email, $subject, $body);
+                    } else {
+                        $passwordResetEmailSent = false;
+                    }
                 }
                 auditLog('EDIT_USER','users',$id,"Updated user: $username");
-                setFlash('success',"User '$fullName' updated.");
+                if ($passwordResetEmailSent === true) {
+                    setFlash('success',"User '$fullName' updated. Temporary password email sent.");
+                } elseif ($passwordResetEmailSent === false) {
+                    setFlash('success',"User '$fullName' updated, but the temporary password email could not be sent.");
+                } else {
+                    setFlash('success',"User '$fullName' updated.");
+                }
             }
         }
     }
@@ -366,7 +398,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-group" style="grid-column:1/-1">
                         <label>Password <?= $editUser?'(leave blank to keep current)':'(leave blank to auto-generate)' ?></label>
                         <input type="text" id="modal_password" name="password" minlength="8" placeholder="Min 8 characters">
-                        <small class="form-note"><?= $editUser ? 'Leave blank to keep the current password.' : 'Auto-generates as fullname@123, for example joelmugole@123.' ?></small>
+                        <small class="form-note"><?= $editUser ? 'Entering a new password emails it to the user and forces a password change on next login.' : 'Auto-generates as fullname@123, emails the login link, and forces a password change on first login.' ?></small>
                     </div>
                 </div>
             </div>

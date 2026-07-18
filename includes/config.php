@@ -121,6 +121,31 @@ function requireLogin(): void {
         header('Location: ' . BASE_URL . 'index.php');
         exit;
     }
+    enforcePasswordChangeGate();
+}
+
+function enforcePasswordChangeGate(): void {
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $allowed = str_ends_with($script, '/pages/force_password_change.php')
+        || str_ends_with($script, '/includes/logout.php');
+    if ($allowed) {
+        return;
+    }
+
+    $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
+    if ($userId <= 0) {
+        return;
+    }
+
+    $stmt = db()->prepare("SELECT must_change_password FROM users WHERE id = ? AND is_active = 1");
+    $stmt->execute([$userId]);
+    $mustChange = (int)($stmt->fetchColumn() ?: 0);
+    $_SESSION['user']['must_change_password'] = $mustChange;
+
+    if ($mustChange === 1) {
+        header('Location: ' . BASE_URL . 'pages/force_password_change.php');
+        exit;
+    }
 }
 
 function currentUser(): array {
@@ -323,6 +348,30 @@ function ensureUsersProfilePhotoColumn(): void {
     }
 }
 
+function ensureUsersPasswordPolicyColumns(): void {
+    $ensureColumns = function (PDO $pdo): void {
+        $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'must_change_password'");
+        if (!$check->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password");
+        }
+
+        $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'password_changed_at'");
+        if (!$check->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN password_changed_at DATETIME DEFAULT NULL AFTER must_change_password");
+        }
+    };
+
+    try {
+        $ensureColumns(db());
+    } catch (PDOException $e) {
+        if (isLostDatabaseConnection($e)) {
+            $ensureColumns(db(true));
+            return;
+        }
+        throw $e;
+    }
+}
+
 function profilePhotoUrl(?array $user = null): string {
     $user = $user ?? currentUser();
     $photo = $user['profile_photo'] ?? '';
@@ -378,6 +427,7 @@ function saveProfilePhotoUpload(array $file, int $userId): ?string {
 // Include helper functions
 require_once __DIR__ . '/functions.php';
 ensureUsersProfilePhotoColumn();
+ensureUsersPasswordPolicyColumns();
 
 // Validate password strength
 function validatePassword(string $password, string &$error = ''): bool {

@@ -36,11 +36,18 @@ if (!isLoggedIn() && isset($_COOKIE['remember_token'])) {
             'section_id'    => $user['section_id'],
             'department_id' => $user['department_id'],
             'profile_photo' => $user['profile_photo'] ?? null,
+            'must_change_password' => (int)($user['must_change_password'] ?? 0),
         ];
         db()->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")->execute([$user['id']]);
         auditLog('LOGIN', 'users', $user['id'], 'Auto-login via remember token');
         recordLoginAttempt($user['id'], true, 'Auto-login via remember token');
-        header('Location: ' . BASE_URL . 'pages/dashboard.php');
+        if ((int)($user['must_change_password'] ?? 0) === 1) {
+            db()->prepare("UPDATE users SET remember_token = NULL WHERE id = ?")->execute([$user['id']]);
+            setcookie('remember_token', '', time() - 3600, '/', '', false, true);
+            header('Location: ' . BASE_URL . 'pages/force_password_change.php');
+        } else {
+            header('Location: ' . BASE_URL . 'pages/dashboard.php');
+        }
         exit;
     }
 }
@@ -124,6 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'section_id'    => $user['section_id'],
                         'department_id' => $user['department_id'],
                         'profile_photo' => $user['profile_photo'] ?? null,
+                        'must_change_password' => (int)($user['must_change_password'] ?? 0),
                     ];
 
                     // Reset failed attempts and update last login
@@ -131,15 +139,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     clearRateLimitAttempts($loginIdentifier);
 
                     // Handle remember me
-                    if ($remember) {
+                    $mustChangePassword = (int)($user['must_change_password'] ?? 0) === 1;
+                    if ($remember && !$mustChangePassword) {
                         $rememberToken = bin2hex(random_bytes(32));
                         db()->prepare("UPDATE users SET remember_token = ? WHERE id = ?")->execute([$rememberToken, $user['id']]);
                         setcookie('remember_token', $rememberToken, time() + (30 * 24 * 60 * 60), '/', '', false, true); // 30 days, httponly
+                    } elseif ($mustChangePassword) {
+                        db()->prepare("UPDATE users SET remember_token = NULL WHERE id = ?")->execute([$user['id']]);
+                        setcookie('remember_token', '', time() - 3600, '/', '', false, true);
                     }
 
                     auditLog('LOGIN', 'users', $user['id'], 'User logged in');
                     recordLoginAttempt($user['id'], true, 'User logged in');
-                    header('Location: ' . BASE_URL . 'pages/dashboard.php');
+                    header('Location: ' . BASE_URL . ($mustChangePassword ? 'pages/force_password_change.php' : 'pages/dashboard.php'));
                     exit;
                 } else {
                     // Failed login attempt

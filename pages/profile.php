@@ -71,7 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user']['profile_photo'] = $profilePhoto;
 
             if ($passwordHash) {
-                $pdo->prepare("UPDATE users SET password=?, failed_login_attempts=0 WHERE id=?")->execute([$passwordHash,$userId]);
+                $pdo->prepare("UPDATE users SET password=?, must_change_password=0, password_changed_at=NOW(), failed_login_attempts=0 WHERE id=?")->execute([$passwordHash,$userId]);
+                $_SESSION['user']['must_change_password'] = 0;
                 setFlash('success','Profile and password updated successfully.');
             } elseif ($photoChanged) {
                 setFlash('success','Profile photo updated successfully.');
