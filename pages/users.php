@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
                         $subject = SITE_SHORT . ' — Account created';
                         $body = "Hello {$fullName},\n\nAn account has been created for you on " . SITE_NAME . ".\n\nUsername: {$username}\nPassword: {$pass}\n\nPlease sign in and change your password after your first login.";
-                        $sent = sendMail($email, $subject, $body, SMTP_FROM_NAME, SMTP_FROM_EMAIL, false);
+                        $sent = sendMail($email, $subject, $body);
                     }
 
                     if ($sent) {

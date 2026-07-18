@@ -179,7 +179,7 @@ $flash = getFlash();
 </head>
 <body class="login-body">
 
-<div class="login-page">
+<div class="login-page login-page-shadcn">
     <!-- Left Panel -->
     <div class="login-panel-left">
         <div class="login-brand">
@@ -206,9 +206,9 @@ $flash = getFlash();
     <div class="login-panel-right">
         <div class="login-form-wrap">
             <div class="login-form-header">
-                <h3>Welcome back to UIRI IMS</h3>
-                <p class="login-form-subtext">Use your registered UIRI credentials to access the inventory portal.</p>
-                <p class="login-return-link"><a href="<?= BASE_URL ?>pages/landing.html">← Back to landing page</a></p>
+                <h3>Login to your account</h3>
+                <p class="login-form-subtext">Enter your username or email below to login to your account.</p>
+                <p class="login-return-link"><a href="<?= BASE_URL ?>pages/landing.html">Back to landing page</a></p>
             </div>
 
             <?php if ($loggedOut): ?>
@@ -236,10 +236,10 @@ $flash = getFlash();
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
 
                 <div class="form-group">
-                    <label for="username">Username or Email</label>
+                    <label for="username">Username or email</label>
                     <div class="input-wrap">
                         <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        <input type="text" id="username" name="username" placeholder="Enter your username"
+                        <input type="text" id="username" name="username" placeholder="name@uiri.go.ug"
                                value="<?= clean($_POST['username'] ?? '') ?>" required autocomplete="username">
                     </div>
                 </div>
@@ -258,17 +258,17 @@ $flash = getFlash();
                 <div class="form-group checkbox-group">
                     <label>
                         <input type="checkbox" name="remember_me" value="1">
-                        Remember me for 30 days
+                        Remember me
                     </label>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block">
-                    Sign In
+                <button type="submit" class="btn btn-primary btn-block login-submit-btn">
+                    Login
                     <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                 </button>
 
                 <div class="login-help">
-                    <p><a href="forgot-password.php">Forgot password?</a></p>
+                    <p>Protected access for UIRI inventory operations.</p>
                 </div>
             </form>
         </div>

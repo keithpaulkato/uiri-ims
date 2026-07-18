@@ -91,23 +91,23 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="form-section-card">
                 <h4>Mail Configuration</h4>
-                <p>Set up SMTP details for outgoing email notifications.</p>
+                <p>For Gmail, use smtp.gmail.com, port 587, your full Gmail address, and a Google App Password.</p>
                 <div class="form-grid-2">
                     <div class="form-group">
                         <label>SMTP Host</label>
-                        <input type="text" name="smtp_host" value="<?= clean($settings['smtp_host'] ?? '') ?>">
+                        <input type="text" name="smtp_host" placeholder="smtp.gmail.com" value="<?= clean($settings['smtp_host'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>SMTP Port</label>
-                        <input type="number" name="smtp_port" min="1" value="<?= (int)($settings['smtp_port'] ?? 587) ?>">
+                        <input type="number" name="smtp_port" min="1" placeholder="587" value="<?= (int)($settings['smtp_port'] ?? 587) ?>">
                     </div>
                     <div class="form-group">
                         <label>SMTP Username</label>
-                        <input type="text" name="smtp_user" value="<?= clean($settings['smtp_user'] ?? '') ?>">
+                        <input type="text" name="smtp_user" placeholder="your.name@gmail.com" value="<?= clean($settings['smtp_user'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>SMTP Password</label>
-                        <input type="password" name="smtp_pass" value="<?= clean($settings['smtp_pass'] ?? '') ?>">
+                        <input type="password" name="smtp_pass" placeholder="Google App Password" value="<?= clean($settings['smtp_pass'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>From Email</label>

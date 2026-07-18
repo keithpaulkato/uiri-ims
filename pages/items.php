@@ -801,10 +801,13 @@ include __DIR__ . '/../includes/header.php';
         <div class="inventory-table-canvas">
         <table class="data-table inventory-items-table">
             <thead><tr>
-                <th>#</th><th>Item</th><th>Category</th><th>Department</th><th>Section / Unit</th>
-                <?php if ($isAdmin): ?><th>Branch</th><?php endif; ?>
-                <th>Model / Specs</th><th>Serial No.</th><th>Purchase Date</th><th>Unit Price</th><th>Stock</th><th>Min</th><th>Status</th>
-                <?php if ($canManage): ?><th class="inventory-actions-col">Actions</th><?php endif; ?>
+                <th style="width: 50px; text-align: center;">#</th>
+                <th>Item</th>
+                <th>Category</th>
+                <?php if ($isAdmin): ?><th>Campus</th><?php endif; ?>
+                <th>Stock</th>
+                <th>Status</th>
+                <th class="inventory-actions-col" style="width: 125px; text-align: center;">Actions</th>
             </tr></thead>
             <tbody>
             <?php foreach ($items as $i => $item):
@@ -821,7 +824,7 @@ include __DIR__ . '/../includes/header.php';
                 $latestMarkerLabel = $isFeedbackItem ? ($inventoryFeedback ? ('Just ' . ($inventoryFeedback['action'] ?? 'saved')) : 'Saved item') : 'Latest change';
             ?>
             <tr class="<?= clean(implode(' ', $rowClasses)) ?>" <?= $isFeedbackItem ? 'data-inventory-feedback-row="true"' : '' ?>>
-                <td><?= $offset + $i + 1 ?></td>
+                <td style="text-align: center;"><?= $offset + $i + 1 ?></td>
                 <td>
                     <div class="item-cell">
                         <div>
@@ -832,33 +835,57 @@ include __DIR__ . '/../includes/header.php';
                             <span class="latest-change-marker" title="Last changed <?= clean(date('d M Y, H:i', strtotime($latestChangeDate))) ?>"><?= clean($latestMarkerLabel) ?></span>
                             <?php endif; ?>
                             <span class="item-code"><?= clean($item['item_code']) ?></span>
-                            <span class="item-audit-line">Recorded by: <?= clean(trim((($item['recorded_by_name'] ?? '') ?: 'Not recorded') . (($item['recorded_by_role'] ?? '') ? ', ' . $item['recorded_by_role'] : ''))) ?></span>
+                            <?php if ($item['brand_model']): ?>
+                            <span class="item-specs-sub"><?= clean($item['brand_model']) ?></span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </td>
                 <td><?= clean($item['category_name']) ?></td>
-                <td><?= clean($item['section_name'] ?: '—') ?></td>
-                <td><?= clean($item['department_name'] ?: '—') ?></td>
                 <?php if ($isAdmin): ?><td><?= clean($item['branch_name']) ?></td><?php endif; ?>
-                <td><?= $item['brand_model'] ? clean($item['brand_model']) : '<span class="table-muted-value">Not specified</span>' ?></td>
-                <td><?= $item['serial_number'] ? clean($item['serial_number']) : '<span class="table-muted-value">—</span>' ?></td>
-                <td><?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?></td>
-                <td><?= ugx($item['unit_price']) ?></td>
                 <td><strong><?= number_format($item['current_stock']) ?> <?= clean($displayUnit) ?></strong></td>
-                <td><?= $item['minimum_stock'] ?></td>
                 <td><span class="badge badge-<?= $ss==='good'?'success':($ss==='low'?'warn':'danger') ?>"><?= $sl ?></span></td>
-                <?php if ($canManage): ?>
                 <td class="inventory-actions-col">
-                    <div class="action-btns">
+                    <div class="action-btns" style="justify-content: center;">
+                        <button type="button" class="btn-icon js-view-item" title="View Details"
+                            data-id="<?= $item['id'] ?>"
+                            data-name="<?= clean($item['name']) ?>"
+                            data-code="<?= clean($item['item_code']) ?>"
+                            data-asset-code="<?= clean($item['asset_code'] ?? '') ?>"
+                            data-serial="<?= clean($item['serial_number'] ?? '') ?>"
+                            data-qr="<?= clean($item['qr_code'] ?? '') ?>"
+                            data-category="<?= clean($item['category_name']) ?>"
+                            data-department="<?= clean($item['section_name'] ?: '—') ?>"
+                            data-section="<?= clean($item['department_name'] ?: '—') ?>"
+                            data-branch="<?= clean($item['branch_name']) ?>"
+                            data-brand-model="<?= clean($item['brand_model'] ?: '—') ?>"
+                            data-purchase-date="<?= $item['purchase_date'] ? date('d M Y', strtotime($item['purchase_date'])) : '—' ?>"
+                            data-warranty-date="<?= $item['warranty_date'] ? date('d M Y', strtotime($item['warranty_date'])) : '—' ?>"
+                            data-price="<?= ugx($item['unit_price']) ?>"
+                            data-stock="<?= number_format($item['current_stock']) ?> <?= clean($displayUnit) ?>"
+                            data-min-stock="<?= $item['minimum_stock'] ?>"
+                            data-status="<?= $sl ?>"
+                            data-status-class="badge-<?= $ss==='good'?'success':($ss==='low'?'warn':'danger') ?>"
+                            data-asset-status="<?= clean($item['asset_status'] ?: 'Available') ?>"
+                            data-condition="<?= clean($item['asset_condition'] ?: 'New') ?>"
+                            data-supplier="<?= clean($item['supplier_name'] ?: '—') ?>"
+                            data-funding="<?= clean($item['funding_source'] ?: '—') ?>"
+                            data-location="<?= clean($item['storage_location'] ?: '—') ?>"
+                            data-image="<?= $item['image'] ? UPLOAD_URL . clean($item['image']) : '' ?>"
+                            data-description="<?= clean($item['description'] ?: 'No description provided.') ?>"
+                            data-recorded-by="<?= clean(trim((($item['recorded_by_name'] ?? '') ?: 'Not recorded') . (($item['recorded_by_role'] ?? '') ? ', ' . $item['recorded_by_role'] : ''))) ?>">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
+                        </button>
+                        <?php if ($canManage): ?>
                         <a href="items.php?edit=<?= $item['id'] ?>" class="btn-icon" title="Edit">
                             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </a>
                         <button type="button" class="btn-icon btn-icon-danger js-delete-item" title="Delete" aria-label="Delete <?= clean($item['name']) ?>" data-item-id="<?= $item['id'] ?>" data-item-name="<?= clean($item['name']) ?>" data-item-code="<?= clean($item['item_code']) ?>" data-item-category="<?= clean($item['category_name']) ?>" data-item-stock="<?= (int)$item['current_stock'] ?>" data-item-unit="<?= clean($displayUnit) ?>">
                             <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                         </button>
+                        <?php endif; ?>
                     </div>
                 </td>
-                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -931,6 +958,140 @@ include __DIR__ . '/../includes/header.php';
             <button type="button" class="btn btn-outline delete-user-cancel" id="cancelDeleteItem">No, keep item</button>
             <button type="submit" class="btn btn-danger delete-user-confirm" id="confirmDeleteItem">Yes, remove item</button>
         </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="viewItemModal" role="dialog" aria-modal="true" aria-labelledby="viewItemTitle">
+    <div class="modal modal-lg inventory-item-modal">
+        <div class="modal-header">
+            <h3>Inventory Item Details</h3>
+            <button class="modal-close" onclick="closeModal('viewItemModal')">×</button>
+        </div>
+        <div class="modal-body" style="padding: 24px;">
+            <div class="inventory-wizard">
+                <div class="wizard-intro" style="background: linear-gradient(135deg, var(--navy-3) 0%, var(--navy) 100%); color: #fff; border: none; margin-bottom: 20px;">
+                    <div class="wizard-breadcrumb" style="color: rgba(255,255,255,0.7);">Dashboard / Inventory / View Details</div>
+                    <div class="wizard-title-row">
+                        <div>
+                            <h4 id="viewItemName" style="color: #fff; font-size: 1.4rem; font-weight: 850;">-</h4>
+                            <p id="viewItemCodeSub" style="color: var(--gold); font-size: 0.9rem; font-weight: 700; margin-top: 4px;">-</p>
+                        </div>
+                        <div class="wizard-badges">
+                            <span class="badge" id="viewItemStatusBadge" style="font-weight: 800; border-radius: 999px;">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wizard-content" style="grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.2fr); gap: 24px;">
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div class="preview-card" style="padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240px; background: #fafbfc; border-radius: 12px;">
+                            <div id="viewItemImagePlaceholder" style="color: var(--sub); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+                                <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                <span style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">No Image Available</span>
+                            </div>
+                            <img id="viewItemImage" src="" alt="Item Image" style="width: 100%; max-height: 280px; object-fit: contain; border-radius: 8px; display: none;">
+                        </div>
+
+                        <div class="preview-card" style="padding: 16px;">
+                            <div class="preview-card-title">Description</div>
+                            <p id="viewItemDescription" style="font-size: 0.88rem; line-height: 1.6; color: var(--navy); white-space: pre-wrap; font-weight: 500; margin-top: 6px;">-</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div class="preview-card" style="flex: 1;">
+                            <div class="preview-card-title">Technical specifications</div>
+                            <div class="preview-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Brand & Model</span>
+                                    <strong id="viewItemBrandModel" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Serial Number</span>
+                                    <strong id="viewItemSerial" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Asset Code</span>
+                                    <strong id="viewItemAssetCode" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">QR Code / Tag</span>
+                                    <strong id="viewItemQr" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                            </div>
+
+                            <div class="preview-card-title" style="margin-top: 24px;">Location & Operations</div>
+                            <div class="preview-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Campus Location</span>
+                                    <strong id="viewItemBranch" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Department</span>
+                                    <strong id="viewItemDepartment" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Section / Unit</span>
+                                    <strong id="viewItemSection" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Storage Placement</span>
+                                    <strong id="viewItemStorage" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="preview-card" style="padding: 16px;">
+                            <div class="preview-card-title">Commercial & Sourcing</div>
+                            <div class="preview-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Category Group</span>
+                                    <strong id="viewItemCategory" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Unit Price</span>
+                                    <strong id="viewItemPrice" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Stock Level</span>
+                                    <strong id="viewItemStock" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Min Threshold</span>
+                                    <strong id="viewItemMinStock" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Supplier Vendor</span>
+                                    <strong id="viewItemSupplier" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Funding Origin</span>
+                                    <strong id="viewItemFunding" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Asset Status / Condition</span>
+                                    <strong id="viewItemStatusCondition" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Acquisition / Warranty</span>
+                                    <strong id="viewItemDates" style="font-size: 0.85rem; color: var(--navy);">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Audit Stamp</span>
+                                    <strong id="viewItemAudit" style="font-size: 0.75rem; color: var(--sub); font-weight: 600;">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" id="printViewItemSummaryBtn">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle;"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg> Print Details
+            </button>
+            <button type="button" class="btn btn-primary" onclick="closeModal('viewItemModal')">Close</button>
+        </div>
     </div>
 </div>
 
@@ -1898,6 +2059,205 @@ td { font-weight: 700; }
     document.getElementById('previewCategoryInput')?.addEventListener('change', syncInventoryClassification);
     document.getElementById('previewDeptInput')?.addEventListener('change', syncInventoryClassification);
     document.getElementById('printInventorySummaryBtn')?.addEventListener('click', printInventorySummary);
+
+    // View Details Modal functionality
+    document.querySelectorAll('.js-view-item').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const name = this.dataset.name;
+            const code = this.dataset.code;
+            const assetCode = this.dataset.assetCode;
+            const serial = this.dataset.serial;
+            const qr = this.dataset.qr;
+            const category = this.dataset.category;
+            const department = this.dataset.department;
+            const section = this.dataset.section;
+            const branch = this.dataset.branch;
+            const brandModel = this.dataset.brandModel;
+            const purchaseDate = this.dataset.purchaseDate;
+            const warrantyDate = this.dataset.warrantyDate;
+            const price = this.dataset.price;
+            const stock = this.dataset.stock;
+            const minStock = this.dataset.minStock;
+            const status = this.dataset.status;
+            const statusClass = this.dataset.statusClass;
+            const assetStatus = this.dataset.assetStatus;
+            const condition = this.dataset.condition;
+            const supplier = this.dataset.supplier;
+            const funding = this.dataset.funding;
+            const location = this.dataset.location;
+            const image = this.dataset.image;
+            const description = this.dataset.description;
+            const recordedBy = this.dataset.recordedBy;
+
+            document.getElementById('viewItemName').textContent = name;
+            document.getElementById('viewItemCodeSub').textContent = code;
+
+            const statusBadge = document.getElementById('viewItemStatusBadge');
+            if (statusBadge) {
+                statusBadge.textContent = status;
+                statusBadge.className = 'badge ' + statusClass;
+            }
+
+            const img = document.getElementById('viewItemImage');
+            const placeholder = document.getElementById('viewItemImagePlaceholder');
+            if (img && placeholder) {
+                if (image) {
+                    img.src = image;
+                    img.style.display = 'block';
+                    placeholder.style.display = 'none';
+                } else {
+                    img.src = '';
+                    img.style.display = 'none';
+                    placeholder.style.display = 'flex';
+                }
+            }
+
+            document.getElementById('viewItemDescription').textContent = description;
+            document.getElementById('viewItemBrandModel').textContent = brandModel;
+            document.getElementById('viewItemSerial').textContent = serial;
+            document.getElementById('viewItemAssetCode').textContent = assetCode;
+            document.getElementById('viewItemQr').textContent = qr;
+            document.getElementById('viewItemBranch').textContent = branch;
+            document.getElementById('viewItemDepartment').textContent = department;
+            document.getElementById('viewItemSection').textContent = section;
+            document.getElementById('viewItemStorage').textContent = location;
+            document.getElementById('viewItemCategory').textContent = category;
+            document.getElementById('viewItemPrice').textContent = price;
+            document.getElementById('viewItemStock').textContent = stock;
+            document.getElementById('viewItemMinStock').textContent = minStock;
+            document.getElementById('viewItemSupplier').textContent = supplier;
+            document.getElementById('viewItemFunding').textContent = funding;
+            document.getElementById('viewItemStatusCondition').textContent = `${assetStatus} / ${condition}`;
+            document.getElementById('viewItemDates').textContent = `${purchaseDate} (Warranty: ${warrantyDate})`;
+            document.getElementById('viewItemAudit').textContent = recordedBy;
+
+            // Setup Print button details
+            const printBtn = document.getElementById('printViewItemSummaryBtn');
+            if (printBtn) {
+                const newPrintBtn = printBtn.cloneNode(true);
+                printBtn.parentNode.replaceChild(newPrintBtn, printBtn);
+                newPrintBtn.addEventListener('click', function() {
+                    printDetailSummary({
+                        name, category, campus: branch, description, itemCode: code, imageSrc: image,
+                        rows: [
+                            ['Brand & Model', brandModel],
+                            ['Serial Number', serial],
+                            ['Asset Code', assetCode],
+                            ['QR Code / Tag', qr],
+                            ['Campus Location', branch],
+                            ['Department', department],
+                            ['Section / Unit', section],
+                            ['Storage Placement', location],
+                            ['Category Group', category],
+                            ['Unit Price', price],
+                            ['Stock Level', stock],
+                            ['Min Threshold', minStock],
+                            ['Supplier Vendor', supplier],
+                            ['Funding Origin', funding],
+                            ['Asset Status / Condition', `${assetStatus} / ${condition}`],
+                            ['Acquisition / Warranty', `${purchaseDate} (Warranty: ${warrantyDate})`],
+                            ['Audit Stamp', recordedBy]
+                        ]
+                    });
+                });
+            }
+
+            openModal('viewItemModal');
+        });
+    });
+
+    function printDetailSummary(item) {
+        const printWindow = window.open('', 'inventorySummaryPrint', 'width=900,height=720');
+        if (!printWindow) {
+            window.print();
+            return;
+        }
+
+        const rowsHtml = item.rows.map(([label, value]) => {
+            return `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`;
+        }).join('');
+
+        printWindow.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(item.name)} - Inventory Summary</title>
+<style>
+@page { size: A4 portrait; margin: 14mm; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #0A1628; background: #fff; font-size: 12px; }
+.sheet { width: 100%; }
+.header { display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 2px solid #0A1628; margin-bottom: 16px; }
+.brand { width: 64px; height: 64px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px; }
+.header h1 { margin: 0 0 4px; font-size: 21px; line-height: 1.15; }
+.header p { margin: 2px 0; color: #475569; font-size: 11px; }
+.summary { display: grid; grid-template-columns: 240px 1fr; gap: 18px; align-items: start; }
+.image-frame { width: 100%; aspect-ratio: 4 / 3; border: 1px solid #cbd5e1; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #f8fafc; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.image-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.title { margin-bottom: 12px; }
+.title h2 { margin: 0 0 6px; font-size: 18px; line-height: 1.2; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { display: inline-flex; padding: 5px 8px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 10px; font-weight: 800; }
+.section-title { margin: 16px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #334155; }
+table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; }
+th, td { padding: 8px 10px; border-top: 1px solid #e2e8f0; vertical-align: top; }
+tr:first-child th, tr:first-child td { border-top: 0; }
+th { width: 34%; background: #f8fafc; text-align: left; text-transform: uppercase; letter-spacing: .05em; font-size: 10px; color: #475569; }
+td { font-weight: 700; }
+.description { border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; line-height: 1.45; white-space: pre-wrap; }
+.footer { margin-top: 18px; padding-top: 10px; border-top: 1px solid #cbd5e1; color: #64748b; font-size: 10px; display: flex; justify-content: space-between; gap: 12px; }
+@media print { .sheet { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main class="sheet">
+    <header class="header">
+        <img class="brand" src="${escapeHtml(window.location.origin)}/uiri-ims/assets/img/uiri-logo.webp" alt="UIRI">
+        <div>
+            <h1>Inventory Item Summary</h1>
+            <p>Uganda Industrial Research Institute</p>
+            <p>Summary generated by: ${escapeHtml(window.inventoryPrintGeneratedBy || 'Current user')} · ${escapeHtml(new Date().toLocaleString())}</p>
+        </div>
+    </header>
+    <section class="summary">
+        <div class="image-frame">${item.imageSrc ? `<img src="${escapeHtml(item.imageSrc)}" alt="${escapeHtml(item.name)}">` : 'No image selected'}</div>
+        <div>
+            <div class="title">
+                <h2>${escapeHtml(item.name)}</h2>
+                <div class="pills">
+                    <span class="pill">${escapeHtml(item.category)}</span>
+                    <span class="pill">${escapeHtml(item.campus)}</span>
+                    <span class="pill">${escapeHtml(item.itemCode)}</span>
+                </div>
+            </div>
+            <div class="section-title">Inventory Details</div>
+            <table>${rowsHtml}</table>
+        </div>
+    </section>
+    <div class="section-title">Description</div>
+    <div class="description">${escapeHtml(item.description)}</div>
+    <footer class="footer">
+        <span>Generated from UIRI IMS inventory view details.</span>
+        <span>${escapeHtml(item.campus)}</span>
+    </footer>
+</main>
+</body>
+</html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        const printNow = () => {
+            printWindow.print();
+            printWindow.close();
+        };
+        const printImage = printWindow.document.querySelector('.image-frame img');
+        if (printImage && !printImage.complete) {
+            printImage.addEventListener('load', printNow, { once: true });
+            printImage.addEventListener('error', printNow, { once: true });
+        } else {
+            window.setTimeout(printNow, 150);
+        }
+    }
 
     refreshUnitOptions();
     filterSectionOptions();

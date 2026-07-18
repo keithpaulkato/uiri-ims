@@ -476,25 +476,49 @@ function getTransferStatusClass(string $status): string {
 }
 
 /**
- * Send mail using configured SMTP or fallback to PHP mail().
+ * Resolve mail settings from code config or the database.
+ */
+function getMailSettings(): array {
+    $pdo = db();
+    $dbSettings = [];
+    try {
+        foreach ($pdo->query("SELECT setting_key, setting_value FROM settings") as $row) {
+            $dbSettings[$row['setting_key']] = $row['setting_value'];
+        }
+    } catch (Throwable $e) {
+        $dbSettings = [];
+    }
+
+    $useConfigSmtp = trim((string) SMTP_HOST) !== '';
+    $dbFromEmail = trim((string)($dbSettings['smtp_from_email'] ?? ''));
+    $dbFromName = trim((string)($dbSettings['smtp_from_name'] ?? ''));
+    $constantFromEmail = trim((string) SMTP_FROM_EMAIL);
+    $constantFromName = trim((string) SMTP_FROM_NAME);
+    $port = (int)($useConfigSmtp ? SMTP_PORT : ($dbSettings['smtp_port'] ?? SMTP_PORT));
+
+    return [
+        'host' => $useConfigSmtp ? trim((string) SMTP_HOST) : trim((string)($dbSettings['smtp_host'] ?? '')),
+        'port' => $port > 0 ? $port : 587,
+        'user' => $useConfigSmtp ? trim((string) SMTP_USER) : trim((string)($dbSettings['smtp_user'] ?? '')),
+        'pass' => $useConfigSmtp ? (string) SMTP_PASS : (string)($dbSettings['smtp_pass'] ?? ''),
+        'from_email' => $useConfigSmtp ? ($constantFromEmail ?: $dbFromEmail) : ($dbFromEmail ?: $constantFromEmail ?: 'no-reply@localhost'),
+        'from_name' => $useConfigSmtp ? ($constantFromName ?: $dbFromName) : ($dbFromName ?: $constantFromName ?: SITE_SHORT),
+        'source' => $useConfigSmtp ? 'config' : 'database',
+    ];
+}
+
+/**
+ * Send mail using configured SMTP or fallback to PHP mail() when SMTP is absent.
  * Returns true on success, false on failure.
  */
 function sendMail(string $to, string $subject, string $body, string $fromName = SMTP_FROM_NAME, string $fromEmail = SMTP_FROM_EMAIL, bool $isHtml = false): bool {
-    $pdo = db();
-    // Load SMTP settings from DB if constants are empty
-    $dbSettings = [];
-    foreach ($pdo->query("SELECT setting_key, setting_value FROM settings") as $row) {
-        $dbSettings[$row['setting_key']] = $row['setting_value'];
-    }
-
-    $host = !empty(SMTP_HOST) ? SMTP_HOST : ($dbSettings['smtp_host'] ?? '');
-    $port = !empty(SMTP_PORT) ? SMTP_PORT : (int)($dbSettings['smtp_port'] ?? 587);
-    $user = !empty(SMTP_USER) ? SMTP_USER : ($dbSettings['smtp_user'] ?? '');
-    $pass = !empty(SMTP_PASS) ? SMTP_PASS : ($dbSettings['smtp_pass'] ?? '');
-    $dbFromEmail = $dbSettings['smtp_from_email'] ?? '';
-    $dbFromName = $dbSettings['smtp_from_name'] ?? '';
-    $fromEmail = !empty($fromEmail) ? $fromEmail : (!empty(SMTP_FROM_EMAIL) ? SMTP_FROM_EMAIL : ($dbFromEmail ?: 'no-reply@localhost'));
-    $fromName = !empty($fromName) ? $fromName : (!empty(SMTP_FROM_NAME) ? SMTP_FROM_NAME : ($dbFromName ?: SITE_SHORT));
+    $mailSettings = getMailSettings();
+    $host = $mailSettings['host'];
+    $port = (int) $mailSettings['port'];
+    $user = $mailSettings['user'];
+    $pass = $mailSettings['pass'];
+    $fromEmail = (trim($fromEmail) === '' || trim($fromEmail) === SMTP_FROM_EMAIL) ? $mailSettings['from_email'] : trim($fromEmail);
+    $fromName = (trim($fromName) === '' || trim($fromName) === SMTP_FROM_NAME) ? $mailSettings['from_name'] : trim($fromName);
 
     // Prefer PHPMailer (installed via Composer)
     $autoload = __DIR__ . '/../vendor/autoload.php';
@@ -529,8 +553,11 @@ function sendMail(string $to, string $subject, string $body, string $fromName = 
             }
             $mail->send();
             return true;
-        } catch (Exception $e) {
-            // fallback to PHP mail
+        } catch (Throwable $e) {
+            error_log('SMTP send failed: ' . $e->getMessage());
+            if (!empty($host)) {
+                return false;
+            }
         }
     }
 
@@ -543,12 +570,7 @@ function sendMail(string $to, string $subject, string $body, string $fromName = 
         return (bool) @mail($to, $subject, $body, $headers);
     }
 
-    // Best-effort fallback when SMTP_HOST is set but PHPMailer isn't installed
-    $headers = "From: {$fromName} <{$fromEmail}>\r\n";
-    if ($isHtml) {
-        $headers .= "MIME-Version: 1.0\r\nContent-type: text/html; charset=utf-8\r\n";
-    }
-    return (bool) @mail($to, $subject, $body, $headers);
+    return false;
 }
 
 /**

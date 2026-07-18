@@ -92,8 +92,6 @@ $notifications = $notifStmt->fetchAll();
     <!-- Navigation -->
     <?php
     $sidebarActivePage = $activePage ?? '';
-    $publicOpen = in_array($sidebarActivePage, ['landing'], true);
-    $mainOpen = in_array($sidebarActivePage, ['dashboard'], true);
     $inventoryOpen = in_array($sidebarActivePage, ['items', 'categories'], true);
     $stockOpen = in_array($sidebarActivePage, ['stock_in', 'stock_out', 'stock_adjustment', 'transactions'], true);
     $managementOpen = in_array($sidebarActivePage, ['suppliers', 'requests', 'procurement', 'maintenance', 'transfers', 'users', 'sections', 'departments', 'settings'], true);
@@ -101,38 +99,11 @@ $notifications = $notifStmt->fetchAll();
     ?>
     <nav class="sidebar-nav">
         <ul>
-            <li class="nav-section">Public</li>
-            <li class="nav-dropdown <?= $publicOpen ? 'open' : '' ?>">
-                <button type="button" class="nav-dropdown-toggle" onclick="this.closest('.nav-dropdown').classList.toggle('open')" aria-expanded="<?= $publicOpen ? 'true' : 'false' ?>">
-                    <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5v9a1.5 1.5 0 01-1.5 1.5h-3v-7h-9v7h-3A1.5 1.5 0 013 19.5z"/></svg></span>
-                    <span>Public</span>
-                    <svg viewBox="0 0 24 24" class="dropdown-chevron"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                <ul class="nav-submenu">
-                    <li class="<?= $sidebarActivePage === 'landing' ? 'active' : '' ?>">
-                        <a href="<?= BASE_URL ?>includes/logout.php?redirect=landing">
-                            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5v9a1.5 1.5 0 01-1.5 1.5h-3v-7h-9v7h-3A1.5 1.5 0 013 19.5z"/></svg></span>
-                            Landing Page
-                        </a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="nav-section">Main</li>
-            <li class="nav-dropdown <?= $mainOpen ? 'open' : '' ?>">
-                <button type="button" class="nav-dropdown-toggle" onclick="this.closest('.nav-dropdown').classList.toggle('open')" aria-expanded="<?= $mainOpen ? 'true' : 'false' ?>">
+            <li class="<?= $sidebarActivePage === 'dashboard' ? 'active' : '' ?>">
+                <a href="<?= BASE_URL ?>pages/dashboard.php">
                     <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
-                    <span>Main</span>
-                    <svg viewBox="0 0 24 24" class="dropdown-chevron"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                <ul class="nav-submenu">
-                    <li class="<?= $sidebarActivePage === 'dashboard' ? 'active' : '' ?>">
-                        <a href="<?= BASE_URL ?>pages/dashboard.php">
-                            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
-                            Dashboard
-                        </a>
-                    </li>
-                </ul>
+                    Dashboard
+                </a>
             </li>
 
             <li class="nav-section">Inventory</li>

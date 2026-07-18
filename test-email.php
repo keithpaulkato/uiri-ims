@@ -20,18 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $testStatus = 'Invalid email address.';
         $testResult = 'error';
     } else {
-        // Get current SMTP settings
-        $settings = [];
-        foreach ($pdo->query("SELECT setting_key, setting_value FROM settings") as $row) {
-            $settings[$row['setting_key']] = $row['setting_value'];
-        }
-        
-        $host = !empty(SMTP_HOST) ? SMTP_HOST : ($settings['smtp_host'] ?? '');
-        $port = !empty(SMTP_PORT) ? SMTP_PORT : (int)($settings['smtp_port'] ?? 587);
-        $user_smtp = !empty(SMTP_USER) ? SMTP_USER : ($settings['smtp_user'] ?? '');
-        $pass = !empty(SMTP_PASS) ? SMTP_PASS : ($settings['smtp_pass'] ?? '');
-        $fromEmail = $settings['smtp_from_email'] ?? SMTP_FROM_EMAIL;
-        $fromName = $settings['smtp_from_name'] ?? SMTP_FROM_NAME;
+        $mailSettings = getMailSettings();
+        $host = $mailSettings['host'];
+        $port = (int) $mailSettings['port'];
+        $fromEmail = $mailSettings['from_email'];
+        $fromName = $mailSettings['from_name'];
         
         // Check if SMTP is configured
         if (empty($host)) {
@@ -91,16 +84,12 @@ include __DIR__ . '/includes/header.php';
         </div>
         <div class="card-body">
             <?php
-            $settings = [];
-            foreach ($pdo->query("SELECT setting_key, setting_value FROM settings") as $row) {
-                $settings[$row['setting_key']] = $row['setting_value'];
-            }
-            
-            $host = !empty(SMTP_HOST) ? SMTP_HOST : ($settings['smtp_host'] ?? '');
-            $port = !empty(SMTP_PORT) ? SMTP_PORT : (int)($settings['smtp_port'] ?? 587);
-            $user_smtp = !empty(SMTP_USER) ? SMTP_USER : ($settings['smtp_user'] ?? '');
-            $fromEmail = $settings['smtp_from_email'] ?? SMTP_FROM_EMAIL;
-            $fromName = $settings['smtp_from_name'] ?? SMTP_FROM_NAME;
+            $mailSettings = getMailSettings();
+            $host = $mailSettings['host'];
+            $port = (int) $mailSettings['port'];
+            $user_smtp = $mailSettings['user'];
+            $fromEmail = $mailSettings['from_email'];
+            $fromName = $mailSettings['from_name'];
             ?>
             <table class="table">
                 <tr>
@@ -166,7 +155,7 @@ include __DIR__ . '/includes/header.php';
                         <li><strong>SMTP Host:</strong> e.g., smtp.gmail.com</li>
                         <li><strong>SMTP Port:</strong> 587 (TLS) or 465 (SSL)</li>
                         <li><strong>SMTP Username:</strong> Your email account</li>
-                        <li><strong>SMTP Password:</strong> Your password or app-specific password</li>
+                        <li><strong>SMTP Password:</strong> Google App Password, not your normal Google password</li>
                         <li><strong>From Email:</strong> Email address emails will come from</li>
                         <li><strong>From Name:</strong> Display name in emails</li>
                     </ul>
