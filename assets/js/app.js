@@ -52,20 +52,10 @@ document.addEventListener('click', function (e) {
     }
 });
 
-// Dark mode toggle
-function setTheme(theme) {
-    document.body.dataset.theme = theme;
-    localStorage.setItem('uiri-theme', theme);
-    const toggle = document.getElementById('themeToggle');
-    if (toggle) {
-        toggle.setAttribute('title', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-    }
-}
+// Theme configuration
 
 document.addEventListener('DOMContentLoaded', function () {
-    const saved = localStorage.getItem('uiri-theme');
-    const theme = saved === 'dark' ? 'dark' : 'light';
-    setTheme(theme);
+    document.body.dataset.theme = 'light';
 
     const savedScheme = localStorage.getItem('uiri-dashboard-theme') || 'corporate';
     document.body.dataset.dashboardTheme = savedScheme;
@@ -81,13 +71,6 @@ document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.theme-chip').forEach(chip => chip.classList.toggle('active', chip === this));
         });
     });
-
-    const toggle = document.getElementById('themeToggle');
-    if (toggle) {
-        toggle.addEventListener('click', function () {
-            setTheme(document.body.dataset.theme === 'dark' ? 'light' : 'dark');
-        });
-    }
 
     const flash = document.getElementById('flashMsg');
     if (flash) {
@@ -287,6 +270,8 @@ function persistSidebarWidth(width) {
 }
 
 function restoreSidebarWidth() {
+    // Don't apply stored sidebar width on mobile — sidebar overlays there
+    if (window.innerWidth <= 768) return;
     const stored = localStorage.getItem('uiri-sidebar-width');
     if (stored) {
         applySidebarWidth(stored);
@@ -344,11 +329,17 @@ function toggleSidebar(force) {
     sidebar.classList.toggle('closed', !shouldOpen);
 
     if (mainWrapper) {
-        mainWrapper.classList.toggle('sidebar-collapsed', isDesktop && !shouldOpen);
-        if (shouldOpen) {
-            const width = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
-            mainWrapper.style.marginLeft = width;
+        if (isDesktop) {
+            mainWrapper.classList.toggle('sidebar-collapsed', !shouldOpen);
+            if (shouldOpen) {
+                const width = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
+                mainWrapper.style.marginLeft = width;
+            } else {
+                mainWrapper.style.marginLeft = '0';
+            }
         } else {
+            // Mobile: sidebar overlays, don't push content
+            mainWrapper.classList.remove('sidebar-collapsed');
             mainWrapper.style.marginLeft = '0';
         }
     }
@@ -372,15 +363,32 @@ document.addEventListener('click', function (e) {
 });
 
 window.addEventListener('resize', function () {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const mainWrapper = document.querySelector('.main-wrapper');
+
+    if (!sidebar) return;
+
     if (window.innerWidth > 768) {
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebarOverlay');
-        if (sidebar) {
-            sidebar.classList.remove('open');
-            sidebar.classList.toggle('closed', !sidebar.classList.contains('open'));
+        // Desktop: sidebar should be visible, overlay hidden
+        sidebar.classList.remove('open', 'closed');
+        if (overlay) overlay.classList.remove('show');
+        if (mainWrapper) {
+            mainWrapper.classList.remove('sidebar-collapsed');
+            const width = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
+            mainWrapper.style.marginLeft = width;
         }
-        if (overlay) {
+    } else {
+        // Mobile: sidebar should be hidden off-screen, overlay hidden
+        if (!sidebar.classList.contains('open')) {
+            sidebar.classList.add('closed');
+        }
+        if (overlay && !sidebar.classList.contains('open')) {
             overlay.classList.remove('show');
+        }
+        if (mainWrapper) {
+            mainWrapper.classList.remove('sidebar-collapsed');
+            mainWrapper.style.marginLeft = '0';
         }
     }
 });

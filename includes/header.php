@@ -36,6 +36,7 @@ $notifications = $notifStmt->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= clean($pageTitle ?? 'Dashboard') ?> — <?= SITE_SHORT ?></title>
+    <link rel="icon" type="image/webp" href="<?= BASE_URL ?>assets/img/uiri-logo.webp">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
@@ -307,9 +308,7 @@ $notifications = $notifStmt->fetchAll();
                 <?php endif; ?>
             </div>
         </div>
-        <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
-            <svg viewBox="0 0 24 24"><path d="M12 3v2"/><path d="M12 19v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/><circle cx="12" cy="12" r="3.5"/></svg>
-        </button>
+
         <div class="user-menu" id="userMenu">
             <button class="user-btn" onclick="document.getElementById('userDropdown').classList.toggle('show')">
                 <div class="user-avatar<?= profilePhotoUrl($user) ? ' has-photo' : '' ?>">

@@ -69,9 +69,26 @@ $categoryWhere = "WHERE c.branch_id = ?";
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM categories c $categoryWhere");
 $countStmt->execute([$branchFilter]);
 $totalCategories = (int)$countStmt->fetchColumn();
-$categoriesStmt = $pdo->prepare("SELECT c.*,(SELECT COUNT(*) FROM inventory_items WHERE category_id=c.id AND is_active=1) AS item_count FROM categories c $categoryWhere ORDER BY c.name");
+
+$categoriesPerPage = 10;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$totalPages = max(1, (int)ceil($totalCategories / $categoriesPerPage));
+$page = min($page, $totalPages);
+$offset = ($page - 1) * $categoriesPerPage;
+$pageStart = $totalCategories ? $offset + 1 : 0;
+$pageEnd = min($offset + $categoriesPerPage, $totalCategories);
+
+$categoriesStmt = $pdo->prepare("SELECT c.*,(SELECT COUNT(*) FROM inventory_items WHERE category_id=c.id AND is_active=1) AS item_count FROM categories c $categoryWhere ORDER BY c.name LIMIT $categoriesPerPage OFFSET $offset");
 $categoriesStmt->execute([$branchFilter]);
 $categories = $categoriesStmt->fetchAll();
+
+$paginationParams = $_GET;
+unset($paginationParams['page'], $paginationParams['edit'], $paginationParams['action'], $paginationParams['cat_id']);
+$pageUrl = function (int $targetPage) use ($paginationParams): string {
+    $query = http_build_query(array_merge($paginationParams, ['page' => $targetPage]));
+    return 'categories.php' . ($query ? '?' . $query : '');
+};
+
 $branchNamesById = array_column($branches, 'name', 'id');
 $selectedBranchName = $branchNamesById[$branchFilter] ?? ($_SESSION['user']['branch_name'] ?? 'Current Branch');
 $editCat = null;
@@ -113,28 +130,74 @@ include __DIR__ . '/../includes/header.php';
 <div class="card">
     <div class="card-body p0">
         <table class="data-table">
-            <thead><tr><th>#</th><th>Name</th><th>Description</th><th>Items</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr></thead>
+            <thead><tr>
+                <th style="width: 50px; text-align: center;">#</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th style="width: 100px; text-align: center;">Items</th>
+                <th class="inventory-actions-col" style="width: 125px; text-align: center;">Actions</th>
+            </tr></thead>
             <tbody>
             <?php foreach ($categories as $i=>$cat): ?>
             <tr>
-                <td><?= $i + 1 ?></td>
+                <td style="text-align: center;"><?= $offset + $i + 1 ?></td>
                 <td><strong><?= clean($cat['name']) ?></strong></td>
                 <td><?= clean($cat['description']?:'—') ?></td>
-                <td><span class="badge badge-blue"><?= $cat['item_count'] ?></span></td>
-                <?php if ($canManage): ?>
-                <td>
-                    <div class="action-btns">
+                <td style="text-align: center;"><span class="badge badge-blue" style="border-radius: 999px; font-weight: 800;"><?= $cat['item_count'] ?></span></td>
+                <td class="inventory-actions-col">
+                    <div class="action-btns" style="justify-content: center;">
+                        <button type="button" class="btn-icon js-view-category" title="View Details"
+                            data-id="<?= $cat['id'] ?>"
+                            data-name="<?= clean($cat['name']) ?>"
+                            data-branch="<?= clean($selectedBranchName) ?>"
+                            data-items="<?= $cat['item_count'] ?>"
+                            data-description="<?= clean($cat['description']?:'No description provided.') ?>">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
+                        </button>
+                        <?php if ($canManage): ?>
                         <a href="categories.php?edit=<?= $cat['id'] ?>" class="btn-icon" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
                         <?php if ($cat['item_count']==0): ?>
                         <button type="button" class="btn-icon btn-icon-danger js-delete-category" title="Delete" aria-label="Delete <?= clean($cat['name']) ?>" data-category-id="<?= $cat['id'] ?>" data-category-name="<?= clean($cat['name']) ?>" data-category-branch="<?= clean($selectedBranchName) ?>" data-category-items="<?= (int)$cat['item_count'] ?>"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M9 6V4h6v2"/></svg></button>
                         <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </td>
-                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?php if ($totalPages > 1): ?>
+        <div class="pagination-bar">
+            <nav class="pagination-nav pagination-nav-left" aria-label="Previous category pages">
+                <a class="pagination-link pagination-direction <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $page > 1 ? clean($pageUrl($page - 1)) : '#' ?>" aria-disabled="<?= $page <= 1 ? 'true' : 'false' ?>">&lt;&lt;Previous</a>
+                <?php
+                    $windowStart = max(1, $page - 2);
+                    $windowEnd = min($totalPages, $page + 2);
+                    if ($windowEnd - $windowStart < 4) {
+                        $windowStart = max(1, min($windowStart, $windowEnd - 4));
+                        $windowEnd = min($totalPages, max($windowEnd, $windowStart + 4));
+                    }
+                ?>
+                <?php if ($windowStart > 1): ?>
+                    <a class="pagination-link" href="<?= clean($pageUrl(1)) ?>">1</a>
+                    <?php if ($windowStart > 2): ?><span class="pagination-ellipsis">...</span><?php endif; ?>
+                <?php endif; ?>
+                <?php for ($p = $windowStart; $p <= $windowEnd; $p++): ?>
+                    <a class="pagination-link <?= $p === $page ? 'active' : '' ?>" href="<?= clean($pageUrl($p)) ?>" aria-current="<?= $p === $page ? 'page' : 'false' ?>"><?= $p ?></a>
+                <?php endfor; ?>
+                <?php if ($windowEnd < $totalPages): ?>
+                    <?php if ($windowEnd < $totalPages - 1): ?><span class="pagination-ellipsis">...</span><?php endif; ?>
+                    <a class="pagination-link" href="<?= clean($pageUrl($totalPages)) ?>"><?= number_format($totalPages) ?></a>
+                <?php endif; ?>
+            </nav>
+            <div class="pagination-summary">
+                Page <?= number_format($page) ?> of <?= number_format($totalPages) ?>
+            </div>
+            <nav class="pagination-nav pagination-nav-right" aria-label="Next category page">
+                <a class="pagination-link pagination-direction <?= $page >= $totalPages ? 'disabled' : '' ?>" href="<?= $page < $totalPages ? clean($pageUrl($page + 1)) : '#' ?>" aria-disabled="<?= $page >= $totalPages ? 'true' : 'false' ?>">Next&gt;&gt;</a>
+            </nav>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -198,6 +261,36 @@ include __DIR__ . '/../includes/header.php';
         </form>
     </div>
 </div>
+
+<div class="modal-overlay" id="viewCategoryModal" role="dialog" aria-modal="true" aria-labelledby="viewCategoryTitle">
+    <div class="modal inventory-item-modal" style="max-width: 500px;">
+        <div class="modal-header">
+            <div>
+                <h3 id="viewCategoryTitle" style="font-size: 1.15rem; font-weight: 880; color: var(--navy); margin-bottom: 2px;">Category Details</h3>
+                <span id="viewCategoryBranchKicker" style="font-size: 0.74rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">-</span>
+            </div>
+            <button class="modal-close" onclick="closeModal('viewCategoryModal')">×</button>
+        </div>
+        <div class="modal-body" style="padding: 20px; background: var(--bg);">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="details-profile-card" style="padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px;">
+                        <h2 id="viewCategoryName" style="font-size: 1.4rem; font-weight: 850; color: var(--text); margin: 0; line-height: 1.25;">-</h2>
+                        <span class="badge badge-success" id="viewCategoryItemsBadge" style="font-weight: 800; border-radius: 999px; font-size: 0.75rem; padding: 4px 10px;">0 items</span>
+                    </div>
+                </div>
+
+                <div class="details-section-card" style="padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
+                    <h4 style="font-size: 0.84rem; font-weight: 800; color: var(--navy); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; border-left: 3px solid var(--gold); padding-left: 8px; line-height: 1;">Description</h4>
+                    <p id="viewCategoryDescription" style="font-size: 0.84rem; line-height: 1.5; color: var(--text); white-space: pre-wrap; font-weight: 500; margin: 0; min-height: 80px;">-</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="background: var(--surface); border-top: 1px solid var(--border);">
+            <button type="button" class="btn btn-primary" onclick="closeModal('viewCategoryModal')">Close</button>
+        </div>
+    </div>
+</div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const deleteCategoryId = document.getElementById('deleteCategoryId');
@@ -206,6 +299,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelDeleteCategory = document.getElementById('cancelDeleteCategory');
     const confirmDeleteCategory = document.getElementById('confirmDeleteCategory');
     const deleteCategoryForm = document.getElementById('deleteCategoryForm');
+
+    // View Details Modal functionality
+    document.querySelectorAll('.js-view-category').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const name = this.dataset.name;
+            const branch = this.dataset.branch;
+            const items = this.dataset.items;
+            const description = this.dataset.description;
+
+            document.getElementById('viewCategoryName').textContent = name;
+            document.getElementById('viewCategoryBranchKicker').textContent = `${branch} Campus`;
+            document.getElementById('viewCategoryItemsBadge').textContent = `${items} items`;
+            document.getElementById('viewCategoryDescription').textContent = description;
+
+            openModal('viewCategoryModal');
+        });
+    });
 
     document.querySelectorAll('.js-delete-category').forEach(button => {
         button.addEventListener('click', function () {
