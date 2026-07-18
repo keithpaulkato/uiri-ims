@@ -964,129 +964,154 @@ include __DIR__ . '/../includes/header.php';
 <div class="modal-overlay" id="viewItemModal" role="dialog" aria-modal="true" aria-labelledby="viewItemTitle">
     <div class="modal modal-lg inventory-item-modal">
         <div class="modal-header">
-            <h3>Inventory Item Details</h3>
+            <div>
+                <h3 id="viewItemTitle" style="font-size: 1.15rem; font-weight: 800; color: var(--navy); margin-bottom: 2px;">Inventory Item Details</h3>
+                <span id="viewItemCampusKicker" style="font-size: 0.74rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">-</span>
+            </div>
             <button class="modal-close" onclick="closeModal('viewItemModal')">×</button>
         </div>
-        <div class="modal-body" style="padding: 24px;">
-            <div class="inventory-wizard">
-                <div class="wizard-intro" style="background: linear-gradient(135deg, var(--navy-3) 0%, var(--navy) 100%); color: #fff; border: none; margin-bottom: 20px;">
-                    <div class="wizard-breadcrumb" style="color: rgba(255,255,255,0.7);">Dashboard / Inventory / View Details</div>
-                    <div class="wizard-title-row">
+        <div class="modal-body" style="padding: 20px; background: var(--bg);">
+            <div class="inventory-details-container" style="display: flex; flex-direction: column; gap: 20px;">
+
+                <!-- Top Profile Section (Summary) -->
+                <div class="details-profile-card" style="display: grid; grid-template-columns: 200px 1fr; gap: 24px; padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
+                    <!-- Image frame -->
+                    <div class="details-image-frame" style="width: 100%; aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: #fff; position: relative;">
+                        <div id="viewItemImagePlaceholder" style="color: var(--sub); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+                            <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span style="font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">No Image</span>
+                        </div>
+                        <img id="viewItemImage" src="" alt="Item Image" style="width: 100%; height: 100%; object-fit: contain; display: none;">
+                    </div>
+
+                    <!-- Profile Info -->
+                    <div style="display: flex; flex-direction: column; justify-content: space-between;">
                         <div>
-                            <h4 id="viewItemName" style="color: #fff; font-size: 1.4rem; font-weight: 850;">-</h4>
-                            <p id="viewItemCodeSub" style="color: var(--gold); font-size: 0.9rem; font-weight: 700; margin-top: 4px;">-</p>
-                        </div>
-                        <div class="wizard-badges">
-                            <span class="badge" id="viewItemStatusBadge" style="font-weight: 800; border-radius: 999px;">-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="wizard-content" style="grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.2fr); gap: 24px;">
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <div class="preview-card" style="padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240px; background: #fafbfc; border-radius: 12px;">
-                            <div id="viewItemImagePlaceholder" style="color: var(--sub); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
-                                <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                                <span style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">No Image Available</span>
+                            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px;">
+                                <h2 id="viewItemName" style="font-size: 1.5rem; font-weight: 850; color: var(--text); margin: 0; line-height: 1.25;">-</h2>
+                                <span class="badge" id="viewItemStatusBadge" style="font-weight: 800; border-radius: 999px; font-size: 0.7rem; padding: 4px 10px; flex-shrink: 0;">-</span>
                             </div>
-                            <img id="viewItemImage" src="" alt="Item Image" style="width: 100%; max-height: 280px; object-fit: contain; border-radius: 8px; display: none;">
+                            <span id="viewItemCodeSub" style="font-size: 0.82rem; color: var(--gold); font-weight: 700; letter-spacing: 0.02em;">-</span>
                         </div>
 
-                        <div class="preview-card" style="padding: 16px;">
-                            <div class="preview-card-title">Description</div>
-                            <p id="viewItemDescription" style="font-size: 0.88rem; line-height: 1.6; color: var(--navy); white-space: pre-wrap; font-weight: 500; margin-top: 6px;">-</p>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <div class="preview-card" style="flex: 1;">
-                            <div class="preview-card-title">Technical specifications</div>
-                            <div class="preview-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Brand & Model</span>
-                                    <strong id="viewItemBrandModel" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Serial Number</span>
-                                    <strong id="viewItemSerial" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Asset Code</span>
-                                    <strong id="viewItemAssetCode" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">QR Code / Tag</span>
-                                    <strong id="viewItemQr" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
+                        <!-- Highlights strip -->
+                        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);">
+                            <div>
+                                <span style="display: block; font-size: 0.68rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Stock Level</span>
+                                <strong id="viewItemStock" style="font-size: 1rem; color: var(--text); font-weight: 800;">-</strong>
                             </div>
-
-                            <div class="preview-card-title" style="margin-top: 24px;">Location & Operations</div>
-                            <div class="preview-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Campus Location</span>
-                                    <strong id="viewItemBranch" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Department</span>
-                                    <strong id="viewItemDepartment" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Section / Unit</span>
-                                    <strong id="viewItemSection" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Storage Placement</span>
-                                    <strong id="viewItemStorage" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
+                            <div>
+                                <span style="display: block; font-size: 0.68rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Unit Valuation</span>
+                                <strong id="viewItemPrice" style="font-size: 1rem; color: var(--text); font-weight: 800;">-</strong>
                             </div>
-                        </div>
-
-                        <div class="preview-card" style="padding: 16px;">
-                            <div class="preview-card-title">Commercial & Sourcing</div>
-                            <div class="preview-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Category Group</span>
-                                    <strong id="viewItemCategory" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Unit Price</span>
-                                    <strong id="viewItemPrice" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Stock Level</span>
-                                    <strong id="viewItemStock" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Min Threshold</span>
-                                    <strong id="viewItemMinStock" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Supplier Vendor</span>
-                                    <strong id="viewItemSupplier" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Funding Origin</span>
-                                    <strong id="viewItemFunding" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Asset Status / Condition</span>
-                                    <strong id="viewItemStatusCondition" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Acquisition / Warranty</span>
-                                    <strong id="viewItemDates" style="font-size: 0.85rem; color: var(--navy);">-</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span style="font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Audit Stamp</span>
-                                    <strong id="viewItemAudit" style="font-size: 0.75rem; color: var(--sub); font-weight: 600;">-</strong>
-                                </div>
+                            <div>
+                                <span style="display: block; font-size: 0.68rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Operational State</span>
+                                <strong id="viewItemStatusCondition" style="font-size: 0.88rem; color: var(--text); font-weight: 800;">-</strong>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Detail Grid Section -->
+                <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px;">
+
+                    <!-- Left: Metadata groups -->
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+
+                        <!-- Technical Details -->
+                        <div class="details-section-card" style="padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
+                            <h4 style="font-size: 0.84rem; font-weight: 800; color: var(--navy); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; border-left: 3px solid var(--gold); padding-left: 8px; line-height: 1;">Technical Specifications</h4>
+                            <div class="details-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px;">
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Brand & Model</span>
+                                    <strong id="viewItemBrandModel" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Serial Number</span>
+                                    <strong id="viewItemSerial" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Asset Identifier</span>
+                                    <strong id="viewItemAssetCode" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">QR / Barcode Tag</span>
+                                    <strong id="viewItemQr" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Location Details -->
+                        <div class="details-section-card" style="padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
+                            <h4 style="font-size: 0.84rem; font-weight: 800; color: var(--navy); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; border-left: 3px solid var(--gold); padding-left: 8px; line-height: 1;">Location & Assignment</h4>
+                            <div class="details-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px;">
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Campus</span>
+                                    <strong id="viewItemBranch" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Department</span>
+                                    <strong id="viewItemDepartment" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Section / Unit</span>
+                                    <strong id="viewItemSection" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div>
+                                    <span style="display: block; font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Storage Location</span>
+                                    <strong id="viewItemStorage" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Right: Commercial & Description -->
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+
+                        <!-- Commercial Details -->
+                        <div class="details-section-card" style="padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
+                            <h4 style="font-size: 0.84rem; font-weight: 800; color: var(--navy); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; border-left: 3px solid var(--gold); padding-left: 8px; line-height: 1;">Commercial & Procurement</h4>
+                            <div class="details-list" style="display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <span style="font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Category Group</span>
+                                    <strong id="viewItemCategory" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--border); padding-top: 8px;">
+                                    <span style="font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Supplier Vendor</span>
+                                    <strong id="viewItemSupplier" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--border); padding-top: 8px;">
+                                    <span style="font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Funding Source</span>
+                                    <strong id="viewItemFunding" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--border); padding-top: 8px;">
+                                    <span style="font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Min Threshold</span>
+                                    <strong id="viewItemMinStock" style="font-size: 0.88rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--border); padding-top: 8px;">
+                                    <span style="font-size: 0.72rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Acquisition / Warranty</span>
+                                    <strong id="viewItemDates" style="font-size: 0.82rem; color: var(--text); font-weight: 700;">-</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Description Card -->
+                        <div class="details-section-card" style="padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); flex: 1; display: flex; flex-direction: column;">
+                            <h4 style="font-size: 0.84rem; font-weight: 800; color: var(--navy); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; border-left: 3px solid var(--gold); padding-left: 8px; line-height: 1;">Description</h4>
+                            <p id="viewItemDescription" style="font-size: 0.84rem; line-height: 1.5; color: var(--text); white-space: pre-wrap; font-weight: 500; margin: 0; flex: 1; min-height: 60px;">-</p>
+                            <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
+                                <span style="display: block; font-size: 0.68rem; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">Audit Stamp</span>
+                                <span id="viewItemAudit" style="font-size: 0.74rem; color: var(--sub); font-weight: 600;">-</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
             </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer" style="background: var(--surface); border-top: 1px solid var(--border);">
             <button type="button" class="btn btn-outline" id="printViewItemSummaryBtn">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle;"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg> Print Details
             </button>
@@ -2092,6 +2117,11 @@ td { font-weight: 700; }
 
             document.getElementById('viewItemName').textContent = name;
             document.getElementById('viewItemCodeSub').textContent = code;
+
+            const kickerElement = document.getElementById('viewItemCampusKicker');
+            if (kickerElement) {
+                kickerElement.textContent = `${branch} Campus · ${department}`;
+            }
 
             const statusBadge = document.getElementById('viewItemStatusBadge');
             if (statusBadge) {
