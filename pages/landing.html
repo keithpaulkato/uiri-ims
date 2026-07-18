@@ -760,11 +760,23 @@
 
         @media (max-width: 720px) {
             .public-nav {
-                align-items: flex-start;
-                flex-direction: column;
+                padding: 12px 20px;
+                /* stays flex-row, space-between */
             }
-            .nav-actions { width: 100%; }
-            .nav-actions .public-btn { flex: 1; }
+            .brand-lockup div { display: none; }
+            .nav-actions { width: auto; }
+            .nav-actions .public-btn {
+                padding: 0;
+                width: 42px;
+                height: 42px;
+                border-radius: 50%;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .nav-actions .public-btn .btn-text { display: none; }
+            .nav-actions .public-btn .btn-icon-mobile { display: block !important; }
+
             .hero { min-height: auto; }
             .hero-strip,
             .capability-grid,
@@ -810,7 +822,12 @@
                 <a href="#access">Access</a>
             </div>
             <div class="nav-actions">
-                <a class="public-btn primary" href="../login.php">Sign In</a>
+                <a class="public-btn primary" href="../login.php">
+                    <span class="btn-text">Sign In</span>
+                    <svg class="btn-icon-mobile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none; width: 18px; height: 18px;">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+                    </svg>
+                </a>
             </div>
         </nav>
 
