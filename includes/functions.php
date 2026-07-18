@@ -701,31 +701,59 @@ function unlockAccount(int $userId): void {
  */
 function getUserIpAddress(): string {
     $sources = [
+        $_SERVER['HTTP_CF_CONNECTING_IP'] ?? '',
+        $_SERVER['HTTP_TRUE_CLIENT_IP'] ?? '',
         $_SERVER['HTTP_CLIENT_IP'] ?? '',
-        $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '',
         $_SERVER['HTTP_X_REAL_IP'] ?? '',
+        $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '',
+        $_SERVER['HTTP_X_FORWARDED'] ?? '',
+        $_SERVER['HTTP_FORWARDED_FOR'] ?? '',
+        $_SERVER['HTTP_FORWARDED'] ?? '',
         $_SERVER['REMOTE_ADDR'] ?? '',
     ];
 
+    $candidates = [];
     foreach ($sources as $source) {
+        if ($source === '') {
+            continue;
+        }
         foreach (explode(',', (string)$source) as $candidate) {
             $ip = normalizeIpAddress($candidate);
-            if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                return $ip;
+            if ($ip !== '' && !in_array($ip, $candidates, true)) {
+                $candidates[] = $ip;
             }
         }
     }
 
-    foreach ($sources as $source) {
-        foreach (explode(',', (string)$source) as $candidate) {
-            $ip = normalizeIpAddress($candidate);
-            if ($ip !== '') {
-                return $ip;
-            }
+    // 1. Try to find a public IPv4 address (excluding private/reserved ranges)
+    foreach ($candidates as $ip) {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return $ip;
         }
     }
 
-    return 'unknown';
+    // 2. Try to find any IPv4 address (including private/reserved/loopback)
+    foreach ($candidates as $ip) {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $ip;
+        }
+    }
+
+    // 3. Try to find a public IPv6 address (excluding private/reserved ranges)
+    foreach ($candidates as $ip) {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return $ip;
+        }
+    }
+
+    // 4. Try to find any valid IP address
+    foreach ($candidates as $ip) {
+        if (filter_var($ip, FILTER_VALIDATE_IP)) {
+            return $ip;
+        }
+    }
+
+    return '127.0.0.1';
 }
 
 function normalizeIpAddress(string $ip): string {
@@ -733,6 +761,21 @@ function normalizeIpAddress(string $ip): string {
     if ($ip === '') {
         return '';
     }
+
+    // Strip brackets and ports if present (e.g. [2001:db8::1]:8080 or 192.168.1.1:8080)
+    if (strpos($ip, '[') === 0) {
+        $endBracket = strpos($ip, ']');
+        if ($endBracket !== false) {
+            $ip = substr($ip, 1, $endBracket - 1);
+        }
+    } else {
+        // For IPv4 with port, check if there is exactly one colon (IPv6 has multiple)
+        if (substr_count($ip, ':') === 1) {
+            $ip = explode(':', $ip)[0];
+        }
+    }
+
+    $ip = trim($ip);
 
     if ($ip === '::1' || strcasecmp($ip, 'localhost') === 0) {
         return '127.0.0.1';
