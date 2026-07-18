@@ -11,6 +11,243 @@ $canRequest = hasRole('Store Manager');
 $canApprove = hasRole('Campus Manager');
 $canReceive = hasRole('Store Manager');
 $branchId = $user['branch_id'];
+ensureInventoryDecisionColumns();
+
+function transferResolveDestinationCategoryId(PDO $pdo, int $sourceCategoryId, int $toBranchId): int {
+    $sourceStmt = $pdo->prepare("SELECT name, description FROM categories WHERE id = ?");
+    $sourceStmt->execute([$sourceCategoryId]);
+    $sourceCategory = $sourceStmt->fetch();
+    if (!$sourceCategory) {
+        throw new Exception('Source item category could not be found.');
+    }
+
+    $matchStmt = $pdo->prepare("SELECT id FROM categories WHERE branch_id = ? AND name = ? LIMIT 1");
+    $matchStmt->execute([$toBranchId, $sourceCategory['name']]);
+    $categoryId = $matchStmt->fetchColumn();
+    if ($categoryId) {
+        return (int)$categoryId;
+    }
+
+    $insertStmt = $pdo->prepare("INSERT INTO categories (branch_id, name, description) VALUES (?, ?, ?)");
+    $insertStmt->execute([$toBranchId, $sourceCategory['name'], $sourceCategory['description'] ?? null]);
+    return (int)$pdo->lastInsertId();
+}
+
+function transferResolveDestinationSectionId(PDO $pdo, ?int $sourceSectionId, int $toBranchId): ?int {
+    if (!$sourceSectionId) {
+        return null;
+    }
+
+    $sourceStmt = $pdo->prepare("SELECT name FROM sections WHERE id = ?");
+    $sourceStmt->execute([$sourceSectionId]);
+    $sectionName = $sourceStmt->fetchColumn();
+    if (!$sectionName) {
+        return null;
+    }
+
+    $matchStmt = $pdo->prepare("SELECT id FROM sections WHERE branch_id = ? AND name = ? AND is_active = 1 LIMIT 1");
+    $matchStmt->execute([$toBranchId, $sectionName]);
+    $sectionId = $matchStmt->fetchColumn();
+
+    return $sectionId ? (int)$sectionId : null;
+}
+
+function transferResolveDestinationDepartmentId(PDO $pdo, ?int $sourceDepartmentId, ?int $destinationSectionId): ?int {
+    if (!$sourceDepartmentId || !$destinationSectionId) {
+        return null;
+    }
+
+    $sourceStmt = $pdo->prepare("SELECT name FROM departments WHERE id = ?");
+    $sourceStmt->execute([$sourceDepartmentId]);
+    $departmentName = $sourceStmt->fetchColumn();
+    if (!$departmentName) {
+        return null;
+    }
+
+    $matchStmt = $pdo->prepare("SELECT id FROM departments WHERE section_id = ? AND name = ? AND is_active = 1 LIMIT 1");
+    $matchStmt->execute([$destinationSectionId, $departmentName]);
+    $departmentId = $matchStmt->fetchColumn();
+
+    return $departmentId ? (int)$departmentId : null;
+}
+
+function transferFindOrCreateDestinationItem(PDO $pdo, array $sourceItem, int $toBranchId, int $userId): int {
+    $destinationCategoryId = transferResolveDestinationCategoryId($pdo, (int)$sourceItem['category_id'], $toBranchId);
+    $brandModel = (string)($sourceItem['brand_model'] ?? '');
+    $unit = (string)($sourceItem['unit'] ?? '');
+    $assetType = (string)($sourceItem['asset_type'] ?? '');
+
+    $matchSql = "
+        SELECT id
+        FROM inventory_items
+        WHERE branch_id = ?
+          AND category_id = ?
+          AND name = ?
+          AND COALESCE(brand_model, '') = ?
+          AND COALESCE(unit, '') = ?
+          AND COALESCE(asset_type, '') = ?
+          AND is_active = 1
+    ";
+    $matchParams = [$toBranchId, $destinationCategoryId, $sourceItem['name'], $brandModel, $unit, $assetType];
+    if (!empty($sourceItem['serial_number'])) {
+        $matchSql .= " AND serial_number = ?";
+        $matchParams[] = $sourceItem['serial_number'];
+    } else {
+        $matchSql .= " AND (serial_number IS NULL OR serial_number = '')";
+    }
+    $matchSql .= " ORDER BY id LIMIT 1 FOR UPDATE";
+
+    $matchStmt = $pdo->prepare($matchSql);
+    $matchStmt->execute($matchParams);
+    $existingId = $matchStmt->fetchColumn();
+    if ($existingId) {
+        return (int)$existingId;
+    }
+
+    $destinationSectionId = transferResolveDestinationSectionId($pdo, isset($sourceItem['section_id']) ? (int)$sourceItem['section_id'] : null, $toBranchId);
+    $destinationDepartmentId = transferResolveDestinationDepartmentId($pdo, isset($sourceItem['department_id']) ? (int)$sourceItem['department_id'] : null, $destinationSectionId);
+    $itemCode = generateItemCode($destinationCategoryId, $toBranchId);
+    $assetCode = $itemCode . '-A';
+
+    $insertStmt = $pdo->prepare("
+        INSERT INTO inventory_items (
+            branch_id, section_id, department_id, category_id, supplier_id, item_code, asset_code, serial_number, qr_code,
+            name, brand_model, description, unit, unit_price, current_stock, minimum_stock, asset_type,
+            purchase_date, warranty_date, asset_status, asset_condition, funding_source, storage_location, image,
+            is_active, created_by
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, 0, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?,
+            1, ?
+        )
+    ");
+    $insertStmt->execute([
+        $toBranchId,
+        $destinationSectionId,
+        $destinationDepartmentId,
+        $destinationCategoryId,
+        $sourceItem['supplier_id'] ?? null,
+        $itemCode,
+        $assetCode,
+        $sourceItem['serial_number'] ?? null,
+        null,
+        $sourceItem['name'],
+        $sourceItem['brand_model'] ?? null,
+        $sourceItem['description'] ?? null,
+        $sourceItem['unit'] ?? null,
+        $sourceItem['unit_price'] ?? 0,
+        $sourceItem['minimum_stock'] ?? 0,
+        $sourceItem['asset_type'] ?? 'Consumable',
+        $sourceItem['purchase_date'] ?? null,
+        $sourceItem['warranty_date'] ?? null,
+        $sourceItem['asset_status'] ?? 'Available',
+        $sourceItem['asset_condition'] ?? 'New',
+        $sourceItem['funding_source'] ?? null,
+        null,
+        $sourceItem['image'] ?? null,
+        $userId,
+    ]);
+
+    return (int)$pdo->lastInsertId();
+}
+
+function transferLoadItems(PDO $pdo, int $transferId): array {
+    $itemsStmt = $pdo->prepare("
+        SELECT ti.item_id, ti.quantity, i.*, c.name AS category_name
+        FROM transfer_items ti
+        JOIN inventory_items i ON ti.item_id = i.id
+        JOIN categories c ON i.category_id = c.id
+        WHERE ti.transfer_id = ?
+        FOR UPDATE
+    ");
+    $itemsStmt->execute([$transferId]);
+
+    return $itemsStmt->fetchAll();
+}
+
+function transferEnsureTransferOut(PDO $pdo, array $transfer, array $transferItem, int $userId): void {
+    if ((int)$transferItem['branch_id'] !== (int)$transfer['from_branch_id']) {
+        throw new Exception('Transfer source item no longer belongs to the source branch.');
+    }
+
+    $existsStmt = $pdo->prepare("
+        SELECT id
+        FROM stock_transactions
+        WHERE transaction_type = 'transfer_out'
+          AND reference_number = ?
+          AND item_id = ?
+          AND branch_id = ?
+        LIMIT 1
+    ");
+    $existsStmt->execute([$transfer['transfer_code'], $transferItem['item_id'], $transfer['from_branch_id']]);
+    if ($existsStmt->fetchColumn()) {
+        return;
+    }
+
+    $quantity = (int)$transferItem['quantity'];
+    if ((int)$transferItem['current_stock'] < $quantity) {
+        $available = inventoryQuantityWithUnit($transferItem['current_stock'], $transferItem);
+        throw new Exception('Cannot dispatch transfer. Available source stock: ' . $available . '.');
+    }
+
+    $pdo->prepare("UPDATE inventory_items SET current_stock = current_stock - ? WHERE id = ?")
+        ->execute([$quantity, $transferItem['item_id']]);
+    $pdo->prepare("
+        INSERT INTO stock_transactions
+            (item_id, branch_id, user_id, transaction_type, quantity, unit_price, reference_number, destination_branch_id, remarks, transaction_date)
+        VALUES (?, ?, ?, 'transfer_out', ?, ?, ?, ?, ?, CURDATE())
+    ")->execute([
+        $transferItem['item_id'],
+        $transfer['from_branch_id'],
+        $userId,
+        $quantity,
+        $transferItem['unit_price'] ?? 0,
+        $transfer['transfer_code'],
+        $transfer['to_branch_id'],
+        'Transfer dispatched to destination branch',
+    ]);
+}
+
+function transferDispatchItems(PDO $pdo, array $transfer, int $userId): void {
+    $transferItems = transferLoadItems($pdo, (int)$transfer['id']);
+    if (!$transferItems) {
+        throw new Exception('Cannot dispatch a transfer with no items.');
+    }
+
+    foreach ($transferItems as $transferItem) {
+        transferEnsureTransferOut($pdo, $transfer, $transferItem, $userId);
+    }
+}
+
+function transferReceiveItems(PDO $pdo, array $transfer, int $userId): void {
+    $transferItems = transferLoadItems($pdo, (int)$transfer['id']);
+    if (!$transferItems) {
+        throw new Exception('Cannot receive a transfer with no items.');
+    }
+
+    foreach ($transferItems as $transferItem) {
+        transferEnsureTransferOut($pdo, $transfer, $transferItem, $userId);
+        $quantity = (int)$transferItem['quantity'];
+        $destinationItemId = transferFindOrCreateDestinationItem($pdo, $transferItem, (int)$transfer['to_branch_id'], $userId);
+
+        $pdo->prepare("UPDATE inventory_items SET current_stock = current_stock + ? WHERE id = ?")
+            ->execute([$quantity, $destinationItemId]);
+        $pdo->prepare("
+            INSERT INTO stock_transactions
+                (item_id, branch_id, user_id, transaction_type, quantity, unit_price, reference_number, remarks, transaction_date)
+            VALUES (?, ?, ?, 'transfer_in', ?, ?, ?, ?, CURDATE())
+        ")->execute([
+            $destinationItemId,
+            $transfer['to_branch_id'],
+            $userId,
+            $quantity,
+            $transferItem['unit_price'] ?? 0,
+            $transfer['transfer_code'],
+            'Transfer received from source branch',
+        ]);
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -67,57 +304,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $transferId = (int)($_POST['transfer_id'] ?? 0);
         $status = $_POST['status'] ?? '';
         $allowedUpdates = ['Approved', 'Dispatched', 'Received'];
-    if (in_array($status, $allowedUpdates, true)) {
-        $stmt = $pdo->prepare("SELECT * FROM transfers WHERE id = ?");
-        $stmt->execute([$transferId]);
-        $transfer = $stmt->fetch();
-        if ($transfer) {
-            $canPerform = false;
+        if (!in_array($status, $allowedUpdates, true)) {
+            setFlash('error', 'You do not have permission to update transfer status.');
+        } else {
             $notificationTargets = [];
             $notificationMessage = '';
-            if ($status === 'Approved' && $canApprove && $transfer['status'] === 'Requested' && $transfer['from_branch_id'] === $branchId) {
-                $canPerform = true;
-                $pdo->prepare("UPDATE transfers SET status = 'Approved', approved_by = ?, approved_date = CURDATE() WHERE id = ?")
-                    ->execute([$user['id'], $transferId]);
-                $notificationMessage = 'Transfer ' . $transfer['transfer_code'] . ' has been approved and is awaiting destination confirmation.';
-                $notifyStmt = $pdo->prepare("SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1 AND u.branch_id = ? AND r.name = 'Campus Manager'");
-                $notifyStmt->execute([$transfer['to_branch_id']]);
-                $notificationTargets = array_column($notifyStmt->fetchAll(), 'id');
-                $notificationTargets[] = $transfer['requested_by'];
-            } elseif ($status === 'Dispatched' && $canApprove && $transfer['status'] === 'Approved' && $transfer['to_branch_id'] === $branchId) {
-                $canPerform = true;
-                $pdo->prepare("UPDATE transfers SET status = 'Dispatched', dispatched_date = CURDATE() WHERE id = ?")
-                    ->execute([$transferId]);
-                $notificationMessage = 'Transfer ' . $transfer['transfer_code'] . ' has been confirmed by destination campus and is ready for receipt.';
-                $notifyStmt = $pdo->prepare("SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1 AND u.branch_id = ? AND r.name = 'Store Manager'");
-                $notifyStmt->execute([$transfer['to_branch_id']]);
-                $notificationTargets = array_column($notifyStmt->fetchAll(), 'id');
-                $notificationTargets[] = $transfer['requested_by'];
-            } elseif ($status === 'Received' && $canReceive && $transfer['status'] === 'Dispatched' && $transfer['to_branch_id'] === $branchId) {
-                $canPerform = true;
-                $pdo->beginTransaction();
-                try {
+            $successMessage = 'Transfer status updated.';
+
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare("SELECT * FROM transfers WHERE id = ? FOR UPDATE");
+                $stmt->execute([$transferId]);
+                $transfer = $stmt->fetch();
+                if (!$transfer) {
+                    throw new Exception('Transfer not found.');
+                }
+
+                if ($status === 'Approved' && $canApprove && $transfer['status'] === 'Requested' && (int)$transfer['from_branch_id'] === (int)$branchId) {
+                    $pdo->prepare("UPDATE transfers SET status = 'Approved', approved_by = ?, approved_date = CURDATE() WHERE id = ?")
+                        ->execute([$user['id'], $transferId]);
+                    $notificationMessage = 'Transfer ' . $transfer['transfer_code'] . ' has been approved and is awaiting destination confirmation.';
+                    $notifyStmt = $pdo->prepare("SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1 AND u.branch_id = ? AND r.name = 'Campus Manager'");
+                    $notifyStmt->execute([$transfer['to_branch_id']]);
+                    $notificationTargets = array_column($notifyStmt->fetchAll(), 'id');
+                    $notificationTargets[] = $transfer['requested_by'];
+                    $successMessage = 'Transfer approved.';
+                } elseif ($status === 'Dispatched' && $canApprove && $transfer['status'] === 'Approved' && (int)$transfer['to_branch_id'] === (int)$branchId) {
+                    transferDispatchItems($pdo, $transfer, (int)$user['id']);
+                    $pdo->prepare("UPDATE transfers SET status = 'Dispatched', dispatched_date = CURDATE() WHERE id = ?")
+                        ->execute([$transferId]);
+                    $notificationMessage = 'Transfer ' . $transfer['transfer_code'] . ' has been dispatched and is ready for destination receipt.';
+                    $notifyStmt = $pdo->prepare("SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1 AND u.branch_id = ? AND r.name = 'Store Manager'");
+                    $notifyStmt->execute([$transfer['to_branch_id']]);
+                    $notificationTargets = array_column($notifyStmt->fetchAll(), 'id');
+                    $notificationTargets[] = $transfer['requested_by'];
+                    $successMessage = 'Transfer dispatched and source stock deducted.';
+                } elseif ($status === 'Received' && $canReceive && $transfer['status'] === 'Dispatched' && (int)$transfer['to_branch_id'] === (int)$branchId) {
+                    transferReceiveItems($pdo, $transfer, (int)$user['id']);
                     $pdo->prepare("UPDATE transfers SET status = 'Received', received_date = CURDATE() WHERE id = ?")
                         ->execute([$transferId]);
-                    $items = $pdo->prepare("SELECT item_id, quantity FROM transfer_items WHERE transfer_id = ?");
-                    $items->execute([$transferId]);
-                    foreach ($items->fetchAll() as $ti) {
-                        $pdo->prepare("UPDATE inventory_items SET current_stock = current_stock + ? WHERE id = ?")
-                            ->execute([$ti['quantity'], $ti['item_id']]);
-                        $pdo->prepare("INSERT INTO stock_transactions (item_id, branch_id, user_id, transaction_type, quantity, reference_number, remarks, transaction_date) VALUES (?, ?, ?, 'transfer_in', ?, ?, ?, CURDATE())")
-                            ->execute([$ti['item_id'], $transfer['to_branch_id'], $user['id'], $ti['quantity'], $transfer['transfer_code'], 'Transfer received']);
-                    }
-                    $pdo->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'transfer', 'Transfer received', ?)")
-                        ->execute([$transfer['requested_by'], 'Transfer ' . $transfer['transfer_code'] . ' has been received by destination store.']);
-                    $pdo->commit();
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    setFlash('error', 'Unable to complete receipt.');
-                    $canPerform = false;
+                    $notificationMessage = 'Transfer ' . $transfer['transfer_code'] . ' has been received by the destination store.';
+                    $notificationTargets[] = $transfer['requested_by'];
+                    $successMessage = 'Transfer received and destination stock updated.';
+                } else {
+                    throw new Exception('You do not have permission to update transfer status.');
                 }
-            }
 
-            if ($canPerform && $notificationMessage !== '') {
                 foreach (array_unique($notificationTargets) as $targetId) {
                     if (!$targetId) {
                         continue;
@@ -125,17 +357,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'transfer', 'Transfer update', ?)")
                         ->execute([$targetId, $notificationMessage]);
                 }
+
+                $pdo->commit();
                 auditLog('UPDATE_TRANSFER', 'transfers', $transferId, 'Updated transfer status to ' . $status);
-                setFlash('success', 'Transfer status updated.');
-            } elseif (!$canPerform) {
-                setFlash('error', 'You do not have permission to update transfer status.');
+                setFlash('success', $successMessage);
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                setFlash('error', $e->getMessage() ?: 'Unable to update transfer status.');
             }
-        } else {
-            setFlash('error', 'Transfer not found.');
         }
-    } else {
-        setFlash('error', 'You do not have permission to update transfer status.');
-    }
     }
 
     header('Location: transfers.php');

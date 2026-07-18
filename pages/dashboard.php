@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
-requireLogin(); ## hehehhbxdhdjhb
+requireLogin();
 
 $pageTitle  = 'Dashboard';
 $activePage = 'dashboard';
@@ -8,7 +8,7 @@ $user       = currentUser();
 $branchId   = (int)$user['branch_id'];
 $isAdmin    = hasRole('Administrator', 'Executive');
 $pdo        = db();
-ensureInventoryDecisionColumns(); ## ensure the database has the necessary columns for decision metrics
+ensureInventoryDecisionColumns();
 
 $assetStatusOptions = ['Available','Working','Not Working','In Maintenance','In Use','Reserved','Issued','Decommissioned','Disposed'];
 $conditionOptions = ['New','Good','Fair','Used','Refurbished','Needs Repair','Obsolete','Decommissioned'];
@@ -37,7 +37,7 @@ $healthLabel = $healthScore >= 85 ? 'Stable' : ($healthScore >= 65 ? 'Watch' : '
 $healthClass = $healthScore >= 85 ? 'good' : ($healthScore >= 65 ? 'warn' : 'critical');
 $turnoverRatio = $stockInMonth > 0 ? round(($stockOutMonth / max(1, $stockInMonth)) * 100) : 0;
 $monthStart = date('Y-m-01');
-$today = date('Y-m-d'); ## the current date for filtering movement data
+$today = date('Y-m-d');
 
 $movementData = [];
 for ($i = 5; $i >= 0; $i--) {

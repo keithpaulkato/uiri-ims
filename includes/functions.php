@@ -669,7 +669,6 @@ function isAccountLocked(int $userId, int $maxAttempts = 4): bool {
  * Unlock an account (reset failed login attempts).
  */
 function unlockAccount(int $userId): void {
-    
     $pdo = db();
     $stmt = $pdo->prepare("UPDATE users SET failed_login_attempts = 0, last_login_attempt = NULL WHERE id = ?");
     $stmt->execute([$userId]);
@@ -1172,4 +1171,3 @@ function renderPaginationBar(array $pagination, int $totalItems, array $excludeP
     <?php
     return ob_get_clean();
 }
-

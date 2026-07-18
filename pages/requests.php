@@ -26,17 +26,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$itemId]);
             $item = $stmt->fetch();
             if ($item) {
-                $insertReq = $pdo->prepare("INSERT INTO inventory_requests (user_id, branch_id, item_id, quantity, reason, status) VALUES (?,?,?,?,?, 'Pending')");
-                $insertReq->execute([$user['id'], $item['branch_id'], $itemId, $quantity, $reason]);
-                $requestId = (int)$pdo->lastInsertId();
-                auditLog('SUBMIT_REQUEST', 'inventory_requests', $requestId, 'Requested item');
-                $notifyUsers = $pdo->prepare("SELECT id FROM users WHERE is_active = 1 AND role_id IN (1,2) AND branch_id = ?");
-                $notifyUsers->execute([$item['branch_id']]);
-                foreach ($notifyUsers->fetchAll() as $notifyUser) {
-                    $pdo->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'request', 'New inventory request', ?)")
-                        ->execute([$notifyUser['id'], 'A new request has been submitted for ' . $item['name']]);
+                if (!$isAdmin && (int)$item['branch_id'] !== (int)$branchId) {
+                    setFlash('error', 'You can only request items from your assigned branch.');
+                } else {
+                    $insertReq = $pdo->prepare("INSERT INTO inventory_requests (user_id, branch_id, department_id, item_id, quantity, reason, status) VALUES (?,?,?,?,?,?, 'Pending')");
+                    $insertReq->execute([$user['id'], $item['branch_id'], $user['department_id'] ?? null, $itemId, $quantity, $reason]);
+                    $requestId = (int)$pdo->lastInsertId();
+                    auditLog('SUBMIT_REQUEST', 'inventory_requests', $requestId, 'Requested item');
+                    $notifyUsers = $pdo->prepare("SELECT id FROM users WHERE is_active = 1 AND role_id IN (1,2) AND branch_id = ?");
+                    $notifyUsers->execute([$item['branch_id']]);
+                    foreach ($notifyUsers->fetchAll() as $notifyUser) {
+                        $pdo->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'request', 'New inventory request', ?)")
+                            ->execute([$notifyUser['id'], 'A new request has been submitted for ' . $item['name']]);
+                    }
+                    setFlash('success', 'Request submitted successfully.');
                 }
-                setFlash('success', 'Request submitted successfully.');
             } else {
                 setFlash('error', 'Selected item is not available.');
             }
@@ -50,6 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $request = $stmt->fetch();
         if (!$request) {
             setFlash('error', 'Request not found.');
+        } elseif (!$isAdmin && $canProcess && (int)$request['branch_id'] !== (int)$branchId) {
+            setFlash('error', 'You cannot process requests outside your branch.');
+        } elseif (!$isAdmin && !$canProcess && (int)$request['user_id'] !== (int)$user['id']) {
+            setFlash('error', 'You cannot update another user\'s request.');
         } else {
             if ($action === 'cancel' && $request['user_id'] != $user['id'] && !$canProcess) {
                 setFlash('error', 'You cannot cancel this request.');
@@ -83,40 +91,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         setFlash('success', 'Request rejected.');
                     }
                 } elseif ($action === 'issue') {
-                    if ($request['status'] !== 'Approved') {
-                        setFlash('error', 'Only approved requests can be issued.');
-                    } else {
-                        $pdo->beginTransaction();
-                        try {
-                            $itemStmt = $pdo->prepare("SELECT i.*, c.name AS category_name FROM inventory_items i JOIN categories c ON i.category_id = c.id WHERE i.id = ? FOR UPDATE");
-                            $itemStmt->execute([$request['item_id']]);
-                            $item = $itemStmt->fetch();
-                            if (!$item || $item['current_stock'] < $request['quantity']) {
-                                $available = $item ? inventoryQuantityWithUnit($item['current_stock'], $item) : '0';
-                                throw new Exception('Insufficient stock. Available: ' . $available . '.');
-                            }
-                            $pdo->prepare("UPDATE inventory_items SET current_stock = current_stock - ? WHERE id = ?")
-                                ->execute([$request['quantity'], $request['item_id']]);
-                            $pdo->prepare("INSERT INTO stock_transactions (item_id, branch_id, user_id, transaction_type, quantity, reference_number, remarks, transaction_date) VALUES (?, ?, ?, 'stock_out', ?, ?, ?, CURDATE())")
-                                ->execute([
-                                    $request['item_id'],
-                                    $request['branch_id'],
-                                    $user['id'],
-                                    $request['quantity'],
-                                    'REQ-' . str_pad($requestId, 5, '0', STR_PAD_LEFT),
-                                    'Issued via request #' . $requestId
-                                ]);
-                            $pdo->prepare("UPDATE inventory_requests SET status = 'Issued', processed_by = ?, processed_at = NOW() WHERE id = ?")
-                                ->execute([$user['id'], $requestId]);
-                            $pdo->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'request', 'Request issued', ?)")
-                                ->execute([$request['user_id'], 'Your request for item #' . $requestId . ' has been issued.']);
-                            $pdo->commit();
-                            auditLog('ISSUE_REQUEST', 'inventory_requests', $requestId, 'Issued request');
-                            setFlash('success', 'Request issued successfully.');
-                        } catch (Exception $e) {
-                            $pdo->rollBack();
-                            setFlash('error', $e->getMessage());
+                    $pdo->beginTransaction();
+                    try {
+                        $requestStmt = $pdo->prepare("SELECT * FROM inventory_requests WHERE id = ? FOR UPDATE");
+                        $requestStmt->execute([$requestId]);
+                        $request = $requestStmt->fetch();
+                        if (!$request) {
+                            throw new Exception('Request not found.');
                         }
+                        if (!$isAdmin && (int)$request['branch_id'] !== (int)$branchId) {
+                            throw new Exception('You cannot issue requests outside your branch.');
+                        }
+                        if ($request['status'] !== 'Approved') {
+                            throw new Exception('Only approved requests can be issued.');
+                        }
+
+                        $itemStmt = $pdo->prepare("SELECT i.*, c.name AS category_name FROM inventory_items i JOIN categories c ON i.category_id = c.id WHERE i.id = ? FOR UPDATE");
+                        $itemStmt->execute([$request['item_id']]);
+                        $item = $itemStmt->fetch();
+                        if (!$item) {
+                            throw new Exception('Requested item was not found.');
+                        }
+                        if ((int)$item['branch_id'] !== (int)$request['branch_id']) {
+                            throw new Exception('Request branch and item branch no longer match.');
+                        }
+                        if ((int)$item['current_stock'] < (int)$request['quantity']) {
+                            $available = inventoryQuantityWithUnit($item['current_stock'], $item);
+                            throw new Exception('Insufficient stock. Available: ' . $available . '.');
+                        }
+
+                        $pdo->prepare("UPDATE inventory_items SET current_stock = current_stock - ? WHERE id = ?")
+                            ->execute([$request['quantity'], $request['item_id']]);
+                        $pdo->prepare("INSERT INTO stock_transactions (item_id, branch_id, user_id, transaction_type, quantity, unit_price, reference_number, remarks, transaction_date) VALUES (?, ?, ?, 'stock_out', ?, ?, ?, ?, CURDATE())")
+                            ->execute([
+                                $request['item_id'],
+                                $request['branch_id'],
+                                $user['id'],
+                                $request['quantity'],
+                                $item['unit_price'] ?? 0,
+                                'REQ-' . str_pad($requestId, 5, '0', STR_PAD_LEFT),
+                                'Issued via request #' . $requestId
+                            ]);
+                        $pdo->prepare("UPDATE inventory_requests SET status = 'Issued', processed_by = ?, processed_at = NOW() WHERE id = ?")
+                            ->execute([$user['id'], $requestId]);
+                        $pdo->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'request', 'Request issued', ?)")
+                            ->execute([$request['user_id'], 'Your request for item #' . $requestId . ' has been issued.']);
+                        $pdo->commit();
+                        auditLog('ISSUE_REQUEST', 'inventory_requests', $requestId, 'Issued request');
+                        setFlash('success', 'Request issued successfully.');
+                    } catch (Exception $e) {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                        setFlash('error', $e->getMessage());
                     }
                 } elseif ($action === 'cancel') {
                     if ($request['status'] !== 'Pending') {
