@@ -377,11 +377,11 @@ include __DIR__ . '/../includes/header.php';
     </form>
 </div>
 
-<div class="card users-table-card">
+<div class="card">
     <div class="card-body p0">
-        <div class="table-responsive users-table-wrap">
-        <table class="data-table users-table">
-            <thead><tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Department</th><th>Section / Unit</th><th>Phone</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Department</th><th>Section / Unit</th><th>Phone</th><th>Last Login</th><th>Status</th><th class="inventory-actions-col">Actions</th></tr></thead>
             <tbody>
             <?php foreach ($users as $i=>$u):
                 $accountStatusLabel = 'Active';
@@ -412,8 +412,23 @@ include __DIR__ . '/../includes/header.php';
                     <small class="item-code">Awaiting password change</small>
                     <?php endif; ?>
                 </td>
-                <td>
-                    <div class="action-btns">
+                <td class="inventory-actions-col">
+                    <div class="action-btns" style="justify-content: center;">
+                        <button type="button" class="btn-icon js-view-user" title="View Details"
+                            data-name="<?= clean($u['full_name']) ?>"
+                            data-email="<?= clean($u['email']) ?>"
+                            data-username="<?= clean($u['username']) ?>"
+                            data-role="<?= clean($u['role_name']) ?>"
+                            data-branch="<?= clean($u['branch_name']) ?>"
+                            data-dept="<?= clean($u['section_name']?:'—') ?>"
+                            data-sec="<?= clean($u['department_name']?:'—') ?>"
+                            data-phone="<?= clean($u['phone']?:'—') ?>"
+                            data-status="<?= $accountStatusLabel ?>"
+                            data-statusclass="<?= $accountStatusClass ?>"
+                            data-lastlogin="<?= $u['last_login'] ? formatDateTime($u['last_login'], true) : 'Never' ?>"
+                            data-photo="<?= clean(profilePhotoUrl($u)) ?>">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
+                        </button>
                         <a href="users.php?edit=<?= $u['id'] ?>" class="btn-icon" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
                         <?php if ($u['id']!=1): ?>
                         <button
@@ -467,6 +482,62 @@ include __DIR__ . '/../includes/header.php';
             <button type="button" class="btn btn-outline delete-user-cancel" id="cancelDeleteUser">No, keep account</button>
             <button type="submit" class="btn btn-danger delete-user-confirm" id="confirmDeleteUser">Yes, delete permanently</button>
         </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="viewUserModal" role="dialog" aria-modal="true" aria-labelledby="viewUserTitle">
+    <div class="modal view-item-modal">
+        <div class="modal-header">
+            <h3 id="viewUserTitle">User Details</h3>
+            <button class="modal-close" onclick="closeModal('viewUserModal')" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body p0">
+            <div class="view-item-hero" style="text-align: center; padding: 24px;">
+                <div class="user-avatar-sm" style="width: 80px; height: 80px; margin: 0 auto 16px; font-size: 24px;">
+                    <img id="vu_photo" src="" alt="avatar">
+                </div>
+                <h2 id="vu_name" style="margin: 0; font-size: 1.25rem; color: var(--navy);"></h2>
+                <div id="vu_role" class="badge badge-purple" style="margin-top: 8px;"></div>
+            </div>
+            
+            <div class="view-item-details" style="padding: 24px; display: grid; gap: 16px;">
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Username</span>
+                    <span class="detail-value" id="vu_username" style="font-weight: 600; color: var(--navy);"></span>
+                </div>
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Email</span>
+                    <span class="detail-value" id="vu_email" style="font-weight: 600; color: var(--navy);"></span>
+                </div>
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Phone</span>
+                    <span class="detail-value" id="vu_phone" style="font-weight: 600; color: var(--navy);"></span>
+                </div>
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Campus</span>
+                    <span class="detail-value" id="vu_branch" style="font-weight: 600; color: var(--navy);"></span>
+                </div>
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Department</span>
+                    <span class="detail-value" id="vu_dept" style="font-weight: 600; color: var(--navy);"></span>
+                </div>
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Section / Unit</span>
+                    <span class="detail-value" id="vu_sec" style="font-weight: 600; color: var(--navy);"></span>
+                </div>
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Status</span>
+                    <span class="detail-value"><span id="vu_status" class="badge"></span></span>
+                </div>
+                <div class="detail-row" style="display: grid; grid-template-columns: 140px 1fr;">
+                    <span class="detail-label" style="color: var(--sub); font-size: .8rem; font-weight: 700; text-transform: uppercase;">Last Login</span>
+                    <span class="detail-value" id="vu_lastlogin" style="font-weight: 600; color: var(--navy);"></span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="background: var(--surface);">
+            <button class="btn btn-outline" onclick="closeModal('viewUserModal')" style="width: 100%;">Close</button>
+        </div>
     </div>
 </div>
 
@@ -648,6 +719,27 @@ document.addEventListener('DOMContentLoaded', function(){
             confirmDeleteUser.textContent = 'Deleting...';
         });
     }
+
+    document.querySelectorAll('.js-view-user').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.getElementById('vu_photo').src = this.dataset.photo;
+            document.getElementById('vu_name').textContent = this.dataset.name;
+            document.getElementById('vu_username').textContent = this.dataset.username;
+            document.getElementById('vu_email').textContent = this.dataset.email || '—';
+            document.getElementById('vu_role').textContent = this.dataset.role;
+            document.getElementById('vu_branch').textContent = this.dataset.branch;
+            document.getElementById('vu_dept').textContent = this.dataset.dept;
+            document.getElementById('vu_sec').textContent = this.dataset.sec;
+            document.getElementById('vu_phone').textContent = this.dataset.phone;
+            document.getElementById('vu_lastlogin').textContent = this.dataset.lastlogin;
+            
+            const st = document.getElementById('vu_status');
+            st.textContent = this.dataset.status;
+            st.className = 'badge ' + this.dataset.statusclass;
+
+            openModal('viewUserModal');
+        });
+    });
 });
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
