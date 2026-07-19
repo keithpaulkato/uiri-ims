@@ -1354,7 +1354,8 @@ select.form-control { cursor: pointer; color: var(--corp-blue); }
   .login-body::before { background-position: calc(100% - 160px) center; background-size: 65%; opacity: 0.14; }
 }
 .login-form-wrap { background: var(--white); border-radius: 20px; padding: 36px; width: 100%; max-width: 430px; box-shadow: 0 24px 60px rgba(10,22,40,.16); border: 1px solid rgba(10,22,40,.05); animation: floatIn .25s ease; }
-.login-form-header { margin-bottom: 24px; }
+/* Cosmetic spacing tweak: slightly larger header bottom margin for better breathing room */
+.login-form-header { margin-bottom: 28px; }
 .login-form-header h3 { font-size: 1.4rem; font-weight: 800; color: var(--navy); }
 .login-form-header p { color: var(--sub); margin-top: 6px; line-height: 1.6; }
 .login-form-header .login-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; padding: 6px 10px; border-radius: 999px; background: rgba(201,162,39,.12); color: var(--navy); font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
