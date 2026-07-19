@@ -239,7 +239,7 @@ unset($stockInItem);
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
 $suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
 $tWhere = $isAdmin ? ($branchFilter ? "AND t.branch_id=$branchFilter" : '') : "AND t.branch_id=$branchId";
-$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, i.supplier_id, c.name AS category_name, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN categories c ON c.id=i.category_id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 8")->fetchAll();
+$recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, i.supplier_id, c.name AS category_name, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN categories c ON c.id=i.category_id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 24")->fetchAll();
 foreach ($recent as &$recentStockIn) {
     $recentStockIn['display_unit'] = inventoryDisplayUnitForRow($recentStockIn);
 }
@@ -594,7 +594,7 @@ const itemStats = <?= json_encode($itemStats) ?>;
 const latestPurchase = <?= json_encode($latestPurchase) ?>;
 let filteredRecent = [...recentData];
 let recentPage = 1;
-const pageSize = 1;
+const pageSize = 4;
 const stockSteps = ['product', 'supplier', 'reference', 'stock', 'review'];
 let currentStockStep = 'product';
 let selectedStockInItem = null;
@@ -812,20 +812,8 @@ function renderRecentPagination() {
     const maxPage = Math.max(1, Math.ceil(filteredRecent.length / pageSize));
     recentPage = Math.min(maxPage, Math.max(1, recentPage));
     const links = document.getElementById('recentPageLinks');
-    let pageItems;
-    if (maxPage <= 5) {
-        pageItems = Array.from({ length: maxPage }, (_, index) => index + 1);
-    } else if (recentPage <= 3) {
-        pageItems = [1, 2, 3, 'ellipsis-end', maxPage];
-    } else if (recentPage >= maxPage - 2) {
-        pageItems = [1, 'ellipsis-start', maxPage - 2, maxPage - 1, maxPage];
-    } else {
-        pageItems = [1, 'ellipsis-start', recentPage, 'ellipsis-end', maxPage];
-    }
+    const pageItems = Array.from({ length: maxPage }, (_, index) => index + 1);
     links.innerHTML = pageItems.map(page => {
-        if (String(page).startsWith('ellipsis')) {
-            return '<span class="pagination-ellipsis">...</span>';
-        }
         return `<button type="button" class="pagination-link ${page === recentPage ? 'active' : ''}" onclick="goRecentPage(${page})">${page}</button>`;
     }).join('');
     document.getElementById('paginationInfo').textContent = `Page ${recentPage} of ${maxPage}`;
@@ -998,7 +986,7 @@ window.addEventListener('DOMContentLoaded', () => {
 .filter-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .date-range{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .table-actions button{margin-right:4px;}
-.recent-pagination-bar{margin-top:12px;}
+.recent-pagination-bar{margin-top:0;}
 @media (max-width: 1024px){.section-grid-2{grid-template-columns:1fr;}.filter-row,.date-range{grid-template-columns:1fr;}}
 @media print {body *{visibility:hidden;}#recentTable, #recentTable *,.page-header, .card-header, .card-body, .table-actions, .btn, .table-filters, .pagination-bar{visibility:visible;}#stockInForm, .preview-card, .supplier-details, .history-list{visibility:visible;} .page-header{position:relative;} .card{border:none;box-shadow:none;}} 
 </style>

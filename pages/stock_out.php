@@ -117,7 +117,7 @@ $recent = $pdo->query("
     JOIN users u ON t.user_id = u.id
     WHERE t.transaction_type = 'stock_out' $txClause
     ORDER BY t.transaction_date DESC, t.created_at DESC
-    LIMIT 8
+    LIMIT 24
 ")->fetchAll();
 foreach ($recent as &$recentStockOut) {
     $recentStockOut['display_unit'] = inventoryDisplayUnitForRow($recentStockOut);
@@ -367,7 +367,7 @@ const recentOutData = <?= json_encode(array_values($recent)) ?>;
 let selectedStockOutItem = null;
 let filteredRecentOut = [...recentOutData];
 let recentOutPage = 1;
-const recentOutPageSize = 1;
+const recentOutPageSize = 4;
 const stockOutSteps = ['product', 'issue', 'reference', 'review'];
 let currentStockOutStep = 'product';
 
@@ -520,18 +520,8 @@ function renderRecentOutPagination() {
     const maxPage = Math.max(1, Math.ceil(filteredRecentOut.length / recentOutPageSize));
     recentOutPage = Math.min(maxPage, Math.max(1, recentOutPage));
     const links = document.getElementById('recentOutPageLinks');
-    let pageItems;
-    if (maxPage <= 5) {
-        pageItems = Array.from({ length: maxPage }, (_, index) => index + 1);
-    } else if (recentOutPage <= 3) {
-        pageItems = [1, 2, 3, 'ellipsis-end', maxPage];
-    } else if (recentOutPage >= maxPage - 2) {
-        pageItems = [1, 'ellipsis-start', maxPage - 2, maxPage - 1, maxPage];
-    } else {
-        pageItems = [1, 'ellipsis-start', recentOutPage, 'ellipsis-end', maxPage];
-    }
+    const pageItems = Array.from({ length: maxPage }, (_, index) => index + 1);
     links.innerHTML = pageItems.map(page => {
-        if (String(page).startsWith('ellipsis')) return '<span class="pagination-ellipsis">...</span>';
         return `<button type="button" class="pagination-link ${page === recentOutPage ? 'active' : ''}" onclick="goRecentOutPage(${page})">${page}</button>`;
     }).join('');
     document.getElementById('recentOutPaginationInfo').textContent = `Page ${recentOutPage} of ${maxPage}`;
