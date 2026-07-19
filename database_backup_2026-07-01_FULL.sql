@@ -764,6 +764,7 @@ CREATE TABLE reports (
     FOREIGN KEY (category_id) REFERENCES categories(id)
 );
 
+
 -- ============================================================
 -- INDEXES ON FREQUENTLY QUERIED COLUMNS
 -- ============================================================
