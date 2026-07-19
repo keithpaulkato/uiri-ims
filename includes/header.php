@@ -340,6 +340,22 @@ $notifications = $notifStmt->fetchAll();
 </header>
 
 <!-- FLASH MESSAGE -->
+<?php if ($flash): ?>
+<div class="flash flash-<?= $flash['type'] ?>" id="flashMsg">
+    <svg viewBox="0 0 24 24">
+        <?php if ($flash['type'] === 'success'): ?>
+        <polyline points="20 6 9 17 4 12"/>
+        <?php elseif ($flash['type'] === 'error'): ?>
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        <?php else: ?>
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        <?php endif; ?>
+    </svg>
+    <?= clean($flash['message']) ?>
+    <button onclick="this.parentElement.remove()" class="flash-close">×</button>
+</div>
+<?php endif; ?>
 
+<main class="page-content">
 
  
