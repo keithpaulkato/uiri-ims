@@ -775,6 +775,7 @@ select.form-control { cursor: pointer; color: var(--corp-blue); }
 .review-item span { font-size: .8rem; color: var(--sub); }
 .inline-image-preview { width: 150px; aspect-ratio: 4 / 3; border-radius: 10px; margin-top: 10px; }
 .readonly-field { min-height: 42px; display: flex; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; color: var(--navy); font-weight: 800; }
+.inventory-detail-print-area { display: none; }
 
 .inventory-item-modal {
   width: min(1180px, calc(100vw - 56px));
@@ -785,6 +786,25 @@ select.form-control { cursor: pointer; color: var(--corp-blue); }
   max-height: calc(90vh - 124px);
   overflow-y: auto;
   scrollbar-gutter: stable;
+}
+#viewItemModal .inventory-item-modal {
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+#viewItemModal .inventory-item-modal .modal-header,
+#viewItemModal .inventory-item-modal .modal-footer {
+  flex: 0 0 auto;
+}
+#viewItemModal .inventory-item-modal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+#viewItemModal .inventory-item-modal .modal-footer {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 -14px 30px rgba(15, 23, 42, .08);
 }
 .inventory-item-modal .wizard-content {
   grid-template-columns: minmax(0, .88fr) minmax(340px, .58fr);
@@ -1568,6 +1588,162 @@ select.form-control { cursor: pointer; color: var(--corp-blue); }
 
 @media print {
   @page { size: A4 landscape; margin: 6mm; }
+  @page inventoryDetailPage { size: A4 portrait; margin: 14mm; }
+  body.printing-inventory-detail {
+    font-size: 12px !important;
+    background: #fff !important;
+    color: #0A1628 !important;
+  }
+  body.printing-inventory-detail .page-content > :not(.inventory-detail-print-area) {
+    display: none !important;
+  }
+  body.printing-inventory-detail .inventory-detail-print-area {
+    display: block !important;
+    page: inventoryDetailPage;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    color: #0A1628 !important;
+    background: #fff !important;
+  }
+  body.printing-inventory-detail .inventory-detail-print-sheet {
+    width: 100%;
+    break-inside: avoid;
+  }
+  body.printing-inventory-detail .inventory-detail-print-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #0A1628;
+    margin-bottom: 16px;
+  }
+  body.printing-inventory-detail .inventory-detail-print-brand {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 5px;
+    background: #fff;
+  }
+  body.printing-inventory-detail .inventory-detail-print-header h1 {
+    margin: 0 0 4px;
+    font-size: 21px;
+    line-height: 1.15;
+    color: #0A1628;
+  }
+  body.printing-inventory-detail .inventory-detail-print-header p {
+    margin: 2px 0;
+    color: #475569;
+    font-size: 11px;
+  }
+  body.printing-inventory-detail .inventory-detail-print-summary {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  body.printing-inventory-detail .inventory-detail-print-image {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #f8fafc;
+    color: #64748b;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  body.printing-inventory-detail .inventory-detail-print-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  body.printing-inventory-detail .inventory-detail-print-title {
+    margin-bottom: 12px;
+  }
+  body.printing-inventory-detail .inventory-detail-print-title h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    line-height: 1.2;
+    color: #0A1628;
+  }
+  body.printing-inventory-detail .inventory-detail-print-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  body.printing-inventory-detail .inventory-detail-print-pills span {
+    display: inline-flex;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #075985;
+    font-size: 10px;
+    font-weight: 800;
+  }
+  body.printing-inventory-detail .inventory-detail-print-section-title {
+    margin: 16px 0 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #334155;
+    font-weight: 800;
+  }
+  body.printing-inventory-detail .inventory-detail-print-area table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #cbd5e1;
+  }
+  body.printing-inventory-detail .inventory-detail-print-area th,
+  body.printing-inventory-detail .inventory-detail-print-area td {
+    padding: 8px 10px;
+    border-top: 1px solid #e2e8f0;
+    vertical-align: top;
+    font-size: 12px !important;
+    line-height: 1.3;
+  }
+  body.printing-inventory-detail .inventory-detail-print-area tr:first-child th,
+  body.printing-inventory-detail .inventory-detail-print-area tr:first-child td {
+    border-top: 0;
+  }
+  body.printing-inventory-detail .inventory-detail-print-area th {
+    width: 34%;
+    background: #f8fafc;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-size: 10px !important;
+    color: #475569;
+  }
+  body.printing-inventory-detail .inventory-detail-print-area td {
+    font-weight: 700;
+    color: #0A1628;
+  }
+  body.printing-inventory-detail .inventory-detail-print-description {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+  body.printing-inventory-detail .inventory-detail-print-footer {
+    margin-top: 18px;
+    padding-top: 10px;
+    border-top: 1px solid #cbd5e1;
+    color: #64748b;
+    font-size: 10px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
   .sidebar,
   .topnav,
   .filter-bar,
