@@ -85,7 +85,10 @@ include __DIR__ . '/../includes/header.php';
                 <td>
                     <div class="action-btns">
                         <a href="departments.php?edit=<?= $dept['id'] ?>" class="btn-icon" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
-                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this section/unit?')">
+                        <form method="POST" class="js-delete-confirm" style="display:inline"
+                              data-delete-title="Delete section/unit?"
+                              data-delete-text="<?= clean(($dept['name'] ?: 'This section/unit') . ' will be permanently removed from its parent department.') ?>"
+                              data-delete-confirm="Yes, delete section/unit">
                             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="department_id" value="<?= $dept['id'] ?>">

@@ -129,6 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     initializeSessionIdleGuard();
+    initializeDeleteConfirmations();
     initializeUgandanPhoneInputs();
 
     const valueTarget = document.getElementById('inventoryValueCounter');
@@ -271,6 +272,65 @@ function initializeSessionIdleGuard() {
 
     window.addEventListener('pageshow', resetIdleTimer);
     resetIdleTimer();
+}
+
+function initializeDeleteConfirmations() {
+    const confirmElements = document.querySelectorAll('.js-delete-confirm');
+    if (!confirmElements.length) return;
+
+    const buildMessage = (element) => {
+        const title = element.dataset.deleteTitle || 'Confirm deletion';
+        const text = element.dataset.deleteText || 'This record will be deleted. Do you want to continue?';
+        const confirmText = element.dataset.deleteConfirm || 'Yes, delete';
+        return { title, text, confirmText };
+    };
+
+    const askToDelete = (element, proceed) => {
+        const message = buildMessage(element);
+
+        if (!window.Swal) {
+            if (window.confirm(message.title + '\n\n' + message.text)) proceed();
+            return;
+        }
+
+        window.Swal.fire({
+            title: message.title,
+            text: message.text,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: message.confirmText,
+            cancelButtonText: 'No, keep it',
+            reverseButtons: true,
+            focusCancel: true,
+            buttonsStyling: false,
+            customClass: {
+                popup: 'uiri-delete-alert',
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-outline'
+            }
+        }).then(result => {
+            if (result.isConfirmed) proceed();
+        });
+    };
+
+    confirmElements.forEach(element => {
+        if (element.tagName === 'FORM') {
+            element.addEventListener('submit', function (event) {
+                event.preventDefault();
+                askToDelete(element, () => HTMLFormElement.prototype.submit.call(element));
+            });
+            return;
+        }
+
+        element.addEventListener('click', function (event) {
+            event.preventDefault();
+            const href = element.getAttribute('href');
+            if (!href) return;
+            askToDelete(element, () => {
+                window.location.href = href;
+            });
+        });
+    });
 }
 
 function normalizeUgandanPhoneValue(value, keepPrefix) {

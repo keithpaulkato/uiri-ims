@@ -405,7 +405,7 @@ include __DIR__ . '/../includes/header.php';
             </select>
         </label>
         <button type="submit"><i class="fa-solid fa-filter"></i> Apply Filters</button>
-        <a href="analytics.php" class="analytics-reset-link">Reset</a>
+        <a href="analytics.php" class="btn btn-outline analytics-reset-link">Reset</a>
     </form>
 
     <section class="analytics-kpi-grid">

@@ -121,7 +121,8 @@ include __DIR__ . '/../includes/header.php';
 <div class="card">
     <div class="card-body p0">
         <?php if ($suppliers): ?>
-        <table class="data-table">
+        <div class="table-responsive suppliers-table-wrap">
+        <table class="data-table suppliers-table">
             <thead><tr><th>#</th><th>Company</th><th>Contact Person</th><th>Email</th><th>Phone</th><th>TIN</th><th>Status</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr></thead>
             <tbody>
             <?php foreach ($suppliers as $i=>$s): ?>
@@ -144,7 +145,10 @@ include __DIR__ . '/../includes/header.php';
                             <input type="hidden" name="supplier_id" value="<?= $s['id'] ?>">
                             <button type="submit" class="btn-icon" title="Toggle status"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
                         </form>
-                        <form method="POST" style="display:inline" onsubmit="return confirm('Delete this supplier?')">
+                        <form method="POST" class="js-delete-confirm" style="display:inline"
+                              data-delete-title="Delete supplier?"
+                              data-delete-text="<?= clean(($s['company_name'] ?: 'This supplier') . ' will be removed. Related inventory item supplier links will be cleared.') ?>"
+                              data-delete-confirm="Yes, delete supplier">
                             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="supplier_id" value="<?= $s['id'] ?>">
@@ -157,6 +161,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
         <?= renderPaginationBar($pagination, $totalSuppliers, ['edit', 'history']) ?>
         <?php else: ?>
         <div class="empty-state"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg><h3>No suppliers found</h3><p>Add your first supplier to get started.</p></div>
@@ -187,7 +192,8 @@ include __DIR__ . '/../includes/header.php';
                 <p><strong>TIN:</strong> <?= clean($selectedSupplierHistory['tin_number'] ?: '—') ?></p>
             </div>
         </div>
-        <table class="data-table">
+        <div class="table-responsive suppliers-history-wrap">
+        <table class="data-table suppliers-history-table">
             <thead>
                 <tr>
                     <th>Date</th>
@@ -211,6 +217,7 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
         <?= renderPaginationBar($historyPagination, $totalSupplierHistory, ['edit']) ?>
     </div>
 </div>

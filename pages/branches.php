@@ -130,7 +130,11 @@ $flash = getFlash();
                         <td><span class="badge <?= $b['is_headquarters'] ? 'badge-primary' : 'badge-secondary' ?>"><?= $b['is_headquarters'] ? 'HQ' : 'Branch' ?></span></td>
                         <td>
                             <a href="?action=edit&id=<?= $b['id'] ?>" class="btn btn-sm btn-secondary">Edit</a>
-                            <a href="?action=delete&id=<?= $b['id'] ?>&csrf_token=<?= csrfToken() ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this branch?')">Delete</a>
+                            <a href="?action=delete&id=<?= $b['id'] ?>&csrf_token=<?= csrfToken() ?>"
+                               class="btn btn-sm btn-danger js-delete-confirm"
+                               data-delete-title="Delete branch?"
+                               data-delete-text="<?= clean(($b['name'] ?: 'This branch') . ' will be permanently removed if no dependent records block deletion.') ?>"
+                               data-delete-confirm="Yes, delete branch">Delete</a>
                         </td>
                     </tr>
                     <?php endforeach; ?>

@@ -520,7 +520,11 @@ include __DIR__ . '/../includes/header.php';
                 <div class="css-pie" style="background: conic-gradient(<?= clean($statusPie) ?>);"></div>
                 <div class="pie-legend">
                     <?php foreach ($statusMix as $index => $row): ?>
-                    <a href="<?= BASE_URL ?>pages/reports.php?report=summary&asset_status=<?= urlencode($row['status']) ?>"><span style="background: <?= clean($statusColors[$index % count($statusColors)]) ?>"></span><?= clean($row['status']) ?> <strong><?= round(($row['total'] / $statusTotal) * 100) ?>%</strong></a>
+                    <a href="<?= BASE_URL ?>pages/reports.php?report=summary&asset_status=<?= urlencode($row['status']) ?>">
+                        <span class="pie-color-dot" style="background: <?= clean($statusColors[$index % count($statusColors)]) ?>"></span>
+                        <em><?= clean($row['status']) ?></em>
+                        <strong><?= round(($row['total'] / $statusTotal) * 100) ?>%</strong>
+                    </a>
                     <?php endforeach; ?>
                 </div>
             </div>

@@ -235,7 +235,11 @@ $flash = getFlash();
                         <?php if (!$notif['is_read']): ?>
                         <a href="?mark_read=<?= $notif['id'] ?>&csrf_token=<?= csrfToken() ?>" class="btn btn-sm btn-secondary">Mark Read</a>
                         <?php endif; ?>
-                        <a href="?delete=<?= $notif['id'] ?>&csrf_token=<?= csrfToken() ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this notification?');">Delete</a>
+                        <a href="?delete=<?= $notif['id'] ?>&csrf_token=<?= csrfToken() ?>"
+                           class="btn btn-sm btn-danger js-delete-confirm"
+                           data-delete-title="Delete notification?"
+                           data-delete-text="<?= clean('Delete notification: ' . ($notif['title'] ?: 'Untitled notification') . '?') ?>"
+                           data-delete-confirm="Yes, delete notification">Delete</a>
                     </div>
                 </div>
                 <?php endforeach; ?>
