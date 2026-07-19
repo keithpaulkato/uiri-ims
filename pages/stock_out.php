@@ -151,15 +151,21 @@ include __DIR__ . '/../includes/header.php';
                 <div class="inventory-wizard stock-in-wizard">
                     <div class="wizard-intro">
                         <div>
-                            <div class="wizard-breadcrumb">Stock / Stock Out / Issue Inventory</div>
+                            <div class="wizard-breadcrumb">
+                                <span class="breadcrumb-tag tag-navy"><i class="fa-solid fa-layer-group me-1"></i>Stock</span>
+                                <i class="fa-solid fa-chevron-right breadcrumb-sep"></i>
+                                <span class="breadcrumb-tag tag-blue"><i class="fa-solid fa-arrow-up-long me-1"></i>Stock Out</span>
+                                <i class="fa-solid fa-chevron-right breadcrumb-sep"></i>
+                                <span class="breadcrumb-tag tag-amber"><i class="fa-solid fa-dolly me-1"></i>Issue Inventory</span>
+                            </div>
                             <div class="wizard-title-row">
                                 <h3>Record Stock Out</h3>
                                 <div class="wizard-badges">
-                                    <span>Live preview</span>
-                                    <span>Stock guarded</span>
+                                    <span class="wizard-badge badge-live"><i class="fa-solid fa-bolt me-1"></i>Live preview</span>
+                                    <span class="wizard-badge badge-guarded"><i class="fa-solid fa-shield-halved me-1"></i>Stock guarded</span>
                                 </div>
                             </div>
-                            <p>Issue inventory in focused steps, then review the stock impact before saving.</p>
+                            <p class="wizard-desc">Issue inventory in focused steps, then review the stock impact cleanly before issuing.</p>
                         </div>
                     </div>
 
