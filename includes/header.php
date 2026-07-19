@@ -357,3 +357,5 @@ $notifications = $notifStmt->fetchAll();
 <?php endif; ?>
 
 <main class="page-content">
+
+ 
