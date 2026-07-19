@@ -35,6 +35,8 @@ define('PROFILE_UPLOAD_URL', BASE_URL . 'uploads/profiles/');
 define('APP_TIMEZONE', 'Africa/Kampala');
 define('APP_TIMEZONE_ABBR', 'EAT');
 define('APP_TIMEZONE_OFFSET', '+03:00');
+define('SESSION_IDLE_TIMEOUT', max(60, (int)appConfigValue('APP_SESSION_IDLE_TIMEOUT', 'APP_SESSION_IDLE_TIMEOUT', 3600)));
+define('SESSION_REGENERATE_INTERVAL', max(60, (int)appConfigValue('APP_SESSION_REGENERATE_INTERVAL', 'APP_SESSION_REGENERATE_INTERVAL', 600)));
 
 date_default_timezone_set(APP_TIMEZONE);
 
@@ -113,31 +115,144 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_httponly', 1);           // Prevent JavaScript access
     ini_set('session.cookie_secure', false);         // Set to true in production with HTTPS
     ini_set('session.cookie_samesite', 'Lax');       // CSRF protection
-    ini_set('session.gc_maxlifetime', 3600);         // 1 hour session lifetime
-    ini_set('session.cookie_lifetime', 3600);        // Session cookie lifetime
+    ini_set('session.gc_maxlifetime', (string)SESSION_IDLE_TIMEOUT);
+    ini_set('session.cookie_lifetime', (string)SESSION_IDLE_TIMEOUT);
     
     session_start();
     
     // Regenerate session ID periodically for security
     if (!isset($_SESSION['_session_created'])) {
         $_SESSION['_session_created'] = time();
-    } else if (time() - $_SESSION['_session_created'] > 600) {
-        // Regenerate session ID every 10 minutes
+    } else if (time() - $_SESSION['_session_created'] > SESSION_REGENERATE_INTERVAL) {
         session_regenerate_id(true);
         $_SESSION['_session_created'] = time();
     }
 }
 
+function sendNoStoreHeaders(): void {
+    if (headers_sent()) {
+        return;
+    }
+
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+
+function expireAppCookie(string $name, string $path = '/', string $domain = '', ?bool $secure = null, bool $httpOnly = true): void {
+    if (headers_sent()) {
+        return;
+    }
+
+    $options = [
+        'expires' => time() - 3600,
+        'path' => $path !== '' ? $path : '/',
+        'secure' => $secure ?? (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'httponly' => $httpOnly,
+        'samesite' => 'Lax',
+    ];
+
+    if ($domain !== '') {
+        $options['domain'] = $domain;
+    }
+
+    setcookie($name, '', $options);
+}
+
+function clearRememberMeToken(?int $userId = null, ?string $token = null): void {
+    try {
+        if ($userId !== null && $userId > 0) {
+            db()->prepare("UPDATE users SET remember_token = NULL WHERE id = ?")->execute([$userId]);
+        } elseif ($token !== null && $token !== '') {
+            db()->prepare("UPDATE users SET remember_token = NULL WHERE remember_token = ?")->execute([$token]);
+        }
+    } catch (Throwable $e) {
+        error_log('Unable to clear remember-me token: ' . $e->getMessage());
+    }
+
+    expireAppCookie('remember_token');
+}
+
+function endAuthenticatedSession(string $auditDetails = '', bool $restart = false, bool $writeAudit = true): void {
+    $userId = 0;
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
+    }
+
+    if ($writeAudit && $userId > 0 && $auditDetails !== '') {
+        try {
+            auditLog('LOGOUT', 'users', $userId, $auditDetails);
+        } catch (Throwable $e) {
+            error_log('Unable to audit session close: ' . $e->getMessage());
+        }
+    }
+
+    clearRememberMeToken(
+        $userId > 0 ? $userId : null,
+        $userId > 0 ? null : ($_COOKIE['remember_token'] ?? null)
+    );
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            expireAppCookie(
+                session_name(),
+                $params['path'] ?? '/',
+                $params['domain'] ?? '',
+                $params['secure'] ?? false,
+                $params['httponly'] ?? true
+            );
+        }
+        session_destroy();
+    }
+
+    expireAppCookie('csrf_token');
+
+    if ($restart && !headers_sent()) {
+        session_id('');
+        session_start();
+        session_regenerate_id(true);
+        $_SESSION['_session_created'] = time();
+    }
+}
+
+function authenticatedSessionExpired(): bool {
+    if (empty($_SESSION['user_id'])) {
+        return false;
+    }
+
+    $lastActivity = (int)($_SESSION['_last_activity'] ?? $_SESSION['_session_created'] ?? time());
+    return (time() - $lastActivity) > SESSION_IDLE_TIMEOUT;
+}
+
 // Auth helpers
 function isLoggedIn(): bool {
-    return isset($_SESSION['user_id']);
+    if (empty($_SESSION['user_id'])) {
+        return false;
+    }
+
+    if (authenticatedSessionExpired()) {
+        endAuthenticatedSession('', true, false);
+        $_SESSION['_session_expired'] = 1;
+        return false;
+    }
+
+    $_SESSION['_last_activity'] = time();
+    return true;
 }
 
 function requireLogin(): void {
     if (!isLoggedIn()) {
-        header('Location: ' . BASE_URL . 'index.php');
+        $loginUrl = BASE_URL . 'login.php';
+        if (!empty($_SESSION['_session_expired'])) {
+            unset($_SESSION['_session_expired']);
+            $loginUrl .= '?msg=session_expired';
+        }
+        header('Location: ' . $loginUrl);
         exit;
     }
+    sendNoStoreHeaders();
     enforcePasswordChangeGate();
 }
 
@@ -190,7 +305,7 @@ function csrfToken(): string {
     $token = $_SESSION['csrf_token'];
     if (empty($_COOKIE['csrf_token']) || !hash_equals($_COOKIE['csrf_token'], $token)) {
         setcookie('csrf_token', $token, [
-            'expires' => time() + 3600,
+            'expires' => time() + SESSION_IDLE_TIMEOUT,
             'path' => '/',
             'domain' => '',
             'secure' => false,

@@ -7,54 +7,27 @@ header("X-Frame-Options: SAMEORIGIN");
 header("X-XSS-Protection: 1; mode=block");
 header("Referrer-Policy: strict-origin-when-cross-origin");
 header("Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()");
+sendNoStoreHeaders();
 
-// Check for remember-me cookie
-if (!isLoggedIn() && isset($_COOKIE['remember_token'])) {
-    $token = $_COOKIE['remember_token'];
-    $stmt = db()->prepare("
-        SELECT u.*, r.name AS role, b.name AS branch_name
-        FROM users u
-        JOIN roles r ON u.role_id = r.id
-        JOIN branches b ON u.branch_id = b.id
-        WHERE u.remember_token = ? AND u.is_active = 1
-    ");
-    $stmt->execute([$token]);
-    $user = $stmt->fetch();
-
-    if ($user) {
-        session_regenerate_id(true);
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['user'] = [
-            'id'            => $user['id'],
-            'full_name'     => $user['full_name'],
-            'email'         => $user['email'],
-            'username'      => $user['username'],
-            'role'          => $user['role'],
-            'role_id'       => $user['role_id'],
-            'branch_id'     => $user['branch_id'],
-            'branch_name'   => $user['branch_name'],
-            'section_id'    => $user['section_id'],
-            'department_id' => $user['department_id'],
-            'profile_photo' => $user['profile_photo'] ?? null,
-            'must_change_password' => (int)($user['must_change_password'] ?? 0),
-        ];
-        db()->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")->execute([$user['id']]);
-        auditLog('LOGIN', 'users', $user['id'], 'Auto-login via remember token');
-        recordLoginAttempt($user['id'], true, 'Auto-login via remember token');
-        if ((int)($user['must_change_password'] ?? 0) === 1) {
-            db()->prepare("UPDATE users SET remember_token = NULL WHERE id = ?")->execute([$user['id']]);
-            setcookie('remember_token', '', time() - 3600, '/', '', false, true);
-            header('Location: ' . BASE_URL . 'pages/force_password_change.php');
-        } else {
-            header('Location: ' . BASE_URL . 'pages/dashboard.php');
-        }
-        exit;
-    }
+if (!empty($_COOKIE['remember_token'])) {
+    clearRememberMeToken(null, $_COOKIE['remember_token']);
 }
 
-if (isLoggedIn()) {
-    header('Location: ' . BASE_URL . 'pages/dashboard.php');
-    exit;
+$securityNotice = '';
+$sessionExpiredFromState = false;
+$activeSessionOnLoginPage = isLoggedIn();
+if (!$activeSessionOnLoginPage && !empty($_SESSION['_session_expired'])) {
+    unset($_SESSION['_session_expired']);
+    $sessionExpiredFromState = true;
+}
+
+if ($activeSessionOnLoginPage) {
+    endAuthenticatedSession('Session closed on login page for password re-entry', true);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Location: ' . BASE_URL . 'login.php?msg=reauth');
+        exit;
+    }
+    $securityNotice = 'For your security, please sign in again.';
 }
 
 $error = '';
@@ -71,8 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
-        $remember = isset($_POST['remember_me']);
-
         if ($username && $password) {
             $loginSql = "
                 SELECT u.*, r.name AS role, b.name AS branch_name
@@ -138,16 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     db()->prepare("UPDATE users SET last_login = NOW(), failed_login_attempts = 0, last_login_attempt = NULL WHERE id = ?")->execute([$user['id']]);
                     clearRateLimitAttempts($loginIdentifier);
 
-                    // Handle remember me
                     $mustChangePassword = (int)($user['must_change_password'] ?? 0) === 1;
-                    if ($remember && !$mustChangePassword) {
-                        $rememberToken = bin2hex(random_bytes(32));
-                        db()->prepare("UPDATE users SET remember_token = ? WHERE id = ?")->execute([$rememberToken, $user['id']]);
-                        setcookie('remember_token', $rememberToken, time() + (30 * 24 * 60 * 60), '/', '', false, true); // 30 days, httponly
-                    } elseif ($mustChangePassword) {
-                        db()->prepare("UPDATE users SET remember_token = NULL WHERE id = ?")->execute([$user['id']]);
-                        setcookie('remember_token', '', time() - 3600, '/', '', false, true);
-                    }
+                    clearRememberMeToken((int)$user['id']);
+                    $_SESSION['_last_activity'] = time();
 
                     auditLog('LOGIN', 'users', $user['id'], 'User logged in');
                     recordLoginAttempt($user['id'], true, 'User logged in');
@@ -177,6 +141,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $loggedOut = isset($_GET['msg']) && $_GET['msg'] === 'logged_out';
 $registered = isset($_GET['msg']) && $_GET['msg'] === 'registered';
+$sessionExpired = $sessionExpiredFromState || (isset($_GET['msg']) && $_GET['msg'] === 'session_expired');
+$reauthRequired = isset($_GET['msg']) && $_GET['msg'] === 'reauth';
 $flash = getFlash();
 ?>
 <!DOCTYPE html>
@@ -221,11 +187,19 @@ $flash = getFlash();
             <div class="login-form-header">
                 <h3>Login to your account</h3>
                 <p class="login-form-subtext">Enter your username or email below to login to your account.</p>
-                <p class="login-return-link"><a href="<?= BASE_URL ?>pages/landing.html">Back to landing page</a></p>
+                <p class="login-return-link"><a href="<?= BASE_URL ?>pages/landing.php">Back to landing page</a></p>
             </div>
 
             <?php if ($loggedOut): ?>
             <div class="alert alert-info">You have been logged out successfully.</div>
+            <?php endif; ?>
+
+            <?php if ($sessionExpired): ?>
+            <div class="alert alert-info">Your session expired due to inactivity. Please sign in again.</div>
+            <?php endif; ?>
+
+            <?php if ($reauthRequired || $securityNotice): ?>
+            <div class="alert alert-info"><?= clean($securityNotice ?: 'Please sign in again to continue.') ?></div>
             <?php endif; ?>
 
             <?php if ($registered): ?>
@@ -266,13 +240,6 @@ $flash = getFlash();
                             <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
                     </div>
-                </div>
-
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" name="remember_me" value="1">
-                        Remember me
-                    </label>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block login-submit-btn">
