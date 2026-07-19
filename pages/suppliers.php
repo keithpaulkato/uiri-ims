@@ -54,6 +54,18 @@ $pagination = getPagination($totalSuppliers, 10);
 $suppliers = $pdo->prepare("SELECT * FROM suppliers $whereSQL ORDER BY company_name LIMIT {$pagination['per_page']} OFFSET {$pagination['offset']}");
 $suppliers->execute($params); $suppliers = $suppliers->fetchAll();
 
+$printStmt = $pdo->prepare("SELECT * FROM suppliers $whereSQL ORDER BY company_name");
+$printStmt->execute($params);
+$printSuppliers = $printStmt->fetchAll();
+$printActiveCount = count(array_filter($printSuppliers, static fn($supplier) => (int)$supplier['is_active'] === 1));
+$printInactiveCount = count($printSuppliers) - $printActiveCount;
+$supplierPrintFilters = [
+    'Search' => $search !== '' ? $search : 'Not applied',
+    'Total suppliers' => number_format(count($printSuppliers)),
+    'Active' => number_format($printActiveCount),
+    'Inactive' => number_format($printInactiveCount),
+];
+
 $selectedSupplierHistory = null;
 $supplierStats = null;
 if (isset($_GET['history'])) {
@@ -107,9 +119,15 @@ include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <div><h1 class="page-title">Suppliers</h1><p class="page-sub"><?= number_format($totalSuppliers) ?> supplier(s)</p></div>
-    <?php if ($canManage): ?>
-    <div class="page-actions"><button class="btn btn-primary" onclick="openModal('supplierModal')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Supplier</button></div>
-    <?php endif; ?>
+    <div class="page-actions">
+        <button type="button" class="btn btn-outline" onclick="printSuppliersReport()">
+            <svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print Suppliers
+        </button>
+        <?php if ($canManage): ?>
+        <button class="btn btn-primary" onclick="openModal('supplierModal')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Supplier</button>
+        <?php endif; ?>
+    </div>
 </div>
 <div class="card filter-bar">
     <form method="GET" class="filter-form">
@@ -118,6 +136,56 @@ include __DIR__ . '/../includes/header.php';
         <a href="suppliers.php" class="btn btn-outline">Reset</a>
     </form>
 </div>
+
+<section class="suppliers-print-area" id="suppliersPrintArea" aria-hidden="true">
+    <div class="suppliers-print-header">
+        <div class="suppliers-print-logo"><img src="<?= BASE_URL ?>assets/img/uiri-logo.webp" alt="UIRI"></div>
+        <div>
+            <span>Uganda Industrial Research Institute</span>
+            <h1>Supplier Register</h1>
+            <p>Printed: <?= date('d M Y, h:i A') ?> by <?= clean($user['full_name'] ?? 'Current user') ?><?= !empty($user['role']) ? ' (' . clean($user['role']) . ')' : '' ?></p>
+        </div>
+    </div>
+    <div class="suppliers-print-meta">
+        <?php foreach ($supplierPrintFilters as $label => $value): ?>
+        <div><strong><?= clean($label) ?></strong><span><?= clean($value) ?></span></div>
+        <?php endforeach; ?>
+    </div>
+    <table class="suppliers-print-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Company</th>
+                <th>Contact Person</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>TIN</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php if ($printSuppliers): ?>
+            <?php foreach ($printSuppliers as $i => $supplier): ?>
+            <tr>
+                <td><?= $i + 1 ?></td>
+                <td><strong><?= clean($supplier['company_name']) ?></strong></td>
+                <td><?= clean($supplier['contact_person'] ?: 'â€”') ?></td>
+                <td><?= clean($supplier['email'] ?: 'â€”') ?></td>
+                <td><?= clean($supplier['phone'] ?: 'â€”') ?></td>
+                <td><?= clean($supplier['tin_number'] ?: 'â€”') ?></td>
+                <td><?= (int)$supplier['is_active'] === 1 ? 'Active' : 'Inactive' ?></td>
+            </tr>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <tr><td colspan="7" class="suppliers-print-empty">No suppliers found for this print scope.</td></tr>
+        <?php endif; ?>
+        </tbody>
+    </table>
+    <div class="suppliers-print-footer">
+        <span>Generated from UIRI IMS supplier management.</span>
+        <span><?= clean($user['branch_name'] ?? 'UIRI') ?></span>
+    </div>
+</section>
 <div class="card">
     <div class="card-body p0">
         <?php if ($suppliers): ?>
@@ -249,4 +317,24 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+<script>
+function printSuppliersReport() {
+    const printArea = document.getElementById('suppliersPrintArea');
+    if (!printArea) {
+        window.print();
+        return;
+    }
+
+    const cleanup = () => {
+        document.body.classList.remove('supplier-printing');
+        printArea.setAttribute('aria-hidden', 'true');
+        window.removeEventListener('afterprint', cleanup);
+    };
+
+    printArea.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('supplier-printing');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.setTimeout(() => window.print(), 80);
+}
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
