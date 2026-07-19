@@ -692,7 +692,7 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= date('d M', strtotime($tx['activity_at'] ?? $tx['transaction_date'])) ?></td>
                         <td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td>
                         <td><span class="badge <?= $activityBadge ?>"><?= clean($activityLabel . $activityQty) ?></span></td>
-                        <td><?= clean(formatShortName($tx['user_name'])) ?></td>
+                        <td><?= clean(formatFirstName($tx['user_name'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

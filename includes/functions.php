@@ -1248,3 +1248,11 @@ function formatShortName(?string $fullName): string {
     }
     return $fullName;
 }
+
+function formatFirstName(?string $fullName): string {
+    $fullName = trim((string)$fullName);
+    if ($fullName === '') return '';
+
+    $parts = preg_split('/\s+/', $fullName);
+    return $parts[0] ?? $fullName;
+}
