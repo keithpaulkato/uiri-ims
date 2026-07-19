@@ -278,20 +278,65 @@ function initializeDeleteConfirmations() {
     const confirmElements = document.querySelectorAll('.js-delete-confirm');
     if (!confirmElements.length) return;
 
+    const modal = document.getElementById('deleteConfirmModal');
+    const titleEl = document.getElementById('deleteConfirmTitle');
+    const textEl = document.getElementById('deleteConfirmText');
+    const kickerEl = document.getElementById('deleteConfirmKicker');
+    const warningEl = document.getElementById('deleteConfirmWarning');
+    const cancelBtn = document.getElementById('cancelDeleteConfirm');
+    const confirmBtn = document.getElementById('confirmDeleteAction');
+    let pendingDeleteAction = null;
+    let lastTrigger = null;
+    let idleLabel = 'Yes, delete';
+
     const buildMessage = (element) => {
         const title = element.dataset.deleteTitle || 'Confirm deletion';
         const text = element.dataset.deleteText || 'This record will be deleted. Do you want to continue?';
         const confirmText = element.dataset.deleteConfirm || 'Yes, delete';
-        return { title, text, confirmText };
+        const warning = element.dataset.deleteWarning || 'This action may affect related records and cannot be undone.';
+        const kicker = element.dataset.deleteKicker || 'Deletion confirmation';
+        return { title, text, confirmText, warning, kicker };
+    };
+
+    const setConfirmLoading = (isLoading) => {
+        if (!confirmBtn) return;
+        confirmBtn.disabled = isLoading;
+        confirmBtn.textContent = isLoading ? 'Deleting...' : idleLabel;
+    };
+
+    const resetDeleteModal = () => {
+        pendingDeleteAction = null;
+        setConfirmLoading(false);
+        if (lastTrigger && typeof lastTrigger.focus === 'function') {
+            lastTrigger.focus();
+        }
+        lastTrigger = null;
+    };
+
+    const closeDeleteModal = () => {
+        closeModal('deleteConfirmModal');
+        resetDeleteModal();
     };
 
     const askToDelete = (element, proceed) => {
         const message = buildMessage(element);
 
-        if (!window.Swal) {
-            if (window.confirm(message.title + '\n\n' + message.text)) proceed();
+        if (modal && titleEl && textEl && warningEl && cancelBtn && confirmBtn) {
+            idleLabel = message.confirmText;
+            pendingDeleteAction = proceed;
+            lastTrigger = element;
+            titleEl.textContent = message.title;
+            textEl.textContent = message.text;
+            warningEl.textContent = message.warning;
+            warningEl.hidden = !message.warning;
+            if (kickerEl) kickerEl.textContent = message.kicker;
+            setConfirmLoading(false);
+            openModal('deleteConfirmModal');
+            cancelBtn.focus();
             return;
         }
+
+        if (!window.Swal) return;
 
         window.Swal.fire({
             title: message.title,
@@ -312,6 +357,32 @@ function initializeDeleteConfirmations() {
             if (result.isConfirmed) proceed();
         });
     };
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeDeleteModal);
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function () {
+            if (!pendingDeleteAction) return;
+            const action = pendingDeleteAction;
+            pendingDeleteAction = null;
+            setConfirmLoading(true);
+            action();
+        });
+    }
+
+    if (modal) {
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) resetDeleteModal();
+        });
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal && modal.style.display === 'flex') {
+            resetDeleteModal();
+        }
+    });
 
     confirmElements.forEach(element => {
         if (element.tagName === 'FORM') {

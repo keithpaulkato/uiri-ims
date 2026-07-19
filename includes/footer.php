@@ -2,6 +2,29 @@
 </div><!-- .main-wrapper -->
 
 <?php if (isLoggedIn()): ?>
+<div class="modal-overlay" id="deleteConfirmModal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
+    <div class="modal delete-user-modal">
+        <div class="delete-user-topline"></div>
+        <div class="delete-user-body">
+            <div class="delete-user-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </div>
+            <div class="delete-user-copy">
+                <span class="delete-user-kicker" id="deleteConfirmKicker">Deletion confirmation</span>
+                <h3 id="deleteConfirmTitle">Confirm deletion</h3>
+                <p id="deleteConfirmText">This record will be deleted. Do you want to continue?</p>
+            </div>
+        </div>
+        <div class="delete-user-warning" id="deleteConfirmWarning">
+            This action may affect related records and cannot be undone.
+        </div>
+        <div class="delete-user-actions">
+            <button type="button" class="btn btn-outline delete-user-cancel" id="cancelDeleteConfirm">No, keep record</button>
+            <button type="button" class="btn btn-danger delete-user-confirm" id="confirmDeleteAction">Yes, delete</button>
+        </div>
+    </div>
+</div>
+
 <script>
 window.UIRI_SESSION = {
     idleTimeoutMs: <?= (int)SESSION_IDLE_TIMEOUT * 1000 ?>,

@@ -430,14 +430,14 @@ body.is-fullscreen .fab-toggle { box-shadow: 0 22px 44px rgba(10,22,40,.24); }
 
 /* TABLES */
 .data-table { width: 100%; border-collapse: collapse; background: var(--white); font-size: .875rem; }
-.data-table th { padding: 14px 16px; text-align: left; font-size: .75rem; font-weight: 650; text-transform: uppercase; letter-spacing: .8px; color: var(--sub); background: var(--surface); border-bottom: 2px solid var(--gold); white-space: nowrap; }
+.data-table th { padding: 14px 16px; text-align: left; font-size: .75rem; font-weight: 650; text-transform: uppercase; letter-spacing: .8px; color: #12314f; background: linear-gradient(180deg, #d8edf8 0%, #c9e2f2 100%); border-bottom: 2px solid var(--gold); white-space: nowrap; }
 .data-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); background: var(--white); }
 .data-table tbody tr:last-child td { border-bottom: none; }
 .data-table tbody tr:hover td { background: var(--surface); transition: background .2s ease; }
 .data-table tbody tr:focus-within td, .data-table tbody tr.selected td { background: var(--surface-2); border-left: 2px solid var(--sky); }
 .data-table tfoot td { padding: 14px 16px; background: var(--surface); border-top: 2px solid var(--border); font-weight: 700; color: var(--text); }
 .table { width: 100%; border-collapse: collapse; background: var(--white); }
-.table th { padding: 14px 16px; text-align: left; font-size: .75rem; font-weight: 650; text-transform: uppercase; letter-spacing: .8px; color: var(--sub); background: var(--surface); border-bottom: 2px solid var(--gold); white-space: nowrap; }
+.table th { padding: 14px 16px; text-align: left; font-size: .75rem; font-weight: 650; text-transform: uppercase; letter-spacing: .8px; color: #12314f; background: linear-gradient(180deg, #d8edf8 0%, #c9e2f2 100%); border-bottom: 2px solid var(--gold); white-space: nowrap; }
 .table td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); background: var(--white); }
 .table tbody tr:last-child td { border-bottom: none; }
 .table-responsive { width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; }
