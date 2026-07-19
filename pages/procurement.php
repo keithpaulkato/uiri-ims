@@ -65,7 +65,7 @@ $purchaseOrders = $pdo->query("SELECT po.*, pr.request_code, s.company_name AS s
 $totalGrns = (int)$pdo->query("SELECT COUNT(*) FROM goods_received_notes")->fetchColumn();
 $grnPagination = getPagination($totalGrns, 10, 'grn_page');
 $grns = $pdo->query("SELECT grn.*, po.po_code FROM goods_received_notes grn JOIN purchase_orders po ON grn.purchase_order_id = po.id ORDER BY grn.received_date DESC LIMIT {$grnPagination['per_page']} OFFSET {$grnPagination['offset']}")->fetchAll();
-$suppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active = 1 ORDER BY company_name")->fetchAll();
+$suppliers = getSupplierOptions(true);
 
 include __DIR__ . '/../includes/header.php';
 ?>

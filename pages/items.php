@@ -373,14 +373,7 @@ if (!$hasSelectedId($departments, $deptFilter)) {
     $deptFilter = 0;
 }
 
-$suppliers = $fetchItemOptionRows("
-    SELECT s.id, s.company_name, COUNT(i.id) AS item_count
-    FROM inventory_items i
-    JOIN suppliers s ON s.id = i.supplier_id
-    {WHERE}
-    GROUP BY s.id, s.company_name
-    ORDER BY s.company_name
-", ['branch', 'section', 'department', 'category', 'purchase_date']);
+$suppliers = getSupplierOptions(false);
 if (!$hasSelectedId($suppliers, $supplierFilter)) {
     $supplierFilter = 0;
 }
@@ -455,7 +448,7 @@ if (!$isAdmin) {
 $allCategories = $pdo->query("SELECT MIN(id) AS id, name, 0 AS branch_id FROM categories GROUP BY name ORDER BY name")->fetchAll();
 $allSections = $pdo->query("SELECT id, name, branch_id FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
 $allDepartments = $pdo->query("SELECT d.id, d.name, d.section_id, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
-$allSuppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
+$allSuppliers = getSupplierOptions(false);
 $filterOptionLabels = [
     'categories' => array_map(static fn($row) => [
         'id' => $row['name'],
@@ -524,14 +517,33 @@ $inventoryActivityAuditIdSql = "(SELECT MAX(al.id) FROM audit_log al WHERE al.ta
 $inventoryActivityAtSql = "GREATEST($inventorySafeRecordTimestampSql, COALESCE($inventoryActivityAuditAtSql, $inventorySafeRecordTimestampSql))";
 $inventoryItemSelect = "SELECT i.*, c.name AS category_name, s.company_name AS supplier_name, b.name AS branch_name, sec.name AS section_name, d.name AS department_name, recorder.full_name AS recorded_by_name, recorder_role.name AS recorded_by_role, $inventoryActivityAtSql AS activity_at, COALESCE($inventoryActivityAuditIdSql, 0) AS activity_log_id FROM inventory_items i JOIN categories c ON i.category_id=c.id LEFT JOIN suppliers s ON i.supplier_id=s.id JOIN branches b ON i.branch_id=b.id LEFT JOIN sections sec ON i.section_id=sec.id LEFT JOIN departments d ON i.department_id=d.id LEFT JOIN users recorder ON recorder.id=i.created_by LEFT JOIN roles recorder_role ON recorder_role.id=recorder.role_id";
 $inventoryItemOrder = "activity_at DESC, activity_log_id DESC, i.id DESC";
-$feedbackOrderSql = $feedbackItemId ? "CASE WHEN i.id = ? THEN 0 ELSE 1 END, " : "";
-$itemParams = $params;
-if ($feedbackItemId) {
-    $itemParams[] = $feedbackItemId;
+
+// When a feedback item exists (just added/updated), fetch it separately so it
+// always appears at the top of the list even when current filters would exclude it.
+$feedbackItem = null;
+if ($feedbackItemId && $page === 1) {
+    $fbStmt = $pdo->prepare("$inventoryItemSelect WHERE i.id = ? AND i.is_active = 1");
+    $fbStmt->execute([$feedbackItemId]);
+    $feedbackItem = $fbStmt->fetch();
 }
-$stmt = $pdo->prepare("$inventoryItemSelect WHERE $whereSQL ORDER BY {$feedbackOrderSql}{$inventoryItemOrder} LIMIT $itemsPerPage OFFSET $offset");
-$stmt->execute($itemParams);
+
+$stmt = $pdo->prepare("$inventoryItemSelect WHERE $whereSQL ORDER BY $inventoryItemOrder LIMIT $itemsPerPage OFFSET $offset");
+$stmt->execute($params);
 $items = $stmt->fetchAll();
+
+// Prepend the feedback item if it wasn't already returned by the filtered query.
+if ($feedbackItem) {
+    $feedbackAlreadyPresent = false;
+    foreach ($items as $row) {
+        if ((int)$row['id'] === (int)$feedbackItem['id']) {
+            $feedbackAlreadyPresent = true;
+            break;
+        }
+    }
+    if (!$feedbackAlreadyPresent) {
+        array_unshift($items, $feedbackItem);
+    }
+}
 
 $printStmt = $pdo->prepare("$inventoryItemSelect WHERE $whereSQL ORDER BY $inventoryItemOrder");
 $printStmt->execute($params);
@@ -544,7 +556,7 @@ $pageUrl = function (int $targetPage) use ($paginationParams): string {
     return 'items.php' . ($query ? '?' . $query : '');
 };
 
-$formSuppliers  = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
+$formSuppliers  = getSupplierOptions(true);
 if ($isAdmin) {
     $categories = $pdo->query("SELECT * FROM categories ORDER BY branch_id, name")->fetchAll();
 } else {
@@ -1485,6 +1497,7 @@ function initSmartItemFilters() {
         supplier: itemFilterLabels.suppliers,
         status: itemFilterLabels.stock_statuses,
     };
+    const masterOptionKeys = new Set(['supplier']);
     const defaultLabels = {
         category: 'All Categories',
         section: 'All Departments',
@@ -1530,7 +1543,9 @@ function initSmartItemFilters() {
             return;
         }
         const selected = select.value;
-        const values = Array.from(uniqueValues(key)).sort((a, b) => labelFor(key, a).localeCompare(labelFor(key, b)));
+        const values = masterOptionKeys.has(key)
+            ? (optionSources[key] || []).map((item) => String(item.id))
+            : Array.from(uniqueValues(key)).sort((a, b) => labelFor(key, a).localeCompare(labelFor(key, b)));
         select.innerHTML = '';
         select.add(new Option(defaultLabels[key], ''));
         values.forEach((value) => select.add(new Option(labelFor(key, value), value)));

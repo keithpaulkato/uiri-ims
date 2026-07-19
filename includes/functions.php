@@ -228,6 +228,28 @@ function canDeleteSupplier(int $supplierId): bool {
 }
 
 /**
+ * Supplier options used by forms and cross-module filters.
+ */
+function getSupplierOptions(bool $activeOnly = false, ?int $selectedSupplierId = null): array {
+    $pdo = db();
+    $where = '';
+    $params = [];
+
+    if ($activeOnly) {
+        if ($selectedSupplierId && $selectedSupplierId > 0) {
+            $where = 'WHERE (is_active = 1 OR id = ?)';
+            $params[] = $selectedSupplierId;
+        } else {
+            $where = 'WHERE is_active = 1';
+        }
+    }
+
+    $stmt = $pdo->prepare("SELECT * FROM suppliers $where ORDER BY company_name");
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
  * Log stock transaction
  */
 function logStockTransaction(int $itemId, int $branchId, int $userId, string $type, int $quantity, float $unitPrice = 0, string $reference = '', string $remarks = ''): int {

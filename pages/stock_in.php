@@ -237,7 +237,7 @@ foreach ($items as &$stockInItem) {
 }
 unset($stockInItem);
 $branches = $pdo->query("SELECT * FROM branches ORDER BY is_headquarters DESC")->fetchAll();
-$suppliers = $pdo->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
+$suppliers = getSupplierOptions(true);
 $tWhere = $isAdmin ? ($branchFilter ? "AND t.branch_id=$branchFilter" : '') : "AND t.branch_id=$branchId";
 $recent = $pdo->query("SELECT t.*, i.name AS item_name, i.item_code, i.brand_model, i.description, i.unit, i.asset_type, i.supplier_id, c.name AS category_name, b.name AS branch_name, u.full_name AS received_by, s.company_name AS supplier_name FROM stock_transactions t JOIN inventory_items i ON t.item_id=i.id JOIN categories c ON c.id=i.category_id JOIN branches b ON t.branch_id=b.id JOIN users u ON t.user_id=u.id LEFT JOIN suppliers s ON i.supplier_id=s.id WHERE t.transaction_type='stock_in' $tWhere ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 24")->fetchAll();
 foreach ($recent as &$recentStockIn) {

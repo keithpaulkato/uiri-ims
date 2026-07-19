@@ -159,14 +159,7 @@ if (!$hasSelectedId($departments, $departmentFilter)) {
     $departmentFilter = 0;
 }
 
-$suppliers = $fetchOptionRows("
-    SELECT s.id, s.company_name, COUNT(i.id) AS item_count
-    FROM inventory_items i
-    JOIN suppliers s ON s.id = i.supplier_id
-    {WHERE}
-    GROUP BY s.id, s.company_name
-    ORDER BY s.company_name
-", ['branch', 'section', 'department', 'category']);
+$suppliers = getSupplierOptions(false);
 if (!$hasSelectedId($suppliers, $supplierFilter)) {
     $supplierFilter = 0;
 }
@@ -260,7 +253,7 @@ if (!$isAdmin) {
 $allCategories = $pdo->query("SELECT MIN(id) AS id, name, 0 AS branch_id FROM categories GROUP BY name ORDER BY name")->fetchAll();
 $allSections = $pdo->query("SELECT id, name, branch_id FROM sections WHERE is_active=1 ORDER BY name")->fetchAll();
 $allDepartments = $pdo->query("SELECT d.id, d.name, d.section_id, s.name AS section_name FROM departments d JOIN sections s ON d.section_id=s.id WHERE d.is_active=1 ORDER BY s.name, d.name")->fetchAll();
-$allSuppliers = $pdo->query("SELECT id, company_name FROM suppliers WHERE is_active=1 ORDER BY company_name")->fetchAll();
+$allSuppliers = getSupplierOptions(false);
 
 $filterOptionLabels = [
     'categories' => array_map(static fn($row) => [
@@ -705,14 +698,14 @@ include __DIR__ . '/../includes/header.php';
 const reportFilterRows = <?= json_encode(array_map(static fn($row) => [
     'branch' => (int)$row['branch_id'],
     'category' => (string)$row['category_name'],
-    'section' => (int)$row['section_id'],
-    'department' => (int)$row['department_id'],
-    'supplier' => (int)$row['supplier_id'],
+    'section' => $row['section_id'] !== null && $row['section_id'] !== '' ? (int)$row['section_id'] : null,
+    'department' => $row['department_id'] !== null && $row['department_id'] !== '' ? (int)$row['department_id'] : null,
+    'supplier' => $row['supplier_id'] !== null && $row['supplier_id'] !== '' && (int)$row['supplier_id'] !== 0 ? (int)$row['supplier_id'] : null,
     'status' => (string)$row['stock_status'],
-    'asset_status' => (string)$row['asset_status'],
-    'asset_type' => (string)$row['asset_type'],
-    'condition' => (string)$row['asset_condition'],
-    'purchase_date' => (string)$row['purchase_date'],
+    'asset_status' => (string)($row['asset_status'] ?? ''),
+    'asset_type' => (string)($row['asset_type'] ?? ''),
+    'condition' => (string)($row['asset_condition'] ?? ''),
+    'purchase_date' => (string)($row['purchase_date'] ?? ''),
 ], $filterRows), JSON_UNESCAPED_SLASHES) ?>;
 const reportFilterLabels = <?= json_encode($filterOptionLabels, JSON_UNESCAPED_SLASHES) ?>;
 const reportFilterFixedBranch = <?= $isAdmin ? 'null' : (int)$branchId ?>;
@@ -792,7 +785,7 @@ function initSmartReportFilters() {
         asset_type: reportFilterLabels.asset_types,
         condition: reportFilterLabels.conditions,
     };
-    const fixedOptionKeys = new Set(['status', 'asset_status', 'asset_type', 'condition']);
+    const fixedOptionKeys = new Set(['supplier', 'status', 'asset_status', 'asset_type', 'condition']);
     const defaultLabels = {
         category: 'All Categories',
         section: 'All Departments',

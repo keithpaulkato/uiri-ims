@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$company) { setFlash('error','Company name is required.'); }
         else {
             if ($action==='add') {
-                $pdo->prepare("INSERT INTO suppliers (company_name,contact_person,email,phone,address,tin_number) VALUES (?,?,?,?,?,?)")->execute([$company,$contact,$email,$phone,$address,$tin]);
+                $pdo->prepare("INSERT INTO suppliers (company_name,contact_person,email,phone,address,tin_number,is_active) VALUES (?,?,?,?,?,?,1)")->execute([$company,$contact,$email,$phone,$address,$tin]);
                 auditLog('ADD_SUPPLIER','suppliers',$pdo->lastInsertId(),"Added supplier: $company");
                 setFlash('success',"Supplier '$company' added.");
             } else {
