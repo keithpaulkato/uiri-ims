@@ -946,10 +946,13 @@ select.form-control { cursor: pointer; color: var(--corp-blue); }
 .activity-filter-summary { margin-top: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid #c7d2df; background: linear-gradient(180deg, #f6fbff 0%, #eef6fc 100%); }
 .activity-filter-summary div { min-height: 64px; padding: 11px 12px; border-right: 1px solid rgba(148,163,184,.28); display: flex; flex-direction: column; justify-content: center; }
 .activity-filter-summary div:last-child { border-right: none; }
-.activity-filter-summary span { display: block; color: #607086; font-size: .66rem; font-weight: 850; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
+.activity-filter-summary > div > span { display: block; color: #607086; font-size: .66rem; font-weight: 850; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
 .activity-filter-summary strong { display: block; color: #12314f; font-size: .8rem; line-height: 1.25; font-weight: 850; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.activity-filter-summary strong .flow-in { color: #16a34a; font-weight: 850; }
-.activity-filter-summary strong .flow-out { color: #dc2626; font-weight: 850; }
+.activity-filter-summary .stock-flow-value { display: inline-flex; align-items: center; gap: 6px; overflow: visible; text-overflow: clip; }
+.activity-filter-summary .stock-flow-value span { display: inline; margin: 0; font-size: .82rem; letter-spacing: 0; text-transform: none; }
+.activity-filter-summary .stock-flow-value .flow-in { color: #16a34a; font-weight: 850; }
+.activity-filter-summary .stock-flow-value .flow-divider { color: #7c8ca1; font-weight: 850; }
+.activity-filter-summary .stock-flow-value .flow-out { color: #dc2626; font-weight: 850; }
 .ops-volume-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr); gap: 16px; margin-bottom: 16px; align-items: stretch; }
 .orders-panel, .volume-panel { border-radius: 8px; overflow: hidden; background: #fff; opacity: 1; visibility: visible; animation: none; transform: none; height: 100%; display: flex; flex-direction: column; }
 .ops-volume-grid .card:hover { transform: none; }
@@ -2013,4 +2016,3 @@ body.login-body::before,
 }
 
 /* End of stylesheet overrides */
-

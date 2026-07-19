@@ -700,7 +700,11 @@ include __DIR__ . '/../includes/header.php';
             <div class="activity-filter-summary">
                 <div>
                     <span>Stock Flow</span>
-                    <strong><span class="flow-in">+<?= $recentStockInCount ?></span> / <span class="flow-out">-<?= $recentStockOutCount ?></span></strong>
+                    <strong class="stock-flow-value">
+                        <span class="flow-in">+<?= $recentStockInCount ?></span>
+                        <span class="flow-divider">/</span>
+                        <span class="flow-out">-<?= $recentStockOutCount ?></span>
+                    </strong>
                 </div>
                 <div>
                     <span>Units Shifted</span>
