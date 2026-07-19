@@ -650,7 +650,7 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= clean($item['category_name']) ?></td>
                         <td><?= clean($item['branch_name']) ?></td>
                         <?php $displayUnit = inventoryDisplayUnitForRow($item); ?>
-                        <td><span class="badge <?= (int)$item['current_stock'] === 0 ? 'badge-danger' : 'badge-warn' ?>"><?= number_format($item['current_stock']) ?> <?= clean($displayUnit) ?> / <?= number_format($item['minimum_stock']) ?> <?= clean($displayUnit) ?></span></td>
+                        <td><span class="badge <?= (int)$item['current_stock'] === 0 ? 'badge-danger' : 'badge-warn' ?>"><?= number_format($item['current_stock']) ?> / <?= number_format($item['minimum_stock']) ?> <?= clean($displayUnit) ?></span></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -659,9 +659,9 @@ include __DIR__ . '/../includes/header.php';
             <div class="empty-state"><p>No immediate stock risks.</p></div>
             <?php endif; ?>
         </div>
-    </div>
+     </div>
 
-    <div class="card enterprise-list-card recent-activity-card">
+     <div class="card enterprise-list-card recent-activity-card">
         <div class="card-header">
             <h3>Recent Inventory Activity</h3>
             <a class="card-link" href="<?= BASE_URL ?>pages/audit.php">Audit Trail</a>
@@ -692,30 +692,22 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= date('d M', strtotime($tx['activity_at'] ?? $tx['transaction_date'])) ?></td>
                         <td><span class="item-name"><?= clean($tx['item_name']) ?></span><span class="item-code"><?= clean($tx['item_code']) ?></span></td>
                         <td><span class="badge <?= $activityBadge ?>"><?= clean($activityLabel . $activityQty) ?></span></td>
-                        <td><?= clean($tx['user_name']) ?></td>
+                        <td><?= clean(formatShortName($tx['user_name'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
             <div class="activity-filter-summary">
                 <div>
-                    <span>Current View</span>
-                    <strong><?= clean($scopeText) ?></strong>
+                    <span>Stock Flow</span>
+                    <strong><span class="flow-in">+<?= $recentStockInCount ?></span> / <span class="flow-out">-<?= $recentStockOutCount ?></span></strong>
                 </div>
                 <div>
-                    <span>Activities</span>
-                    <strong><?= number_format(count($recentTx)) ?></strong>
+                    <span>Units Shifted</span>
+                    <strong><?= number_format($recentActivityQty) ?> units</strong>
                 </div>
                 <div>
-                    <span>Movement Mix</span>
-                    <strong><?= number_format($recentStockInCount) ?> in / <?= number_format($recentStockOutCount) ?> out / <?= number_format($recentItemChangeCount) ?> changes</strong>
-                </div>
-                <div>
-                    <span>Units Moved</span>
-                    <strong><?= number_format($recentActivityQty) ?></strong>
-                </div>
-                <div>
-                    <span>Latest Entry</span>
+                    <span>Last Update</span>
                     <strong><?= clean($recentActivityDate) ?></strong>
                 </div>
             </div>

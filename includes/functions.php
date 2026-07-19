@@ -1236,3 +1236,15 @@ function renderPaginationBar(array $pagination, int $totalItems, array $excludeP
     <?php
     return ob_get_clean();
 }
+
+/**
+ * Format a full name to a shorter version (e.g. "Keith Paul Kato" -> "Keith K.")
+ */
+function formatShortName(?string $fullName): string {
+    if (!$fullName) return '';
+    $parts = explode(' ', trim($fullName));
+    if (count($parts) > 1) {
+        return $parts[0] . ' ' . substr($parts[count($parts) - 1], 0, 1) . '.';
+    }
+    return $fullName;
+}
