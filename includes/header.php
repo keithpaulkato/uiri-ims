@@ -1,6 +1,6 @@
-heyeyh
 <?php
 requireLogin();
+
 
 // Set security headers
 header("X-Content-Type-Options: nosniff");
@@ -234,4 +234,127 @@ $notifications = $notifStmt->fetchAll();
                         </a>
                     </li>
                     <?php endif; ?>
-    
+                </ul>
+            </li>
+
+            <li class="nav-section">Reports</li>
+            <li class="nav-dropdown <?= $reportsOpen ? 'open' : '' ?>">
+                <button type="button" class="nav-dropdown-toggle" onclick="this.closest('.nav-dropdown').classList.toggle('open')" aria-expanded="<?= $reportsOpen ? 'true' : 'false' ?>">
+                    <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-7"/><circle cx="7" cy="15" r="1"/><circle cx="10" cy="12" r="1"/><circle cx="13" cy="14" r="1"/><circle cx="18" cy="7" r="1"/></svg></span>
+                    <span>Reports</span>
+                    <svg viewBox="0 0 24 24" class="dropdown-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <ul class="nav-submenu">
+                    <li class="<?= $sidebarActivePage === 'analytics' ? 'active' : '' ?>">
+                        <a href="<?= BASE_URL ?>pages/analytics.php">
+                            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-7"/><circle cx="7" cy="15" r="1"/><circle cx="10" cy="12" r="1"/><circle cx="13" cy="14" r="1"/><circle cx="18" cy="7" r="1"/></svg></span>
+                            Analytics
+                        </a>
+                    </li>
+                    <li class="<?= $sidebarActivePage === 'reports' ? 'active' : '' ?>">
+                        <a href="<?= BASE_URL ?>pages/reports.php">
+                            <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                            Reports
+                        </a>
+                    </li>
+                    <?php if (hasRole('Administrator')): ?>
+                    <li class="<?= $sidebarActivePage === 'audit' ? 'active' : '' ?>">
+                        <a href="<?= BASE_URL ?>pages/audit.php">
+                            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+                            Audit Trail
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                </ul>
+            </li>
+        </ul>
+    </nav>
+</aside>
+
+<!-- TOP NAV -->
+<div class="main-wrapper">
+<header class="topnav">
+    <button class="menu-toggle" id="menuToggle" type="button" onclick="toggleSidebar()" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">
+        <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+
+    <div class="topnav-branch">
+        <span class="branch-indicator <?= $currentBranch['is_headquarters'] ? 'hq' : 'branch' ?>">
+            <?= clean($currentBranch['name']) ?>
+        </span>
+    </div>
+
+    <div class="topnav-right">
+        <div class="notification-menu">
+            <button class="icon-btn" id="notifBtn" type="button" aria-label="Notifications">
+                <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                <?php if ($notifCount > 0): ?>
+                <span class="notif-badge"><?= $notifCount ?></span>
+                <?php endif; ?>
+            </button>
+            <div class="notification-dropdown" id="notifDropdown">
+                <div class="dropdown-header">Notifications</div>
+                <?php if ($notifications): ?>
+                    <?php foreach ($notifications as $n): ?>
+                    <a href="<?= BASE_URL ?>pages/requests.php" class="notification-item <?= $n['is_read'] ? '' : 'unread' ?>">
+                        <div>
+                            <strong><?= clean($n['title']) ?></strong>
+                            <p><?= clean($n['message']) ?></p>
+                        </div>
+                        <span><?= date('d M', strtotime($n['created_at'])) ?></span>
+                    </a>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="notification-empty">No notifications yet.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="user-menu" id="userMenu">
+            <button class="user-btn" onclick="document.getElementById('userDropdown').classList.toggle('show')">
+                <div class="user-avatar<?= profilePhotoUrl($user) ? ' has-photo' : '' ?>">
+                    <?php if (profilePhotoUrl($user)): ?>
+                        <img src="<?= clean(profilePhotoUrl($user)) ?>" alt="<?= clean($user['full_name']) ?> avatar">
+                    <?php else: ?>
+                        <?= strtoupper(substr($user['full_name'], 0, 1)) ?>
+                    <?php endif; ?>
+                </div>
+                <div class="user-info">
+                    <span class="user-name"><?= clean(explode(' ', $user['full_name'])[0]) ?></span>
+                    <span class="user-role"><?= clean($user['role']) ?></span>
+                </div>
+                <svg viewBox="0 0 24 24" class="chevron"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="user-dropdown" id="userDropdown">
+                <a href="<?= BASE_URL ?>pages/profile.php">
+                    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    My Profile
+                </a>
+                <hr>
+                <a href="<?= BASE_URL ?>includes/logout.php" class="logout">
+                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Logout
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- FLASH MESSAGE -->
+<?php if ($flash): ?>
+<div class="flash flash-<?= $flash['type'] ?>" id="flashMsg">
+    <svg viewBox="0 0 24 24">
+        <?php if ($flash['type'] === 'success'): ?>
+        <polyline points="20 6 9 17 4 12"/>
+        <?php elseif ($flash['type'] === 'error'): ?>
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        <?php else: ?>
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        <?php endif; ?>
+    </svg>
+    <?= clean($flash['message']) ?>
+    <button onclick="this.parentElement.remove()" class="flash-close">×</button>
+</div>
+<?php endif; ?>
+
+<main class="page-content">
