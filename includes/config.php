@@ -35,8 +35,10 @@ define('PROFILE_UPLOAD_URL', BASE_URL . 'uploads/profiles/');
 define('APP_TIMEZONE', 'Africa/Kampala');
 define('APP_TIMEZONE_ABBR', 'EAT');
 define('APP_TIMEZONE_OFFSET', '+03:00');
-define('SESSION_IDLE_TIMEOUT', max(60, (int)appConfigValue('APP_SESSION_IDLE_TIMEOUT', 'APP_SESSION_IDLE_TIMEOUT', 3600)));
-define('SESSION_REGENERATE_INTERVAL', max(60, (int)appConfigValue('APP_SESSION_REGENERATE_INTERVAL', 'APP_SESSION_REGENERATE_INTERVAL', 600)));
+$sessionIdleTimeout = (int)appConfigValue('APP_SESSION_IDLE_TIMEOUT', 'APP_SESSION_IDLE_TIMEOUT', 420);
+define('SESSION_IDLE_TIMEOUT', min(420, max(60, $sessionIdleTimeout)));
+$sessionRegenerateInterval = (int)appConfigValue('APP_SESSION_REGENERATE_INTERVAL', 'APP_SESSION_REGENERATE_INTERVAL', 300);
+define('SESSION_REGENERATE_INTERVAL', min(SESSION_IDLE_TIMEOUT, max(60, $sessionRegenerateInterval)));
 
 date_default_timezone_set(APP_TIMEZONE);
 

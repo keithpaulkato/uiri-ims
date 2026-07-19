@@ -128,6 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    initializeSessionIdleGuard();
     initializeUgandanPhoneInputs();
 
     const valueTarget = document.getElementById('inventoryValueCounter');
@@ -205,6 +206,72 @@ document.addEventListener('DOMContentLoaded', function () {
     restoreSidebarWidth();
     initializeSidebarResizer();
 });
+
+function initializeSessionIdleGuard() {
+    const config = window.UIRI_SESSION || {};
+    const idleTimeoutMs = Number(config.idleTimeoutMs || 0);
+    if (!idleTimeoutMs || !config.timeoutUrl) return;
+
+    let idleTimer = null;
+    let lastActivityHandledAt = 0;
+    let lastKeepaliveAt = 0;
+    let keepaliveInFlight = false;
+    const keepaliveIntervalMs = Math.min(300000, Math.max(60000, Math.floor(idleTimeoutMs / 3)));
+
+    const expireSession = () => {
+        window.location.replace(config.timeoutUrl);
+    };
+
+    const refreshServerSession = () => {
+        if (!config.keepaliveUrl || keepaliveInFlight) return;
+
+        const now = Date.now();
+        if (now - lastKeepaliveAt < keepaliveIntervalMs) return;
+
+        lastKeepaliveAt = now;
+        keepaliveInFlight = true;
+
+        fetch(config.keepaliveUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            keepalive: true,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(response => {
+            if (response.status === 401) {
+                window.location.replace(config.expiredUrl || config.timeoutUrl);
+            }
+        }).catch(() => {
+            // The local idle timer still protects the page if a background ping fails.
+        }).finally(() => {
+            keepaliveInFlight = false;
+        });
+    };
+
+    const resetIdleTimer = () => {
+        window.clearTimeout(idleTimer);
+        idleTimer = window.setTimeout(expireSession, idleTimeoutMs);
+        refreshServerSession();
+    };
+
+    const handleActivity = () => {
+        const now = Date.now();
+        if (now - lastActivityHandledAt < 1000) return;
+        lastActivityHandledAt = now;
+        resetIdleTimer();
+    };
+
+    ['click', 'keydown', 'input', 'pointerdown', 'pointermove', 'scroll', 'touchstart'].forEach(eventName => {
+        document.addEventListener(eventName, handleActivity, { passive: true });
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) handleActivity();
+    });
+
+    window.addEventListener('pageshow', resetIdleTimer);
+    resetIdleTimer();
+}
 
 function normalizeUgandanPhoneValue(value, keepPrefix) {
     let digits = String(value || '').replace(/\D+/g, '');
