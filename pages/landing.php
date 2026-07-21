@@ -153,9 +153,9 @@ endAuthenticatedSession('Session closed after returning to the public landing pa
             background-image:
                 linear-gradient(90deg, rgba(6,27,51,.94) 0%, rgba(6,27,51,.78) 43%, rgba(6,27,51,.28) 100%),
                 linear-gradient(180deg, rgba(6,27,51,.16) 0%, rgba(6,27,51,.76) 100%),
-                url("https://uiri.go.ug/images/news/laborexpo.jpg");
+                url("../assets/img/hero-technician.jpg");
             background-size: cover;
-            background-position: center;
+            background-position: center 25%;
         }
 
         .hero::after {
@@ -456,9 +456,9 @@ endAuthenticatedSession('Session closed after returning to the public landing pa
             border-radius: 8px;
             background-image:
                 linear-gradient(180deg, rgba(9,34,63,.05), rgba(9,34,63,.62)),
-                url("https://uiri.go.ug/images/news/laborexpo.jpg");
+                url("../assets/img/system-architecture.jpg");
             background-size: cover;
-            background-position: center;
+            background-position: center 30%;
             overflow: hidden;
             display: flex;
             align-items: end;
