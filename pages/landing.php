@@ -151,11 +151,12 @@ endAuthenticatedSession('Session closed after returning to the public landing pa
             inset: 0;
             z-index: -2;
             background-image:
-                linear-gradient(90deg, rgba(6,27,51,.94) 0%, rgba(6,27,51,.78) 43%, rgba(6,27,51,.28) 100%),
-                linear-gradient(180deg, rgba(6,27,51,.16) 0%, rgba(6,27,51,.76) 100%),
+                linear-gradient(90deg, rgba(6,27,51,.95) 0%, rgba(6,27,51,.84) 38%, rgba(6,27,51,.12) 65%, rgba(6,27,51,0) 100%),
+                linear-gradient(180deg, rgba(6,27,51,0) 0%, rgba(6,27,51,0) 65%, rgba(6,27,51,.55) 100%),
                 url("../assets/img/hero-technician.jpg");
             background-size: cover;
             background-position: center 25%;
+            filter: brightness(1.16) contrast(1.08) saturate(1.06);
         }
 
         .hero::after {
