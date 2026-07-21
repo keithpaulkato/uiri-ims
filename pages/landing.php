@@ -456,9 +456,9 @@ endAuthenticatedSession('Session closed after returning to the public landing pa
             border-radius: 8px;
             background-image:
                 linear-gradient(180deg, rgba(9,34,63,.05), rgba(9,34,63,.62)),
-                url("../assets/img/system-architecture.jpg");
+                url("https://uiri.go.ug/images/news/laborexpo.jpg");
             background-size: cover;
-            background-position: center 30%;
+            background-position: center;
             overflow: hidden;
             display: flex;
             align-items: end;
